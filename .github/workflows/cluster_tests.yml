@@ -2,6 +2,7 @@ name: Root Service Manager Test
 
 on: push
 
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,16 +18,16 @@ jobs:
           python-version: "3.x"
 
       - name: Install pytest
-        working-directory: root-service-manager/service-manager
+        working-directory: cluster-service-manager/service-manager
         run: |
           pip install pytest
 
       - name: Install dependencies
-        working-directory: root-service-manager/service-manager
+        working-directory: cluster-service-manager/service-manager
         run: |
           pip install -r requirements.txt
 
       - name: Run test suite
-        working-directory: root-service-manager/service-manager
+        working-directory: cluster-service-manager/service-manager
         run: |
            pytest
