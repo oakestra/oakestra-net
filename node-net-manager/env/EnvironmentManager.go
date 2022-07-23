@@ -8,8 +8,6 @@ import (
 	"NetManager/network"
 	"errors"
 	"fmt"
-	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netns"
 	"log"
 	"net"
 	"os"
@@ -18,6 +16,9 @@ import (
 	"runtime/debug"
 	"strconv"
 	"sync"
+
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 )
 
 const NamespaceAlreadyDeclared string = "namespace already declared"
@@ -241,6 +242,42 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		return nil, err
 	}
 
+	//Create Bridge and tap within Ns
+	labr := netlink.NewLinkAttrs()
+	labr.Name = "virbr0"
+	bridge := &netlink.Bridge{LinkAttrs: labr}
+	lat := netlink.NewLinkAttrs()
+	lat.Name = "tap0"
+	tap := &netlink.Tuntap{LinkAttrs: lat}
+	env.execInsideNsByName(sname, func() error {
+		//Create Bridge
+		err := netlink.LinkAdd(bridge)
+		if err != nil {
+			log.Printf("Unable to create Bridge: %v\n", err)
+			return err
+		}
+		//Set IP on Bridge
+		addrbr, _ := netlink.ParseAddr("192.168.1.1/24")
+		err = netlink.AddrAdd(bridge, addrbr)
+		if err != nil {
+			log.Printf("Unable to add ip address to bridge: %v\n", err)
+			return err
+		}
+		//Create tap for Qemu
+		err = netlink.LinkAdd(tap)
+		if err != nil {
+			log.Printf("Unable to create Tap: %v\n", err)
+			return err
+		}
+		//Attach tap to Bridge
+		if netlink.LinkSetMaster(tap, bridge) != nil {
+			log.Printf("Unable to set master to tap: %v\n", err)
+			return err
+		}
+
+		return nil
+	})
+
 	env.BookVethNumber()
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
@@ -377,6 +414,26 @@ func (env *Environment) addPeerLinkNetwork(nspid int, addr string, vethname stri
 	return err
 }
 
+// setup the address of the network namespace veth based on Ns name
+func (env *Environment) addPeerLinkNetworkByNsName(NsName string, addr string, vethname string) error {
+	netlinkAddr, err := netlink.ParseAddr(addr)
+	if err != nil {
+		return err
+	}
+	err = env.execInsideNsByName(NsName, func() error {
+		link, err := netlink.LinkByName(vethname)
+		if err != nil {
+			return err
+		}
+		err = netlink.AddrAdd(link, netlinkAddr)
+		if err == nil {
+			err = netlink.LinkSetUp(link)
+		}
+		return err
+	})
+	return err
+}
+
 // Execute function inside a namespace
 func (env *Environment) execInsideNs(pid int, function func() error) error {
 	var containerNs netns.NsHandle
@@ -388,6 +445,28 @@ func (env *Environment) execInsideNs(pid int, function func() error) error {
 	if err == nil {
 		defer stdNetns.Close()
 		containerNs, err = netns.GetFromPid(pid)
+		if err == nil {
+			defer netns.Set(stdNetns)
+			err = netns.Set(containerNs)
+			if err == nil {
+				err = function()
+			}
+		}
+	}
+	return err
+}
+
+// Execute function inside a namespace based on Ns name
+func (env *Environment) execInsideNsByName(Nsname string, function func() error) error {
+	var containerNs netns.NsHandle
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	stdNetns, err := netns.Get()
+	if err == nil {
+		defer stdNetns.Close()
+		containerNs, err = netns.GetFromName(Nsname)
 		if err == nil {
 			defer netns.Set(stdNetns)
 			err = netns.Set(containerNs)
@@ -559,4 +638,153 @@ func (env *Environment) generateAddress() (net.IP, error) {
 
 func (env *Environment) freeContainerAddress(ip net.IP) {
 	env.addrCache = append(env.addrCache, ip)
+}
+
+/*
+	Unikernel
+*/
+
+func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string) (net.IP, error) {
+
+	cleanup := func(veth *netlink.Veth) {
+		_ = netlink.LinkDel(veth)
+	}
+
+	log.Println("Creating veth pair for unikernel deployment")
+	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
+	if err != nil {
+		cleanup(vethIfce)
+		return nil, err
+	}
+
+	peerVeth, err := netlink.LinkByName(vethIfce.PeerName)
+	if err != nil {
+		cleanup(vethIfce)
+		return nil, err
+	}
+	log.Println("Creating Namespace for unikernel")
+	ns, err := netns.NewNamed(sname)
+	if err != nil {
+		cleanup(vethIfce)
+		return nil, err
+	}
+	if err := netlink.LinkSetNsFd(peerVeth, int(ns)); err != nil {
+		cleanup(vethIfce)
+		return nil, err
+	}
+
+	//Get IP for veth interface
+	ip, err := env.generateAddress()
+	if err != nil {
+		cleanup(vethIfce)
+		return nil, err
+	}
+	if err := env.addPeerLinkNetworkByNsName(sname, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		return nil, err
+	}
+
+	//Create Bridge and tap within Ns
+	labr := netlink.NewLinkAttrs()
+	labr.Name = "virbr0"
+	bridge := &netlink.Bridge{LinkAttrs: labr}
+	lat := netlink.NewLinkAttrs()
+	lat.Name = "tap0"
+	tap := &netlink.Tuntap{LinkAttrs: lat}
+	err = env.execInsideNsByName(sname, func() error {
+		//Create Bridge
+		err := netlink.LinkAdd(bridge)
+		if err != nil {
+			log.Printf("Unable to create Bridge: %v\n", err)
+			return err
+		}
+		//Set IP on Bridge
+		addrbr, _ := netlink.ParseAddr("192.168.1.1/24")
+		err = netlink.AddrAdd(bridge, addrbr)
+		if err != nil {
+			log.Printf("Unable to add ip address to bridge: %v\n", err)
+			return err
+		}
+		//Create tap for Qemu
+		err = netlink.LinkAdd(tap)
+		if err != nil {
+			log.Printf("Unable to create Tap: %v\n", err)
+			return err
+		}
+		//Attach tap to Bridge
+		if netlink.LinkSetMaster(tap, bridge) != nil {
+			log.Printf("Unable to set master to tap: %v\n", err)
+			return err
+		}
+
+		//Set route for Ns
+		dst, err := netlink.ParseIPNet("0.0.0.0/0")
+		if err != nil {
+			return err
+		}
+		err = netlink.RouteAdd(&netlink.Route{
+			LinkIndex: peerVeth.Attrs().Index,
+			Dst:       dst,
+			Gw:        ip,
+		})
+		if err != nil {
+			log.Printf("Failed to set route in Ns: %v", err)
+			return err
+		}
+
+		//Set NAT for VM
+		cmd := exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vethIfce.PeerName, "-j", "SNAT", "--to", ip.String())
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+		//TODO Portmapping
+		cmd = exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-i", vethIfce.PeerName, "-j", "DNAT", "--to", ip.String())
+
+		return nil
+	})
+	if err != nil {
+		log.Printf("Failed to configure Ns for Unikernel\n")
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		return nil, err
+	}
+
+	env.BookVethNumber()
+
+	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
+		env.freeContainerAddress(ip)
+		cleanup(vethIfce)
+		return nil, err
+	}
+
+	if err = network.ManageContainerPorts(ip.String(), portmapping, network.OpenPorts); err != nil {
+		debug.PrintStack()
+		env.freeContainerAddress(ip)
+		cleanup(vethIfce)
+		return nil, err
+	}
+
+	env.deployedServices[sname] = service{
+		ip:          ip,
+		sname:       sname,
+		portmapping: portmapping,
+		veth:        vethIfce,
+	}
+
+	return ip, nil
+
+}
+
+func (env *Environment) DeleteUnikernelNamespace(sname string) {
+	s, ok := env.deployedServices[sname]
+	if ok {
+		_ = env.translationTable.RemoveByNsip(s.ip)
+		delete(env.deployedServices, sname)
+		env.freeContainerAddress(s.ip)
+		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
+		_ = netlink.LinkDel(s.veth)
+		_ = netns.DeleteNamed(sname)
+	}
 }

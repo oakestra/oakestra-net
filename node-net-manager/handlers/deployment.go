@@ -4,8 +4,10 @@ import (
 	"NetManager/env"
 	"NetManager/logger"
 	"NetManager/mqtt"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -17,6 +19,7 @@ type ContainerDeployTask struct {
 	ServiceName    string `json:"serviceName"`
 	Instancenumber int    `json:"instanceNumber"`
 	PortMappings   string `json:"portMappings"`
+	IsUnikernel    bool   `json:"isUnikernel,omitempty"`
 	PublicAddr     string
 	PublicPort     string
 	Env            *env.Environment
@@ -37,6 +40,18 @@ type DeployTaskQueue interface {
 	NewTask(request *ContainerDeployTask)
 }
 
+/*
+type UnikernelDeployRequest struct {
+	ServiceName    string `json:"serviceName"`
+	Instancenumber int    `json:"instanceNumber"`
+	PortMappings   string `json:"portMappings"` //Not really possible I think / Depends on the Unikernel
+	PublicAddr     string
+	PublicPort     string
+	Env            *env.Environment
+	Writer         *http.ResponseWriter
+	Finish         chan bool
+}
+*/
 var once sync.Once
 var taskQueue deployTaskQueue
 
@@ -113,4 +128,48 @@ func updateInternalProxyDataStructures(requestStruct *ContainerDeployTask) {
 		requestStruct.Env.RefreshServiceTable(requestStruct.ServiceName)
 		mqtt.MqttRegisterInterest(requestStruct.ServiceName, requestStruct.Env, requestStruct.Instancenumber)
 	}
+}
+
+func deploymentHandlerUnikernel(requestStruct *ContainerDeployRequest) {
+	writer := *requestStruct.Writer
+	appCompleteName := strings.Split(requestStruct.ServiceName, ".")
+	if len(appCompleteName) != 4 {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	//Create Ns and bridge/tap to deploy the Unikernel
+	addr, err := requestStruct.Env.CreateUnikernelNetwork(requestStruct.ServiceName, requestStruct.PortMappings)
+	if err != nil {
+		log.Println("Failed to Create Network for Unikernel environment: ", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	//notify net-component
+	mqtt.NotifyDeploymentStatus(
+		requestStruct.ServiceName,
+		"DEPLOYED",
+		requestStruct.Instancenumber,
+		addr.String(),
+		requestStruct.PublicAddr,
+		requestStruct.PublicPort,
+	)
+	//update internal table entry
+	requestStruct.Env.RefreshServiceTable(requestStruct.ServiceName)
+
+	mqtt.MqttRegisterInterest(requestStruct.ServiceName, requestStruct.Env)
+
+	//answer the caller
+	response := DeployResponse{
+		ServiceName: requestStruct.ServiceName,
+		NsAddress:   addr.String(),
+	}
+
+	log.Println("Response to /unikernel/deploy: ", response)
+
+	writer.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(writer).Encode(response)
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+	}
+
 }

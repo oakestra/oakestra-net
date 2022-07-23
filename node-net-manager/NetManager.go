@@ -11,11 +11,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/tkanos/gonfig"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/tkanos/gonfig"
 )
 
 type undeployRequest struct {
@@ -46,6 +48,8 @@ func handleRequests(port int) {
 	netRouter.HandleFunc("/container/deploy", containerDeploy).Methods("POST")
 	netRouter.HandleFunc("/docker/undeploy", containerUndeploy).Methods("POST")
 	netRouter.HandleFunc("/container/undeploy", containerUndeploy).Methods("POST")
+	netRouter.HandleFunc("/unikernel/deploy", CreateUnikernelNamesapce).Methods("POST")
+	netRouter.HandleFunc("/unikernel/undeploy", DeleteUnikernelNamespace).Methods("POST")
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 }
 
@@ -230,6 +234,66 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	//initialize the Env Manager
 	Env = env.NewEnvironmentClusterConfigured(Proxy.HostTUNDeviceName)
 	Proxy.SetEnvironment(Env)
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+/*
+Endpoint: /unikernel/generate
+Usage: Used to generate the network for the unikernel.
+Method: POST
+Request Json:
+	{
+		client_id:string # id of the worker node
+	}
+Response: TODO
+*/
+
+func CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request) {
+	log.Println("Received HTTP request - /unikernel/generate")
+
+	if WorkerID == "" {
+		log.Printf("[ERROR] Node not initialized")
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	reqBody, _ := ioutil.ReadAll(request.Body)
+	log.Println("ReqBody received :", reqBody)
+	var requestStruct handlers.ContainerDeployRequest
+	err := json.Unmarshal(reqBody, &requestStruct)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+	}
+	requestStruct.PublicAddr = Configuration.NodePublicAddress
+	requestStruct.PublicPort = Configuration.NodePublicPort
+	requestStruct.Env = Env
+	requestStruct.Writer = &writer
+	requestStruct.Finish = make(chan bool, 0)
+	log.Println(requestStruct)
+	handlers.NewDeployTaskQueue().NewTask(&requestStruct)
+	<-requestStruct.Finish
+}
+
+func DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request) {
+	log.Println("Received HTTP request - /docker/undeploy ")
+
+	if WorkerID == "" {
+		log.Printf("[ERROR] Node not initialized")
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	reqBody, _ := ioutil.ReadAll(request.Body)
+	var requestStruct undeployRequest
+	err := json.Unmarshal(reqBody, &requestStruct)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+	}
+
+	log.Println(requestStruct)
+
+	Env.DetachContainer(requestStruct.Servicename)
 
 	writer.WriteHeader(http.StatusOK)
 }
