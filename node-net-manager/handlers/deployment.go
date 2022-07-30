@@ -5,7 +5,10 @@ import (
 	"NetManager/logger"
 	"NetManager/mqtt"
 	"encoding/json"
+<<<<<<< HEAD
 	"errors"
+=======
+>>>>>>> 8ebdcb7 (Unikernel Undeploy; Fix for the nat in the namespace)
 	"fmt"
 	"log"
 	"net"
@@ -138,7 +141,8 @@ func deploymentHandlerUnikernel(requestStruct *ContainerDeployRequest) {
 		return
 	}
 	//Create Ns and bridge/tap to deploy the Unikernel
-	addr, err := requestStruct.Env.CreateUnikernelNetwork(requestStruct.ServiceName, requestStruct.PortMappings)
+	name := fmt.Sprintf("%s.instance.%d", requestStruct.ServiceName, requestStruct.Instancenumber)
+	addr, err := requestStruct.Env.CreateUnikernelNetwork(name, requestStruct.PortMappings)
 	if err != nil {
 		log.Println("Failed to Create Network for Unikernel environment: ", err)
 		writer.WriteHeader(http.StatusBadRequest)

@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os/exec"
 
 	"github.com/gorilla/mux"
 	"github.com/tkanos/gonfig"
@@ -239,18 +240,19 @@ func register(writer http.ResponseWriter, request *http.Request) {
 }
 
 /*
-Endpoint: /unikernel/generate
-Usage: Used to generate the network for the unikernel.
+Endpoint: /unikernel/delpoy
+Usage: used to create the network for the unikernel.
 Method: POST
 Request Json:
 	{
 		client_id:string # id of the worker node
+		#TODO
 	}
 Response: TODO
 */
 
 func CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request) {
-	log.Println("Received HTTP request - /unikernel/generate")
+	log.Println("Received HTTP request - /unikernel/deploy")
 
 	if WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
@@ -275,8 +277,19 @@ func CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request)
 	<-requestStruct.Finish
 }
 
+/*
+Endpoint: /unikernel/undeploy
+Usage: used to remove the network from the unikernel env and delete the namespace associated with the unikernel.
+Method: POST
+Request Json:
+	{
+		serviceName:string #name used to register the service in the first place
+	}
+Response: 200 OK or Failure code
+*/
+
 func DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request) {
-	log.Println("Received HTTP request - /docker/undeploy ")
+	log.Println("Received HTTP request - /unikernel/undeploy ")
 
 	if WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
@@ -294,6 +307,13 @@ func DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request)
 	log.Println(requestStruct)
 
 	Env.DetachContainer(requestStruct.Servicename)
+
+	//Delete Namespace
+	cmd := exec.Command("ip", "netns", "del", requestStruct.Servicename)
+	err = cmd.Run()
+	if err != nil {
+		log.Printf("Failed to delete Namespace %s: %v", requestStruct.Servicename, err)
+	}
 
 	writer.WriteHeader(http.StatusOK)
 }

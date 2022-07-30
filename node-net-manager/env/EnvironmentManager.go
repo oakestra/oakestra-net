@@ -662,13 +662,24 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 		cleanup(vethIfce)
 		return nil, err
 	}
+
 	log.Println("Creating Namespace for unikernel")
-	ns, err := netns.NewNamed(sname)
+	nscreation := exec.Command("ip", "netns", "add", sname)
+	err = nscreation.Run()
+	//ns, err := netns.NewNamed(sname) ## Changes Namespace of current application
 	if err != nil {
 		cleanup(vethIfce)
 		return nil, err
 	}
+	ns, err := netns.GetFromName(sname)
+	l, err := netlink.LinkList()
+	for _, link := range l {
+
+		log.Printf("%s", link.Attrs().Name)
+	}
+
 	if err := netlink.LinkSetNsFd(peerVeth, int(ns)); err != nil {
+		log.Fatalf("Error %s: %v", peerVeth.Attrs().Name, err)
 		cleanup(vethIfce)
 		return nil, err
 	}
@@ -680,18 +691,20 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 		return nil, err
 	}
 	if err := env.addPeerLinkNetworkByNsName(sname, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
+		log.Println("Unable to configure Peer")
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
 		return nil, err
 	}
 
 	//Create Bridge and tap within Ns
+	log.Println("Creating Bridge and Tap inside of Ns")
 	labr := netlink.NewLinkAttrs()
 	labr.Name = "virbr0"
 	bridge := &netlink.Bridge{LinkAttrs: labr}
 	lat := netlink.NewLinkAttrs()
 	lat.Name = "tap0"
-	tap := &netlink.Tuntap{LinkAttrs: lat}
+	tap := &netlink.Tuntap{LinkAttrs: lat, Mode: netlink.TUNTAP_MODE_TAP}
 	err = env.execInsideNsByName(sname, func() error {
 		//Create Bridge
 		err := netlink.LinkAdd(bridge)
@@ -718,6 +731,18 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 			return err
 		}
 
+		//ip link set up virbr0/tap0
+		cmd := exec.Command("ip", "link", "set", "up", "dev", "virbr0")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+		cmd = exec.Command("ip", "link", "set", "up", "dev", "tap0")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+
 		//Set route for Ns
 		dst, err := netlink.ParseIPNet("0.0.0.0/0")
 		if err != nil {
@@ -734,14 +759,16 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 		}
 
 		//Set NAT for VM
-		cmd := exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vethIfce.PeerName, "-j", "SNAT", "--to", ip.String())
+		cmd = exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vethIfce.PeerName, "-j", "SNAT", "--to", ip.String())
 		err = cmd.Run()
 		if err != nil {
 			return err
 		}
-		//TODO Portmapping
-		cmd = exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-i", vethIfce.PeerName, "-j", "DNAT", "--to", ip.String())
-
+		cmd = exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-i", vethIfce.PeerName, "-j", "DNAT", "--to", "192.168.1.2")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -772,7 +799,7 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 		portmapping: portmapping,
 		veth:        vethIfce,
 	}
-
+	log.Println("Successful Network creation for Unikernel")
 	return ip, nil
 
 }
