@@ -5,10 +5,7 @@ import (
 	"NetManager/logger"
 	"NetManager/mqtt"
 	"encoding/json"
-<<<<<<< HEAD
 	"errors"
-=======
->>>>>>> 8ebdcb7 (Unikernel Undeploy; Fix for the nat in the namespace)
 	"fmt"
 	"log"
 	"net"

@@ -7,10 +7,6 @@ import (
 	"NetManager/network"
 	"errors"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/ip4defrag"
-	"github.com/google/gopacket/layers"
-	"github.com/songgao/water"
 	"log"
 	"math/rand"
 	"net"
@@ -18,6 +14,11 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/ip4defrag"
+	"github.com/google/gopacket/layers"
+	"github.com/songgao/water"
 )
 
 // Ipv4 defragger
