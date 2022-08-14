@@ -241,14 +241,14 @@ func register(writer http.ResponseWriter, request *http.Request) {
 
 /*
 Endpoint: /unikernel/delpoy
-Usage: used to create the network for the unikernel.
+Usage: used to create the network for the unikernel. Including a namespace, bridge and tap device
 Method: POST
 Request Json:
 	{
 		client_id:string # id of the worker node
 		#TODO
 	}
-Response: TODO
+Response: 200 or Failure code
 */
 
 func CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request) {
@@ -283,9 +283,9 @@ Usage: used to remove the network from the unikernel env and delete the namespac
 Method: POST
 Request Json:
 	{
-		serviceName:string #name used to register the service in the first place
+		serviceName:string #name used to register the service in a unikernel deploy request
 	}
-Response: 200 OK or Failure code
+Response: 200 or Failure code
 */
 
 func DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request) {
