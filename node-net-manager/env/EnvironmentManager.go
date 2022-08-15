@@ -654,6 +654,7 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
 	if err != nil {
 		cleanup(vethIfce)
+		log.Printf("%v", err)
 		return nil, err
 	}
 
@@ -663,7 +664,7 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 		return nil, err
 	}
 
-	log.Println("Creating Namespace for unikernel")
+	log.Printf("Creating Namespace for unikernel (%s)", sname)
 	nscreation := exec.Command("ip", "netns", "add", sname)
 	err = nscreation.Run()
 	//ns, err := netns.NewNamed(sname) ## Changes Namespace of current application
