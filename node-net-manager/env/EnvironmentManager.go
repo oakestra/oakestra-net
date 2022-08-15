@@ -672,14 +672,22 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 		return nil, err
 	}
 	ns, err := netns.GetFromName(sname)
-	l, err := netlink.LinkList()
-	for _, link := range l {
+	if err != nil {
+		log.Printf("Unable to find namespace: %v", err)
+		return nil, err
+	}
 
-		log.Printf("%s", link.Attrs().Name)
+	cleanup = func(veth *netlink.Veth) {
+		_ = netlink.LinkDel(veth)
+		ns.Close()
+		err = netns.DeleteNamed(sname)
+		if err != nil {
+			log.Printf("Unable to delete namespace: %v", err)
+		}
 	}
 
 	if err := netlink.LinkSetNsFd(peerVeth, int(ns)); err != nil {
-		log.Fatalf("Error %s: %v", peerVeth.Attrs().Name, err)
+		log.Printf("Error %s: %v", peerVeth.Attrs().Name, err)
 		cleanup(vethIfce)
 		return nil, err
 	}
@@ -758,7 +766,7 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 			return err
 		}
 
-		//Set NAT for VM
+		//Set NAT for Unikernel
 		cmd = exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vethIfce.PeerName, "-j", "SNAT", "--to", ip.String())
 		err = cmd.Run()
 		if err != nil {
@@ -804,14 +812,15 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 
 }
 
-func (env *Environment) DeleteUnikernelNamespace(sname string) {
-	s, ok := env.deployedServices[sname]
+func (env *Environment) DeleteUnikernelNamespace(sname string, instance int) {
+	name := fmt.Sprintf("%s.instance.%d", sname, instance)
+	s, ok := env.deployedServices[name]
 	if ok {
 		_ = env.translationTable.RemoveByNsip(s.ip)
-		delete(env.deployedServices, sname)
+		delete(env.deployedServices, name)
 		env.freeContainerAddress(s.ip)
 		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
-		_ = netns.DeleteNamed(sname)
+		_ = netns.DeleteNamed(name)
 	}
 }

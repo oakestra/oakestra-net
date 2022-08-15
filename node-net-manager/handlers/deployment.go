@@ -40,18 +40,6 @@ type DeployTaskQueue interface {
 	NewTask(request *ContainerDeployTask)
 }
 
-/*
-type UnikernelDeployRequest struct {
-	ServiceName    string `json:"serviceName"`
-	Instancenumber int    `json:"instanceNumber"`
-	PortMappings   string `json:"portMappings"` //Not really possible I think / Depends on the Unikernel
-	PublicAddr     string
-	PublicPort     string
-	Env            *env.Environment
-	Writer         *http.ResponseWriter
-	Finish         chan bool
-}
-*/
 var once sync.Once
 var taskQueue deployTaskQueue
 

@@ -15,7 +15,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os/exec"
 
 	"github.com/gorilla/mux"
 	"github.com/tkanos/gonfig"
@@ -261,7 +260,7 @@ func CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request)
 	}
 
 	reqBody, _ := ioutil.ReadAll(request.Body)
-	log.Println("ReqBody received :", reqBody)
+	log.Printf("ReqBody received :%s", reqBody)
 	var requestStruct handlers.ContainerDeployRequest
 	err := json.Unmarshal(reqBody, &requestStruct)
 	if err != nil {
@@ -289,7 +288,7 @@ Response: 200 or Failure code
 */
 
 func DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request) {
-	log.Println("Received HTTP request - /unikernel/undeploy ")
+	log.Println("Received HTTP request - /unikernel/undeploy")
 
 	if WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
@@ -306,14 +305,7 @@ func DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request)
 
 	log.Println(requestStruct)
 
-	Env.DetachContainer(requestStruct.Servicename)
-
-	//Delete Namespace
-	cmd := exec.Command("ip", "netns", "del", requestStruct.Servicename)
-	err = cmd.Run()
-	if err != nil {
-		log.Printf("Failed to delete Namespace %s: %v", requestStruct.Servicename, err)
-	}
+	Env.DeleteUnikernelNamespace(requestStruct.Servicename, requestStruct.Instancenumber)
 
 	writer.WriteHeader(http.StatusOK)
 }
