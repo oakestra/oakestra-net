@@ -721,10 +721,11 @@ func (env *Environment) CreateUnikernelNetwork(sname string, name string, portma
 		if err != nil {
 			return err
 		}
+
 		err = netlink.RouteAdd(&netlink.Route{
 			LinkIndex: peerVeth.Attrs().Index,
 			Dst:       dst,
-			Gw:        ip,
+			Gw:        net.ParseIP(env.config.HostBridgeIP),
 		})
 		if err != nil {
 			log.Printf("Failed to set route in Ns: %v", err)
