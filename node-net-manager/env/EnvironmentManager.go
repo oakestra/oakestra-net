@@ -242,42 +242,6 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		return nil, err
 	}
 
-	//Create Bridge and tap within Ns
-	labr := netlink.NewLinkAttrs()
-	labr.Name = "virbr0"
-	bridge := &netlink.Bridge{LinkAttrs: labr}
-	lat := netlink.NewLinkAttrs()
-	lat.Name = "tap0"
-	tap := &netlink.Tuntap{LinkAttrs: lat}
-	env.execInsideNsByName(sname, func() error {
-		//Create Bridge
-		err := netlink.LinkAdd(bridge)
-		if err != nil {
-			log.Printf("Unable to create Bridge: %v\n", err)
-			return err
-		}
-		//Set IP on Bridge
-		addrbr, _ := netlink.ParseAddr("192.168.1.1/24")
-		err = netlink.AddrAdd(bridge, addrbr)
-		if err != nil {
-			log.Printf("Unable to add ip address to bridge: %v\n", err)
-			return err
-		}
-		//Create tap for Qemu
-		err = netlink.LinkAdd(tap)
-		if err != nil {
-			log.Printf("Unable to create Tap: %v\n", err)
-			return err
-		}
-		//Attach tap to Bridge
-		if netlink.LinkSetMaster(tap, bridge) != nil {
-			log.Printf("Unable to set master to tap: %v\n", err)
-			return err
-		}
-
-		return nil
-	})
-
 	env.BookVethNumber()
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
