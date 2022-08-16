@@ -127,7 +127,7 @@ func deploymentHandlerUnikernel(requestStruct *ContainerDeployRequest) {
 	}
 	//Create Ns and bridge/tap to deploy the Unikernel
 	name := fmt.Sprintf("%s.instance.%d", requestStruct.ServiceName, requestStruct.Instancenumber)
-	addr, err := requestStruct.Env.CreateUnikernelNetwork(name, requestStruct.PortMappings)
+	addr, err := requestStruct.Env.CreateUnikernelNetwork(name, requestStruct.ServiceName, requestStruct.PortMappings)
 	if err != nil {
 		log.Println("Failed to Create Network for Unikernel environment: ", err)
 		writer.WriteHeader(http.StatusBadRequest)

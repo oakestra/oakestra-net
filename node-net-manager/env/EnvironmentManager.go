@@ -644,7 +644,7 @@ func (env *Environment) freeContainerAddress(ip net.IP) {
 	Unikernel
 */
 
-func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string) (net.IP, error) {
+func (env *Environment) CreateUnikernelNetwork(sname string, name string, portmapping string) (net.IP, error) {
 
 	cleanup := func(veth *netlink.Veth) {
 		_ = netlink.LinkDel(veth)
@@ -804,7 +804,7 @@ func (env *Environment) CreateUnikernelNetwork(sname string, portmapping string)
 
 	env.deployedServices[sname] = service{
 		ip:          ip,
-		sname:       sname,
+		sname:       name,
 		portmapping: portmapping,
 		veth:        vethIfce,
 	}
