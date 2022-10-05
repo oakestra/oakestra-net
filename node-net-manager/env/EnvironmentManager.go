@@ -686,7 +686,7 @@ func (env *Environment) CreateUnikernelNetwork(sname string, name string, portma
 			return err
 		}
 		//Set IP on Bridge
-		addrbr, _ := netlink.ParseAddr("192.168.1.1/24")
+		addrbr, _ := netlink.ParseAddr("192.168.1.1/30")
 		err = netlink.AddrAdd(bridge, addrbr)
 		if err != nil {
 			log.Printf("Unable to add ip address to bridge: %v\n", err)
