@@ -117,5 +117,5 @@ func MqttIsInterestRegistered(jobName string) bool {
 func cleanInterestTowardsJob(jobName string) {
 	request := mqttInterestDeregisterRequest{Appname: jobName}
 	jsonreq, _ := json.Marshal(request)
-	PublishToBroker("interest/remove", string(jsonreq))
+	_ = PublishToBroker("interest/remove", string(jsonreq))
 }

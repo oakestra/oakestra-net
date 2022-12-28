@@ -58,7 +58,7 @@ type tableQueryRequest struct {
 /*------------------------------------------------------*/
 
 /*
-	returns a singleton pointer to an instance instance of the TableQueryRequestCache class
+returns a singleton pointer to an instance instance of the TableQueryRequestCache class
 */
 func GetTableQueryRequestCacheInstance() *TableQueryRequestCache {
 	once.Do(func() { // <-- atomic, does not allow repeating
@@ -73,9 +73,9 @@ func GetTableQueryRequestCacheInstance() *TableQueryRequestCache {
 }
 
 /*
-	Perform a table query by ServiceIp to the cluster manager
-	The call is blocking and awaits the response for a maximum of 10 seconds
-	set the force value to force the table query even in the event of interest already registered. Used in case of incoming updates notification.
+Perform a table query by ServiceIp to the cluster manager
+The call is blocking and awaits the response for a maximum of 10 seconds
+set the force value to force the table query even in the event of interest already registered. Used in case of incoming updates notification.
 */
 func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname string, force_optional ...bool) (TableQueryResponse, error) {
 	reqname := sip + sname
@@ -108,7 +108,7 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 		Sname: sname,
 		Sip:   sip,
 	})
-	PublishToBroker("tablequery/request", string(jsonreq))
+	_ = PublishToBroker("tablequery/request", string(jsonreq))
 
 	//waiting for maximum 5 seconds the mqtt handler to receive a response. Otherwise fail the tableQuery.
 	log.Printf("waiting for table query %s", reqname)
@@ -123,23 +123,23 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 }
 
 /*
-	Perform a table query by ServiceIp to the cluster manager
-	The call is blocking and awaits the response for a maximum of 5 seconds
+Perform a table query by ServiceIp to the cluster manager
+The call is blocking and awaits the response for a maximum of 5 seconds
 */
 func (cache *TableQueryRequestCache) TableQueryByIpRequestBlocking(sip string, force_optional ...bool) (TableQueryResponse, error) {
 	return cache.tableQueryRequestBlocking(sip, "", force_optional...)
 }
 
 /*
-	Perform a table query by ServiceName to the cluster manager
-	The call is blocking and awaits the response for a maximum of 5 seconds
+Perform a table query by ServiceName to the cluster manager
+The call is blocking and awaits the response for a maximum of 5 seconds
 */
 func (cache *TableQueryRequestCache) TableQueryByJobNameRequestBlocking(jobname string, force_optional ...bool) (TableQueryResponse, error) {
 	return cache.tableQueryRequestBlocking("", jobname, force_optional...)
 }
 
 /*
-	Handler used by the mqtt client to dispatch the table query result
+Handler used by the mqtt client to dispatch the table query result
 */
 func (cache *TableQueryRequestCache) TablequeryResultMqttHandler(client mqtt.Client, msg mqtt.Message) {
 	log.Printf("MQTT - Received mqtt table query message: %s", msg.Payload())
