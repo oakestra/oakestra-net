@@ -1,6 +1,7 @@
 package mqtt
 
 import (
+	"NetManager/logger"
 	"encoding/json"
 	"errors"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -167,8 +168,9 @@ func (cache *TableQueryRequestCache) TablequeryResultMqttHandler(client mqtt.Cli
 		channelList := cache.siprequests[key]
 		if channelList != nil {
 			for _, channel := range *channelList {
-				log.Printf("TableQuery response - notifying a channel regarding %s", key)
+				logger.DebugLogger().Printf("TableQuery response - notifying a channel regarding %s", key)
 				channel <- responseStruct
+				close(channel)
 			}
 		}
 		cache.siprequests[key] = nil

@@ -12,7 +12,7 @@ import (
 )
 
 var runningHandlers = utils.NewStringSlice()
-var startSync sync.Mutex
+var startSync sync.RWMutex
 
 type jobUpdatesTimer struct {
 	eventManager events.EventManager
@@ -99,15 +99,15 @@ func MqttRegisterInterest(jobName string, env jobEnvironmentManagerActions, inst
 	jobTimer.topic = "jobs/" + jobName + "/updates_available"
 	TOPICS[jobTimer.topic] = jobTimer.MessageHandler //adding the topic to the global topic list to be handled in case of disconnection
 	tqtoken := mainMqttClient.Subscribe(jobTimer.topic, 1, jobTimer.MessageHandler)
-	tqtoken.Wait()
+	tqtoken.WaitTimeout(time.Second * 5)
 	log.Printf("MQTT - Subscribed to %s ", jobTimer.topic)
 	runningHandlers.Add(jobTimer.job)
 	go jobTimer.startSelfDestructTimeout()
 }
 
 func MqttIsInterestRegistered(jobName string) bool {
-	startSync.Lock()
-	defer startSync.Unlock()
+	startSync.RLock()
+	defer startSync.RUnlock()
 	if runningHandlers.Exists(jobName) {
 		return true
 	}

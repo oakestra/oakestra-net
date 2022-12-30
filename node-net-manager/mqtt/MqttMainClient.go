@@ -1,6 +1,7 @@
 package mqtt
 
 import (
+	"NetManager/logger"
 	"fmt"
 	"github.com/eclipse/paho.mqtt.golang"
 	"log"
@@ -92,7 +93,7 @@ func runMqttClient(opts *mqtt.ClientOptions) {
 func PublishToBroker(topic string, payload string) error {
 	mqttWriteMutex.Lock()
 	defer mqttWriteMutex.Unlock()
-	log.Printf("MQTT - publish to - %s - the payload - %s", topic, payload)
+	logger.DebugLogger().Printf("MQTT - publish to - %s - the payload - %s", topic, payload)
 	token := mainMqttClient.Publish(fmt.Sprintf("nodes/%s/net/%s", clientID, topic), 1, false, payload)
 	if token.WaitTimeout(time.Second*5) && token.Error() != nil {
 		log.Printf("ERROR: MQTT PUBLISH: %s", token.Error())

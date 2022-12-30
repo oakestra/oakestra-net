@@ -61,10 +61,12 @@ func (t *deployTaskQueue) taskExecutor() {
 		case task := <-t.newTask:
 			//deploy the network stack in the container
 			addr, err := deploymentHandler(task)
-			//communicate the successful deployment
+			if err != nil {
+				logger.ErrorLogger().Println("[ERROR]: %v", err)
+			}
 			task.Finish <- TaskReady{
-				addr,
-				err,
+				IP:  addr,
+				Err: err,
 			}
 			//asynchronously update proxy tables
 			updateInternalProxyDataStructures(task)
@@ -73,12 +75,10 @@ func (t *deployTaskQueue) taskExecutor() {
 }
 
 func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
-	writer := *requestStruct.Writer
 
 	//get app full name
 	appCompleteName := strings.Split(requestStruct.ServiceName, ".")
 	if len(appCompleteName) != 4 {
-		writer.WriteHeader(http.StatusBadRequest)
 		return nil, errors.New(fmt.Sprintf("Invalid app name: %s", appCompleteName))
 	}
 
@@ -86,7 +86,6 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
 	addr, err := requestStruct.Env.AttachNetworkToContainer(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
-		writer.WriteHeader(http.StatusBadRequest)
 		return nil, err
 	}
 
@@ -101,7 +100,6 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
 	)
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
-		writer.WriteHeader(http.StatusBadRequest)
 		return nil, err
 	}
 
@@ -109,7 +107,10 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
 }
 
 func updateInternalProxyDataStructures(requestStruct *ContainerDeployTask) {
-	//update internal table entry
-	requestStruct.Env.RefreshServiceTable(requestStruct.ServiceName)
-	mqtt.MqttRegisterInterest(requestStruct.ServiceName, requestStruct.Env, requestStruct.Instancenumber)
+	//Update internal table entry if an interest has not been set already.
+	//Otherwise, do nothing, the net will autonomously update.
+	if !mqtt.MqttIsInterestRegistered(requestStruct.ServiceName) {
+		requestStruct.Env.RefreshServiceTable(requestStruct.ServiceName)
+		mqtt.MqttRegisterInterest(requestStruct.ServiceName, requestStruct.Env, requestStruct.Instancenumber)
+	}
 }
