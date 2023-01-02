@@ -221,7 +221,7 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	WorkerID = requestStruct.ClientID
 
 	//initialize mqtt connection to the broker
-	mqtt.InitMqtt(requestStruct.ClientID, Configuration.ClusterUrl, Configuration.ClusterMqttPort)
+	mqtt.InitNetMqttClient(requestStruct.ClientID, Configuration.ClusterUrl, Configuration.ClusterMqttPort)
 
 	//initialize the proxy tunnel
 	Proxy = proxy.New()

@@ -43,7 +43,7 @@ func RequestSubnetworkMqttBlocking() (string, error) {
 	request := mqttSubnetworkRequest{METHOD: "GET"}
 	jsonreq, _ := json.Marshal(request)
 	go func() {
-		_ = PublishToBroker("subnet", string(jsonreq))
+		_ = GetNetMqttClient().PublishToBroker("subnet", string(jsonreq))
 	}()
 
 	//waiting for maximum 10 seconds the mqtt handler to receive a response. Otherwise fail the subnetwork request.
@@ -69,5 +69,5 @@ func NotifyDeploymentStatus(appname string, status string, instance int, nsip st
 		Hostport:       hostport,
 	}
 	jsonreq, _ := json.Marshal(request)
-	return PublishToBroker("service/deployed", string(jsonreq))
+	return GetNetMqttClient().PublishToBroker("service/deployed", string(jsonreq))
 }

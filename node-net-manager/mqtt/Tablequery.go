@@ -91,7 +91,7 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 		return TableQueryResponse{}, errors.New("interest already registered")
 	}
 
-	responseChannel := make(chan TableQueryResponse, 2)
+	responseChannel := make(chan TableQueryResponse, 10)
 	var updatedRequests []chan TableQueryResponse
 
 	//appending response channel used by the Mqtt handler
@@ -109,7 +109,7 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 		Sname: sname,
 		Sip:   sip,
 	})
-	_ = PublishToBroker("tablequery/request", string(jsonreq))
+	_ = GetNetMqttClient().PublishToBroker("tablequery/request", string(jsonreq))
 
 	//waiting for maximum 5 seconds the mqtt handler to receive a response. Otherwise fail the tableQuery.
 	log.Printf("waiting for table query %s", reqname)
@@ -117,7 +117,7 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 	case result := <-responseChannel:
 		return result, nil
 	case <-time.After(10 * time.Second):
-		log.Printf("TIMEOUT - Table query without response, quitting goroutine")
+		logger.ErrorLogger().Printf("TIMEOUT - Table query without response, quitting goroutine")
 	}
 
 	return TableQueryResponse{}, net.UnknownNetworkError("Mqtt Timeout")
@@ -170,7 +170,7 @@ func (cache *TableQueryRequestCache) TablequeryResultMqttHandler(client mqtt.Cli
 			for _, channel := range *channelList {
 				logger.DebugLogger().Printf("TableQuery response - notifying a channel regarding %s", key)
 				channel <- responseStruct
-				close(channel)
+				logger.DebugLogger().Printf("TableQuery response - channel notified")
 			}
 		}
 		cache.siprequests[key] = nil
