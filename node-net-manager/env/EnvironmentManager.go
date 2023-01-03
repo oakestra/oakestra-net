@@ -256,7 +256,7 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 	logger.DebugLogger().Println("Retrieving current bridge ")
 	bridge, err := netlink.LinkByName(env.config.HostBridgeName)
 	if err != nil {
-		logger.ErrorLogger().Println("Error retrieving current bridge: %v", err)
+		logger.ErrorLogger().Println("Error retrieving current bridge: ", err)
 		return nil, err
 	}
 	logger.DebugLogger().Println("Retrieved current bridge")

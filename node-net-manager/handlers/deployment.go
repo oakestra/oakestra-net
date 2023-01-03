@@ -62,7 +62,7 @@ func (t *deployTaskQueue) taskExecutor() {
 			//deploy the network stack in the container
 			addr, err := deploymentHandler(task)
 			if err != nil {
-				logger.ErrorLogger().Println("[ERROR]: %v", err)
+				logger.ErrorLogger().Println("[ERROR]: ", err)
 			}
 			task.Finish <- TaskReady{
 				IP:  addr,
