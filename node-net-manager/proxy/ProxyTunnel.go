@@ -54,7 +54,7 @@ type GoProxyTunnel struct {
 	udpwrite          sync.RWMutex
 	tunwrite          sync.RWMutex
 	incomingChannel   chan incomingMessage
-	outgoingChannel   chan []byte
+	outgoingChannel   chan outgoingMessage
 	mtusize           string
 	randseed          *rand.Rand
 }
@@ -63,6 +63,13 @@ type GoProxyTunnel struct {
 type incomingMessage struct {
 	from    net.UDPAddr
 	content []byte
+}
+
+// outgoing message from bridge
+type outgoingMessage struct {
+	ipv4 *layers.IPv4
+	tcp  *layers.TCP
+	udp  *layers.UDP
 }
 
 // create a  new GoProxyTunnel with the configuration from the custom local file
@@ -115,7 +122,7 @@ func NewCustom(configuration Configuration) GoProxyTunnel {
 		udpwrite:         sync.RWMutex{},
 		tunwrite:         sync.RWMutex{},
 		incomingChannel:  make(chan incomingMessage),
-		outgoingChannel:  make(chan []byte),
+		outgoingChannel:  make(chan outgoingMessage),
 		mtusize:          configuration.Mtusize,
 		randseed:         rand.New(rand.NewSource(42)),
 	}
@@ -149,8 +156,9 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 	for {
 		select {
 		case msg := <-proxy.outgoingChannel:
-			logger.DebugLogger().Printf("Outgoing packet ready for decode action \n")
-			ipv4, tcp, udp := decodePacket(msg)
+			ipv4 := msg.ipv4
+			tcp := msg.tcp
+			udp := msg.udp
 
 			if ipv4 != nil {
 
@@ -565,7 +573,7 @@ func createUDPChannel(hoststring string) (*net.UDPConn, error) {
 // read output from an interface and wrap the read operation with a channel
 // out channel gives back the byte array of the output
 // errchannel is the channel where in case of error the error is routed
-func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- []byte, errchannel chan<- error) {
+func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- outgoingMessage, errchannel chan<- error) {
 	buffer := make([]byte, BUFFER_SIZE)
 	for true {
 		n, err := ifce.Read(buffer)
@@ -574,7 +582,13 @@ func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- []byte, 
 		} else {
 			res := make([]byte, n)
 			copy(res, buffer[:n])
-			out <- res
+			logger.DebugLogger().Printf("Outgoing packet ready for decode action \n")
+			ipv4, tcp, udp := decodePacket(res)
+			out <- outgoingMessage{
+				ipv4: ipv4,
+				tcp:  tcp,
+				udp:  udp,
+			}
 		}
 	}
 }

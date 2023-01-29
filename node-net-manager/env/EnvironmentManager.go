@@ -469,9 +469,9 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 			env.AddTableQueryEntry(tableEntry)
 		}
 		table = env.translationTable.SearchByServiceIP(ip)
+		//register interest for sip as well to avoid querying the address too many times
+		mqtt.MqttRegisterInterest(ip.String(), env)
 	}
-	//register interest for sip as well to avoid querying the address too many times
-	mqtt.MqttRegisterInterest(ip.String(), env)
 
 	return table
 }

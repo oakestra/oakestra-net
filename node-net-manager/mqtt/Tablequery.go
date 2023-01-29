@@ -36,6 +36,7 @@ type TableQueryRequestCache struct {
 type TableQueryResponse struct {
 	JobName      string            `json:"app_name"`
 	InstanceList []ServiceInstance `json:"instance_list"`
+	QueryKey     string            `json:"query_key"`
 }
 
 type ServiceInstance struct {
@@ -156,6 +157,7 @@ func (cache *TableQueryRequestCache) TablequeryResultMqttHandler(client mqtt.Cli
 	//extract sip and app names as query keys
 	querykeys := make([]string, 0)
 	querykeys = append(querykeys, responseStruct.JobName)
+	querykeys = append(querykeys, responseStruct.QueryKey)
 	for _, instance := range responseStruct.InstanceList {
 		for _, sip := range instance.ServiceIp {
 			querykeys = append(querykeys, sip.Address)
