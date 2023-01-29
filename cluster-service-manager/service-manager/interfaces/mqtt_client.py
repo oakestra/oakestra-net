@@ -106,7 +106,7 @@ def _tablequery_handler(client_id, payload):
         return
 
     interests.add_interest(serviceName, client_id)
-    result = {'app_name': serviceName, 'instance_list': resolution.format_instance_response(instances, siplist)}
+    result = {'app_name': serviceName, 'instance_list': resolution.format_instance_response(instances, siplist), 'query_key':str(sip)+str(serviceName)}
     mqtt_publish_tablequery_result(client_id, result)
 
 
