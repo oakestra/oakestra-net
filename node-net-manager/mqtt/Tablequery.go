@@ -119,7 +119,7 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 	select {
 	case result := <-responseChannel:
 		return result, nil
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		logger.ErrorLogger().Printf("TIMEOUT - Table query without response, quitting goroutine")
 	}
 
