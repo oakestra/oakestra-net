@@ -170,6 +170,10 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		env.freeContainerAddress(s.ip)
 		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
+		//if no interest registered delete all remaining info about the service
+		if !mqtt.MqttIsInterestRegistered(sname) {
+			env.RemoveServiceEntries(sname)
+		}
 	}
 }
 

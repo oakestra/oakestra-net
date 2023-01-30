@@ -99,7 +99,9 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 	cache.requestadd.Lock()
 	siprequests := cache.siprequests[reqname]
 	if siprequests != nil {
-		updatedRequests = *siprequests
+		cache.requestadd.Unlock()
+		return TableQueryResponse{}, errors.New("Table query already happening for this address")
+		//updatedRequests = *siprequests
 	}
 	updatedRequests = append(updatedRequests, responseChannel)
 	cache.siprequests[reqname] = &updatedRequests
@@ -117,7 +119,7 @@ func (cache *TableQueryRequestCache) tableQueryRequestBlocking(sip string, sname
 	select {
 	case result := <-responseChannel:
 		return result, nil
-	case <-time.After(10 * time.Second):
+	case <-time.After(2 * time.Second):
 		logger.ErrorLogger().Printf("TIMEOUT - Table query without response, quitting goroutine")
 	}
 
