@@ -1,5 +1,6 @@
 from flask import Flask, request
 from flask_socketio import SocketIO
+import socket
 from interfaces.mongodb_requests import mongo_init
 from network.tablequery import *
 from network import subnetwork_management, routes_interests
@@ -195,4 +196,4 @@ if __name__ == '__main__':
     import eventlet
 
     mongo_init(app)
-    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', int(MY_PORT))), app, log=my_logger)
+    eventlet.wsgi.server(eventlet.listen(('::', int(MY_PORT)), family=socket.AF_INET6), app, log=my_logger)
