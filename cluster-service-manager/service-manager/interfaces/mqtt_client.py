@@ -95,12 +95,15 @@ def _tablequery_handler(client_id, payload):
 
     instances = []
     siplist = []
+    query_key = ""
 
     # resolve the query and register interest
     try:
         if sip is not None and sip != "":
+            query_key=str(sip)
             serviceName, instances, siplist = resolution.service_resolution_ip(sip)
         elif serviceName is not None and serviceName != "":
+            query_key = str(serviceName)
             instances, siplist = resolution.service_resolution(serviceName)
     except Exception as e:
         logging.error(e)
@@ -108,7 +111,7 @@ def _tablequery_handler(client_id, payload):
         siplist = []
 
     interests.add_interest(serviceName, client_id)
-    result = {'app_name': serviceName, 'instance_list': resolution.format_instance_response(instances, siplist), 'query_key':str(sip)+str(querySname)}
+    result = {'app_name': serviceName, 'instance_list': resolution.format_instance_response(instances, siplist), 'query_key':query_key}
     mqtt_publish_tablequery_result(client_id, result)
 
 
