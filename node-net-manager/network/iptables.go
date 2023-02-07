@@ -1,8 +1,9 @@
 package network
 
 import (
-	"github.com/coreos/go-iptables/iptables"
 	"log"
+
+	"github.com/coreos/go-iptables/iptables"
 )
 
 type oakestraIpTable struct {
@@ -19,6 +20,7 @@ type IpTable interface {
 
 func NewOakestraIpTable() IpTable {
 	iptable, ipterr := iptables.New()
+	//ip6table, ipt6err := iptables.New(IPFamily(ProtocolIPv6))
 	if ipterr != nil {
 		log.Fatalln(ipterr)
 	}

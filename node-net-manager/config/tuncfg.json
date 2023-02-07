@@ -4,5 +4,9 @@
   "ProxySubnetwork": "10.30.0.0",
   "ProxySubnetworkMask": "255.255.0.0",
   "TunnelPort": 50103,
-  "Mtusize": 1450
+  "Mtusize": 1450,
+
+  "TunNetIPv6": "fc00::dead:beef",
+  "ProxySubnetworkIPv6": "fc00::",
+  "ProxySubnetworkIPv6Prefix": 8
 }

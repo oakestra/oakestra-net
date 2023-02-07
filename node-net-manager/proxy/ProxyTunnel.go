@@ -7,10 +7,6 @@ import (
 	"NetManager/network"
 	"errors"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/ip4defrag"
-	"github.com/google/gopacket/layers"
-	"github.com/songgao/water"
 	"log"
 	"math/rand"
 	"net"
@@ -18,6 +14,11 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/ip4defrag"
+	"github.com/google/gopacket/layers"
+	"github.com/songgao/water"
 )
 
 // Ipv4 defragger
@@ -34,6 +35,10 @@ type Configuration struct {
 	TunNetIP            string
 	TunnelPort          int
 	Mtusize             string
+
+	TunNetIPv6                string
+	ProxySubnetworkIPv6Prefix int
+	ProxySubnetworkIPv6       string
 }
 
 type GoProxyTunnel struct {
@@ -58,6 +63,9 @@ type GoProxyTunnel struct {
 	outgoingChannel   chan outgoingMessage
 	mtusize           string
 	randseed          *rand.Rand
+
+	tunNetIPv6          string
+	ProxyIPv6Subnetwork net.IPNet
 }
 
 // incoming message from UDP channel
@@ -98,13 +106,34 @@ func New() GoProxyTunnel {
 		logger.InfoLogger().Printf("Default to tunNetIP 10.19.1.254")
 		tunNetIP = "10.19.1.254"
 	}
+
+	// IPv6
+	tunNetIPv6 := os.Getenv("TUN_NET_IPv6")
+	if len(tunNetIPv6) == 0 {
+		logger.InfoLogger().Printf("Default to tunNetIPv6 fc00::dead:beef")
+		tunNetIPv6 = "fc00::dead:beef"
+	}
+	proxyIPv6Subnetwork := os.Getenv("PROXY_IPv6_SUBNETWORK")
+	if len(proxyIPv6Subnetwork) == 0 {
+		logger.InfoLogger().Printf("Default to proxy IPv6 subnetwork fc00::")
+		proxyIPv6Subnetwork = "fc00::"
+	}
+	proxyIPv6SubnetworkPrefix, err := strconv.Atoi(os.Getenv("PROXY_IPv6_SUBNETWORKPREFIX"))
+	if err != nil {
+		logger.InfoLogger().Printf("Default to proxy IPv6 network prefix 8")
+		proxyIPv6SubnetworkPrefix = 8
+	}
+
 	tunconfig := Configuration{
-		HostTUNDeviceName:   "goProxyTun",
-		ProxySubnetwork:     proxySubnetwork,
-		ProxySubnetworkMask: proxySubnetworkMask,
-		TunNetIP:            tunNetIP,
-		TunnelPort:          port,
-		Mtusize:             mtusize,
+		HostTUNDeviceName:         "goProxyTun",
+		ProxySubnetwork:           proxySubnetwork,
+		ProxySubnetworkMask:       proxySubnetworkMask,
+		TunNetIP:                  tunNetIP,
+		TunnelPort:                port,
+		Mtusize:                   mtusize,
+		TunNetIPv6:                tunNetIPv6,
+		ProxySubnetworkIPv6Prefix: proxyIPv6SubnetworkPrefix,
+		ProxySubnetworkIPv6:       proxyIPv6Subnetwork,
 	}
 	return NewCustom(tunconfig)
 }
@@ -129,11 +158,18 @@ func NewCustom(configuration Configuration) GoProxyTunnel {
 	//parse confgiuration file
 	tunconfig := configuration
 	proxy.HostTUNDeviceName = tunconfig.HostTUNDeviceName
-	proxy.ProxyIpSubnetwork.IP = net.ParseIP(tunconfig.ProxySubnetwork)
-	proxy.ProxyIpSubnetwork.Mask = net.IPMask(net.ParseIP(tunconfig.ProxySubnetworkMask).To4())
+	proxy.ProxyIpSubnetwork = net.IPNet{
+		IP:   net.ParseIP(tunconfig.ProxySubnetwork),
+		Mask: net.IPMask(net.ParseIP(tunconfig.ProxySubnetworkMask).To4()),
+	}
 	proxy.TunnelPort = tunconfig.TunnelPort
 	proxy.tunNetIP = tunconfig.TunNetIP
 
+	proxy.ProxyIPv6Subnetwork = net.IPNet{
+		IP:   net.ParseIP(tunconfig.ProxySubnetworkIPv6),
+		Mask: net.CIDRMask(tunconfig.ProxySubnetworkIPv6Prefix, 128),
+	}
+	proxy.tunNetIPv6 = tunconfig.TunNetIPv6
 	//create the TUN device
 	proxy.createTun()
 
@@ -363,6 +399,12 @@ func (proxy *GoProxyTunnel) createTun() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	logger.InfoLogger().Println("Bringing tun up with IPv6 addr " + proxy.tunNetIPv6 + "/7")
+	cmd = exec.Command("ip", "addr", "add", proxy.tunNetIPv6+"/7", "dev", ifce.Name())
+	err = cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
 	cmd = exec.Command("ip", "link", "set", "dev", ifce.Name(), "up")
 	err = cmd.Run()
 	if err != nil {
@@ -390,9 +432,21 @@ func (proxy *GoProxyTunnel) createTun() {
 	cmd = exec.Command("ip", "route", "add", "10.30.0.0/12", "dev", ifce.Name())
 	_, _ = cmd.Output()
 
+	//Add network routing rule, Done by default by the system
+	logger.InfoLogger().Printf("adding routing rule for %s to %s\n", proxy.ProxyIPv6Subnetwork.IP.String(), ifce.Name())
+	cmd = exec.Command("ip", "route", "add", proxy.ProxyIPv6Subnetwork.IP.String()+proxy.ProxyIPv6Subnetwork.Mask.String(), "dev", ifce.Name())
+	_, _ = cmd.Output()
+
 	//add firewalls rules
 	logger.InfoLogger().Println("adding firewall roule " + ifce.Name())
 	cmd = exec.Command("iptables", "-A", "INPUT", "-i", "tun0", "-m", "state",
+		"--state", "RELATED,ESTABLISHED", "-j", "ACCEPT")
+	err = cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// IPv6
+	cmd = exec.Command("ip6tables", "-A", "INPUT", "-i", "tun0", "-m", "state",
 		"--state", "RELATED,ESTABLISHED", "-j", "ACCEPT")
 	err = cmd.Run()
 	if err != nil {
