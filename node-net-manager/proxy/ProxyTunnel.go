@@ -298,7 +298,7 @@ func (proxy *GoProxyTunnel) convertToInstanceIp(ipv4 *layers.IPv4) (net.IP, erro
 		}
 	} else {
 		logger.ErrorLogger().Println("Unable to find instance IP for service: ", ipv4.SrcIP)
-		return nil, errors.New(fmt.Sprintf("Unable to find instance IP for service: ", ipv4.SrcIP))
+		return nil, errors.New(fmt.Sprintf("Unable to find instance IP for service: %s ", ipv4.SrcIP.String()))
 	}
 	return instanceIP, nil
 }
