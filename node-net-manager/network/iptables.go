@@ -20,7 +20,6 @@ type IpTable interface {
 
 func NewOakestraIpTable() IpTable {
 	iptable, ipterr := iptables.New()
-	//ip6table, ipt6err := iptables.New(IPFamily(ProtocolIPv6))
 	if ipterr != nil {
 		log.Fatalln(ipterr)
 	}
@@ -30,7 +29,19 @@ func NewOakestraIpTable() IpTable {
 	return oakestraiptable
 }
 
+func NewOakestraIP6Table() IpTable {
+	ip6table, ipt6err := iptables.NewWithProtocol(iptables.ProtocolIPv6)
+	if ipt6err != nil {
+		log.Fatalln(ipt6err)
+	}
+	oakestraiptable := &oakestraIpTable{
+		iptable: ip6table,
+	}
+	return oakestraiptable
+}
+
 func (t *oakestraIpTable) Append(table string, chain string, params ...string) error {
+	t.iptable.Append(table, chain, params...)
 	return t.iptable.Append(table, chain, params...)
 }
 

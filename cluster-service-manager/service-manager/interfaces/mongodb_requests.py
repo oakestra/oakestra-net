@@ -28,13 +28,16 @@ def mongo_init(flask_app):
 # ................. Worker Node Operations ...............#
 ###########################################################
 
-def mongo_find_node_by_id_and_update_subnetwork(node_id, addr):
+def mongo_find_node_by_id_and_update_subnetwork(node_id, addr, addr_v6):
     global app, mongo_nodes
     app.logger.info('MONGODB - update subnetwork of worker node {0} ...'.format(node_id))
 
     mongo_nodes.db.nodes.find_one_and_update(
         {'_id': ObjectId(node_id)},
-        {'$set': {'node_subnet': addr}},
+        {'$set': {
+            'node_subnet': addr,
+            'node_subnet_v6': addr_v6
+            }},
         upsert=True)
 
     return 1

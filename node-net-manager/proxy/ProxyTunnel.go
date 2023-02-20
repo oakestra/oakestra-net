@@ -438,7 +438,7 @@ func (proxy *GoProxyTunnel) createTun() {
 	_, _ = cmd.Output()
 
 	//add firewalls rules
-	logger.InfoLogger().Println("adding firewall roule " + ifce.Name())
+	logger.InfoLogger().Println("adding firewall rule " + ifce.Name())
 	cmd = exec.Command("iptables", "-A", "INPUT", "-i", "tun0", "-m", "state",
 		"--state", "RELATED,ESTABLISHED", "-j", "ACCEPT")
 	err = cmd.Run()

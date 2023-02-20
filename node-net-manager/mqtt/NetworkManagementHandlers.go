@@ -2,16 +2,18 @@ package mqtt
 
 import (
 	"encoding/json"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"log"
 	"net"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 var subnetworkResponseChannel chan string
 
 type mqttSubnetworkResponse struct {
-	Address string `json:"address"`
+	Address    string `json:"address"`
+	Address_v6 string `json:"addressv6"`
 }
 type mqttSubnetworkRequest struct {
 	METHOD string `json:"METHOD"`
@@ -28,12 +30,13 @@ type mqttDeployNotification struct {
 func subnetworkAssignmentMqttHandler(client mqtt.Client, msg mqtt.Message) {
 	responseStruct := mqttSubnetworkResponse{}
 	err := json.Unmarshal(msg.Payload(), &responseStruct)
+	log.Println("DEBUG: Message received: ", responseStruct)
 	if err != nil {
-		log.Println("ERROR - Invalid subnetwork response")
 		subnetworkResponseChannel <- ""
 		return
 	}
 	subnetworkResponseChannel <- responseStruct.Address
+	subnetworkResponseChannel <- responseStruct.Address_v6
 }
 
 /*Request a subnetwork to the cluster using the mqtt broker*/
@@ -50,6 +53,7 @@ func RequestSubnetworkMqttBlocking() (string, error) {
 	select {
 	case result := <-subnetworkResponseChannel:
 		if result != "" {
+			result += " " + <-subnetworkResponseChannel
 			return result, nil
 		}
 	case <-time.After(10 * time.Second):

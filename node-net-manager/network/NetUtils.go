@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"math/big"
 	"net"
-	"tailscale.com/net/interfaces"
 	"time"
+
+	"tailscale.com/net/interfaces"
 )
 
 // GetLocalIP returns the non loopback local IP of the host and the associated interface
@@ -53,7 +55,7 @@ func NameUniqueHash(name string, size int) string {
 	return hashedAndEncoded[:size]
 }
 
-//Given an ipv4, gives the next IP
+// Given an ipv4, gives the next IP
 func NextIP(ip net.IP, inc uint) net.IP {
 	i := ip.To4()
 	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
@@ -63,4 +65,18 @@ func NextIP(ip net.IP, inc uint) net.IP {
 	v1 := byte((v >> 16) & 0xFF)
 	v0 := byte((v >> 24) & 0xFF)
 	return net.IPv4(v0, v1, v2, v3)
+}
+
+func NextIPv6(ip net.IP, inc uint) net.IP {
+	i := ip.To16()
+
+	// transform IP address to 128 bit Integer and increment by one
+	ipInt := new(big.Int).SetBytes(i)
+	ipInt.Add(ipInt, big.NewInt(1))
+
+	// transform new incremented IP address back to net.IP format and return
+	ret := make(net.IP, net.IPv6len)
+	ipInt.FillBytes(ret)
+
+	return ret
 }

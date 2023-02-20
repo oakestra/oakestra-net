@@ -8,8 +8,6 @@ import (
 	"NetManager/network"
 	"errors"
 	"fmt"
-	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netns"
 	"log"
 	"net"
 	"os"
@@ -17,7 +15,11 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync"
+
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 )
 
 const NamespaceAlreadyDeclared string = "namespace already declared"
@@ -32,6 +34,8 @@ type Configuration struct {
 	HostBridgeName             string
 	HostBridgeIP               string
 	HostBridgeMask             string
+	HostBridgeIPv6             string
+	HostBridgeIPv6Prefix       string
 	HostTunName                string
 	ConnectedInternetInterface string
 	Mtusize                    int
@@ -98,6 +102,7 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 	//Get Connected Internet Interface
 	if e.config.ConnectedInternetInterface == "" {
 		_, e.config.ConnectedInternetInterface = network.GetLocalIPandIface()
+		logger.InfoLogger().Println(e.config.ConnectedInternetInterface)
 	}
 
 	//create bridge
@@ -116,7 +121,7 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 
 	//Enable bridge MASQUERADING
 	logger.InfoLogger().Println("Enabling packet masquerading")
-	network.EnableMasquerading(e.config.HostBridgeIP, e.config.HostBridgeMask, e.config.HostBridgeName, e.config.ConnectedInternetInterface)
+	network.EnableMasquerading(e.config.HostBridgeIP, e.config.HostBridgeMask, e.config.HostBridgeIPv6, e.config.HostBridgeIPv6Prefix, e.config.HostBridgeName, e.config.ConnectedInternetInterface)
 
 	//update status with current network configuration
 	logger.InfoLogger().Println("Reading the current environment configuration")
@@ -127,11 +132,14 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 // NewEnvironmentClusterConfigured Creates a new environment using the default configuration and asking the cluster for a new subnetwork
 func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 	logger.InfoLogger().Println("Asking the cluster for a new subnetwork")
-	subnetwork, err := mqtt.RequestSubnetworkMqttBlocking()
+	subnetwork_response, err := mqtt.RequestSubnetworkMqttBlocking()
 	if err != nil {
 		log.Fatal("Invalid subnetwork received. Can't proceed.")
 	}
-
+	logger.InfoLogger().Println("got subnetwork data: ", subnetwork_response)
+	subnetworks := strings.Fields(subnetwork_response)
+	ipv4_subnet := subnetworks[0]
+	ipv6_subnet := subnetworks[1]
 	logger.InfoLogger().Println("Creating with default config")
 	mtusize, err := strconv.Atoi(os.Getenv("TUN_MTU_SIZE"))
 	if mtusize < 0 || err != nil {
@@ -140,8 +148,10 @@ func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 	}
 	config := Configuration{
 		HostBridgeName:             "goProxyBridge",
-		HostBridgeIP:               network.NextIP(net.ParseIP(subnetwork), 1).String(),
+		HostBridgeIP:               network.NextIP(net.ParseIP(ipv4_subnet), 1).String(),
 		HostBridgeMask:             "/26",
+		HostBridgeIPv6:             network.NextIPv6(net.ParseIP(ipv6_subnet), 1).String(),
+		HostBridgeIPv6Prefix:       "/64",
 		HostTunName:                "goProxyTun",
 		ConnectedInternetInterface: "",
 		Mtusize:                    mtusize,
@@ -412,6 +422,7 @@ func (env *Environment) CreateHostBridge() error {
 	if err != nil {
 		return err
 	}
+	logger.InfoLogger().Println("joined into CreateHostBridge")
 
 	//is HostBridgeName already created? DESTROY IT
 	for _, ifce := range devices {
@@ -428,6 +439,7 @@ func (env *Environment) CreateHostBridge() error {
 	if err != nil {
 		return err
 	}
+	logger.InfoLogger().Println("Bridge created.")
 
 	//assign ip to the bridge
 	logger.DebugLogger().Println("Assigning IP to the new bridge")
@@ -437,6 +449,16 @@ func (env *Environment) CreateHostBridge() error {
 	if err != nil {
 		return err
 	}
+	logger.InfoLogger().Println("IPv4 Address added to bridge")
+
+	logger.DebugLogger().Println("Assigning IPv6 to the new bridge")
+	bridgeIpv6Cmd := exec.Command("ip", "a", "add",
+		env.config.HostBridgeIPv6+env.config.HostBridgeIPv6Prefix, "dev", env.config.HostBridgeName)
+	_, err = bridgeIpv6Cmd.Output()
+	if err != nil {
+		return err
+	}
+	logger.InfoLogger().Println("IPv6 Address added to bridge")
 
 	//bring the bridge up
 	logger.DebugLogger().Println("Setting bridge UP")

@@ -11,11 +11,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+<<<<<<< HEAD
 	"github.com/gorilla/mux"
 	"github.com/tkanos/gonfig"
 	"io"
+=======
+	"io/ioutil"
+>>>>>>> 33ead5c (Added dual-stack functionality to the goProxyBridge)
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/tkanos/gonfig"
 )
 
 type undeployRequest struct {
@@ -204,7 +211,6 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 	}
-	log.Println(requestStruct)
 
 	//drop the request if the node is already initialized
 	if WorkerID != "" {
@@ -226,6 +232,7 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	//initialize the proxy tunnel
 	Proxy = proxy.New()
 	Proxy.Listen()
+	log.Println("Proxy initialized and listening")
 
 	//initialize the Env Manager
 	Env = env.NewEnvironmentClusterConfigured(Proxy.HostTUNDeviceName)
