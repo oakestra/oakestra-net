@@ -11,13 +11,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"log"
-	"net/http"
-
 	"github.com/gorilla/mux"
 	"github.com/tkanos/gonfig"
+	"io"
+	"log"
+	"net/http"
 )
 
 type undeployRequest struct {
@@ -313,7 +311,7 @@ func DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	reqBody, _ := ioutil.ReadAll(request.Body)
+	reqBody, _ := io.ReadAll(request.Body)
 	var requestStruct undeployRequest
 	err := json.Unmarshal(reqBody, &requestStruct)
 	if err != nil {

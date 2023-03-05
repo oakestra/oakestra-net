@@ -8,6 +8,8 @@ import (
 	"NetManager/network"
 	"errors"
 	"fmt"
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 	"log"
 	"net"
 	"os"
@@ -16,9 +18,6 @@ import (
 	"runtime/debug"
 	"strconv"
 	"sync"
-
-	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netns"
 )
 
 const NamespaceAlreadyDeclared string = "namespace already declared"
