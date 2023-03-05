@@ -259,9 +259,9 @@ func CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	reqBody, _ := ioutil.ReadAll(request.Body)
+	reqBody, _ := io.ReadAll(request.Body)
 	log.Printf("ReqBody received :%s", reqBody)
-	var requestStruct handlers.ContainerDeployRequest
+	var requestStruct handlers.ContainerDeployTask
 	err := json.Unmarshal(reqBody, &requestStruct)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -270,10 +270,27 @@ func CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request)
 	requestStruct.PublicPort = Configuration.NodePublicPort
 	requestStruct.Env = Env
 	requestStruct.Writer = &writer
-	requestStruct.Finish = make(chan bool, 0)
-	log.Println(requestStruct)
+	requestStruct.Finish = make(chan handlers.TaskReady, 0)
+	logger.DebugLogger().Println(requestStruct)
 	handlers.NewDeployTaskQueue().NewTask(&requestStruct)
-	<-requestStruct.Finish
+	result := <-requestStruct.Finish
+	if result.Err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	response := DeployResponse{
+		ServiceName: requestStruct.ServiceName,
+		NsAddress:   result.IP.String(),
+	}
+
+	logger.InfoLogger().Println("Response to /container/deploy: ", response)
+
+	writer.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(writer).Encode(response)
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 /*

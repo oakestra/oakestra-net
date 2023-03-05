@@ -608,8 +608,10 @@ func (env *Environment) freeContainerAddress(ip net.IP) {
 	Unikernel
 */
 
-func (env *Environment) CreateUnikernelNetwork(sname string, name string, portmapping string) (net.IP, error) {
+func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, portmapping string) (net.IP, error) {
 
+	sname := fmt.Sprintf("%s.instance.%d", name, instancenumber)
+	
 	cleanup := func(veth *netlink.Veth) {
 		_ = netlink.LinkDel(veth)
 	}
