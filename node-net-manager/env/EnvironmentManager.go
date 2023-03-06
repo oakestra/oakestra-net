@@ -610,16 +610,15 @@ func (env *Environment) freeContainerAddress(ip net.IP) {
 func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, portmapping string) (net.IP, error) {
 
 	sname := fmt.Sprintf("%s.instance.%d", name, instancenumber)
-	
+
 	cleanup := func(veth *netlink.Veth) {
 		_ = netlink.LinkDel(veth)
 	}
 
-	log.Println("Creating veth pair for unikernel deployment")
+	logger.DebugLogger().Println("Creating veth pair for unikernel deployment")
 	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
 	if err != nil {
 		cleanup(vethIfce)
-		log.Printf("%v", err)
 		return nil, err
 	}
 
@@ -629,7 +628,7 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 		return nil, err
 	}
 
-	log.Printf("Creating Namespace for unikernel (%s)", sname)
+	logger.DebugLogger().Printf("Creating Namespace for unikernel (%s)", sname)
 	nscreation := exec.Command("ip", "netns", "add", sname)
 	err = nscreation.Run()
 	//ns, err := netns.NewNamed(sname) ## Changes Namespace of current application
@@ -639,7 +638,7 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 	}
 	ns, err := netns.GetFromName(sname)
 	if err != nil {
-		log.Printf("Unable to find namespace: %v", err)
+		logger.DebugLogger().Printf("Unable to find namespace: %v", err)
 		return nil, err
 	}
 
@@ -648,12 +647,12 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 		ns.Close()
 		err = netns.DeleteNamed(sname)
 		if err != nil {
-			log.Printf("Unable to delete namespace: %v", err)
+			logger.DebugLogger().Printf("Unable to delete namespace: %v", err)
 		}
 	}
 
 	if err := netlink.LinkSetNsFd(peerVeth, int(ns)); err != nil {
-		log.Printf("Error %s: %v", peerVeth.Attrs().Name, err)
+		logger.DebugLogger().Printf("Error %s: %v", peerVeth.Attrs().Name, err)
 		cleanup(vethIfce)
 		return nil, err
 	}
@@ -665,14 +664,14 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 		return nil, err
 	}
 	if err := env.addPeerLinkNetworkByNsName(sname, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
-		log.Println("Unable to configure Peer")
+		logger.DebugLogger().Println("Unable to configure Peer")
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
 		return nil, err
 	}
 
 	//Create Bridge and tap within Ns
-	log.Println("Creating Bridge and Tap inside of Ns")
+	logger.DebugLogger().Println("Creating Bridge and Tap inside of Ns")
 	labr := netlink.NewLinkAttrs()
 	labr.Name = "virbr0"
 	bridge := &netlink.Bridge{LinkAttrs: labr}
@@ -683,25 +682,25 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 		//Create Bridge
 		err := netlink.LinkAdd(bridge)
 		if err != nil {
-			log.Printf("Unable to create Bridge: %v\n", err)
+			logger.DebugLogger().Printf("Unable to create Bridge: %v\n", err)
 			return err
 		}
 		//Set IP on Bridge
 		addrbr, _ := netlink.ParseAddr("192.168.1.1/30")
 		err = netlink.AddrAdd(bridge, addrbr)
 		if err != nil {
-			log.Printf("Unable to add ip address to bridge: %v\n", err)
+			logger.DebugLogger().Printf("Unable to add ip address to bridge: %v\n", err)
 			return err
 		}
 		//Create tap for Qemu
 		err = netlink.LinkAdd(tap)
 		if err != nil {
-			log.Printf("Unable to create Tap: %v\n", err)
+			logger.DebugLogger().Printf("Unable to create Tap: %v\n", err)
 			return err
 		}
 		//Attach tap to Bridge
 		if netlink.LinkSetMaster(tap, bridge) != nil {
-			log.Printf("Unable to set master to tap: %v\n", err)
+			logger.DebugLogger().Printf("Unable to set master to tap: %v\n", err)
 			return err
 		}
 
@@ -729,7 +728,7 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 			Gw:        net.ParseIP(env.config.HostBridgeIP),
 		})
 		if err != nil {
-			log.Printf("Failed to set route in Ns: %v", err)
+			logger.DebugLogger().Printf("Failed to set route in Ns: %v", err)
 			return err
 		}
 
@@ -747,7 +746,7 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 		return nil
 	})
 	if err != nil {
-		log.Printf("Failed to configure Ns for Unikernel\n")
+		logger.DebugLogger().Printf("Failed to configure Ns for Unikernel\n")
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
 		return nil, err
@@ -767,14 +766,15 @@ func (env *Environment) CreateUnikernelNetwork(instancenumber int, name string, 
 		cleanup(vethIfce)
 		return nil, err
 	}
-
+	env.deployedServicesLock.Lock()
 	env.deployedServices[sname] = service{
 		ip:          ip,
 		sname:       name,
 		portmapping: portmapping,
 		veth:        vethIfce,
 	}
-	log.Println("Successful Network creation for Unikernel")
+	env.deployedServicesLock.Unlock()
+	logger.DebugLogger().Println("Successful Network creation for Unikernel")
 	return ip, nil
 
 }
@@ -784,7 +784,9 @@ func (env *Environment) DeleteUnikernelNamespace(sname string, instance int) {
 	s, ok := env.deployedServices[name]
 	if ok {
 		_ = env.translationTable.RemoveByNsip(s.ip)
+		env.deployedServicesLock.Lock()
 		delete(env.deployedServices, name)
+		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
 		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
