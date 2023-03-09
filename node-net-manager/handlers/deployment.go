@@ -17,7 +17,7 @@ type ContainerDeployTask struct {
 	ServiceName    string `json:"serviceName"`
 	Instancenumber int    `json:"instanceNumber"`
 	PortMappings   string `json:"portMappings"`
-	IsUnikernel    bool   `json:"isUnikernel,omitempty"`
+	Runtime        string
 	PublicAddr     string
 	PublicPort     string
 	Env            *env.Environment
@@ -84,13 +84,9 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
 	}
 
 	//attach network to the container
-	var addr net.IP
-	var err error
-	if requestStruct.IsUnikernel {
-		addr, err = requestStruct.Env.CreateUnikernelNetwork(requestStruct.Instancenumber, requestStruct.ServiceName, requestStruct.PortMappings)
-	} else {
-		addr, err = requestStruct.Env.AttachNetworkToContainer(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
-	}
+	netHandler := env.GetNetDeployment(requestStruct.Runtime)
+	addr, err := netHandler.DeployNetwork(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
+
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
 		return nil, err
