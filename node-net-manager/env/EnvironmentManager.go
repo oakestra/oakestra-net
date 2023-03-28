@@ -44,6 +44,7 @@ type Configuration struct {
 type Environment struct {
 	//### Environment management variables
 	nodeNetwork       net.IPNet
+	nodeNetworkv6     net.IPNet
 	nameSpaces        []string
 	networkInterfaces []networkInterface
 	nextVethNumber    int
@@ -53,9 +54,12 @@ type Environment struct {
 	//### Deployment management variables
 	deployedServices     map[string]service //all the deployed services with the ip and ports
 	deployedServicesLock sync.RWMutex
-	nextContainerIP      net.IP   //next address for the next container to be deployed
-	totNextAddr          int      //number of addresses currently generated, max 62
+	nextContainerIP      net.IP //next address for the next container to be deployed
+	nextContainerIPv6    net.IP
+	totNextAddr          int //number of addresses currently generated, max 62
+	totNextAddrv6        int
 	addrCache            []net.IP //Cache used to store the free addresses available for new containers
+	addrCachev6          []net.IP
 	//### Communication variables
 	clusterPort string
 	clusterAddr string
@@ -64,6 +68,7 @@ type Environment struct {
 
 type service struct {
 	ip          net.IP
+	ipv6        net.IP
 	sname       string
 	portmapping string
 	veth        *netlink.Veth
@@ -91,8 +96,11 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 		config:            customConfig,
 		translationTable:  TableEntryCache.NewTableManager(),
 		nextContainerIP:   network.NextIP(net.ParseIP(customConfig.HostBridgeIP), 1),
+		nextContainerIPv6: network.NextIPv6(net.ParseIP(customConfig.HostBridgeIPv6), 1),
 		totNextAddr:       1,
+		totNextAddrv6:     1,
 		addrCache:         make([]net.IP, 0),
+		addrCachev6:       make([]net.IP, 0),
 		deployedServices:  make(map[string]service, 0),
 		clusterAddr:       os.Getenv("CLUSTER_MANAGER_IP"),
 		clusterPort:       os.Getenv("CLUSTER_MANAGER_PORT"),
@@ -178,6 +186,7 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		delete(env.deployedServices, snameAndInstance)
 		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
+		env.freeContainerAddressIPv6(s.ipv6)
 		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
 		//if no interest registered delete all remaining info about the service
@@ -234,12 +243,26 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		cleanup(vethIfce)
 		return nil, err
 	}
+	ipv6, err := env.generateIPv6Address()
+	if err != nil {
+		cleanup(vethIfce)
+		return nil, err
+	}
+	logger.DebugLogger().Println("IPv6 generated: ", ipv6)
 
 	// set ip to the container veth
 	logger.DebugLogger().Println("Assigning ip ", ip.String()+env.config.HostBridgeMask, " to container ")
 	if err := env.addPeerLinkNetwork(pid, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
+		env.freeContainerAddressIPv6(ipv6)
+		return nil, err
+	}
+	logger.DebugLogger().Println("Assigning ipv6 ", ipv6.String()+env.config.HostBridgeIPv6Prefix, " to container ")
+	if err := env.addPeerLinkNetwork(pid, ipv6.String()+env.config.HostBridgeIPv6Prefix, vethIfce.PeerName); err != nil {
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		env.freeContainerAddressIPv6(ipv6)
 		return nil, err
 	}
 
@@ -248,6 +271,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 	if err = env.setContainerRoutes(pid, vethIfce.PeerName); err != nil {
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
+		env.freeContainerAddressIPv6(ipv6)
 		return nil, err
 	}
 
@@ -255,6 +279,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
 		env.freeContainerAddress(ip)
+		env.freeContainerAddressIPv6(ipv6)
 		cleanup(vethIfce)
 		return nil, err
 	}
@@ -262,6 +287,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 	if err = network.ManageContainerPorts(ip.String(), portmapping, network.OpenPorts); err != nil {
 		debug.PrintStack()
 		env.freeContainerAddress(ip)
+		env.freeContainerAddressIPv6(ipv6)
 		cleanup(vethIfce)
 		return nil, err
 	}
@@ -269,6 +295,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 	env.deployedServicesLock.Lock()
 	env.deployedServices[fmt.Sprintf("%s.%d", sname, instancenumber)] = service{
 		ip:          ip,
+		ipv6:        ipv6,
 		sname:       sname,
 		portmapping: portmapping,
 		veth:        vethIfce,
@@ -359,6 +386,26 @@ func (env *Environment) setContainerRoutes(containerPid int, peerVeth string) er
 	})
 	if err != nil {
 		logger.ErrorLogger().Printf("Impossible to setup route inside the netns: %v\n", err)
+		return err
+	}
+	err = env.execInsideNs(containerPid, func() error {
+		link, err := netlink.LinkByName(peerVeth)
+		if err != nil {
+			return err
+		}
+		dstv6, err := netlink.ParseIPNet("::/0")
+		if err != nil {
+			return err
+		}
+		gwv6 := net.ParseIP(env.config.HostBridgeIPv6)
+		return netlink.RouteAdd(&netlink.Route{
+			LinkIndex: link.Attrs().Index,
+			Dst:       dstv6,
+			Gw:        gwv6,
+		})
+	})
+	if err != nil {
+		logger.ErrorLogger().Printf("Impossible to setup IPv6 route inside the netns: %v\n", err)
 		return err
 	}
 	return nil
@@ -562,6 +609,23 @@ func (env *Environment) RemoveNsIPEntries(nsip string) {
 	_ = env.translationTable.RemoveByNsip(net.IP(nsip))
 }
 
+func (env *Environment) generateIPv6Address() (net.IP, error) {
+	var result net.IP
+	if len(env.addrCachev6) > 0 {
+		result, env.addrCachev6 = env.addrCachev6[0], env.addrCachev6[1:]
+	} else {
+		result = env.nextContainerIPv6
+		if env.totNextAddrv6 < 255 {
+			env.totNextAddrv6++
+		} else {
+			logger.ErrorLogger().Printf("exhausted IPv6 address space")
+			return result, errors.New("IPv6 address space exhausted")
+		}
+		env.nextContainerIPv6 = network.NextIPv6(env.nextContainerIPv6, 1)
+	}
+	return result, nil
+}
+
 func (env *Environment) generateAddress() (net.IP, error) {
 	var result net.IP
 	if len(env.addrCache) > 0 {
@@ -577,6 +641,10 @@ func (env *Environment) generateAddress() (net.IP, error) {
 		env.nextContainerIP = network.NextIP(env.nextContainerIP, 1)
 	}
 	return result, nil
+}
+
+func (env *Environment) freeContainerAddressIPv6(ipv6 net.IP) {
+	env.addrCachev6 = append(env.addrCachev6, ipv6)
 }
 
 func (env *Environment) freeContainerAddress(ip net.IP) {
