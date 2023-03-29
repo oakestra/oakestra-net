@@ -11,11 +11,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/mux"
-  	"github.com/tkanos/gonfig"
 	"io"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/tkanos/gonfig"
 )
 
 type undeployRequest struct {
@@ -44,7 +45,7 @@ func handleRequests(port int) {
 	netRouter.HandleFunc("/register", register).Methods("POST")
 	netRouter.HandleFunc("/docker/deploy", dockerDeploy).Methods("POST")
 
-	handlers.RegisterAllManagers(Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
+	handlers.RegisterAllManagers(&Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 }
 

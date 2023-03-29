@@ -12,7 +12,7 @@ import (
 )
 
 type ContainerDeyplomentHandler struct {
-	env *Environment
+	env **Environment
 }
 
 var containerHandler *ContainerDeyplomentHandler = nil
@@ -23,8 +23,8 @@ func GetContainerNetDeployment() *ContainerDeyplomentHandler {
 	}
 	return containerHandler
 }
-func InitContainerDeployment(env *Environment) {
-	unikernelHandler = &UnikernelDeyplomentHandler{
+func InitContainerDeployment(env **Environment) {
+	containerHandler = &ContainerDeyplomentHandler{
 		env: env,
 	}
 }
@@ -32,7 +32,7 @@ func InitContainerDeployment(env *Environment) {
 // AttachNetworkToContainer Attach a Docker container to the bridge and the current network environment
 func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instancenumber int, portmapping string) (net.IP, error) {
 
-	env := h.env
+	env := *h.env
 
 	cleanup := func(veth *netlink.Veth) {
 		_ = netlink.LinkDel(veth)
