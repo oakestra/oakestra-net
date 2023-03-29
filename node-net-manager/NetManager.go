@@ -44,7 +44,7 @@ func handleRequests(port int) {
 	netRouter.HandleFunc("/register", register).Methods("POST")
 	netRouter.HandleFunc("/docker/deploy", dockerDeploy).Methods("POST")
 
-	handlers.RegisterAllManagers(Env, WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
+	handlers.RegisterAllManagers(Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 }
 

@@ -13,7 +13,7 @@ import (
 
 type ContainerManager struct {
 	Env           *env.Environment
-	WorkerID      string
+	WorkerID      *string
 	Configuration netConfiguration
 }
 
@@ -28,7 +28,7 @@ func GetContainerManager() ManagerInterface {
 	return containerManager
 }
 
-func (m *ContainerManager) Register(Env *env.Environment, WorkerID string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
+func (m *ContainerManager) Register(Env *env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
 	m.Env = Env
 	m.WorkerID = WorkerID
 	m.Configuration = netConfiguration{NodePublicAddress: NodePublicAddress, NodePublicPort: NodePublicPort}
@@ -62,7 +62,7 @@ Response Json:
 func (m *ContainerManager) containerDeploy(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /container/deploy ")
 
-	if m.WorkerID == "" {
+	if *m.WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
@@ -122,7 +122,7 @@ Response: 200 OK or Failure code
 func (m *ContainerManager) containerUndeploy(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /container/undeploy ")
 
-	if m.WorkerID == "" {
+	if *m.WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
 		writer.WriteHeader(http.StatusBadRequest)
 		return

@@ -13,7 +13,7 @@ import (
 
 type UnikernelManager struct {
 	Env           *env.Environment
-	WorkerID      string
+	WorkerID      *string
 	Configuration netConfiguration
 }
 
@@ -28,7 +28,7 @@ func GetUnikernelManager() ManagerInterface {
 	return unikernelManager
 }
 
-func (m *UnikernelManager) Register(Env *env.Environment, WorkerID string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
+func (m *UnikernelManager) Register(Env *env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
 	m.Env = Env
 	m.WorkerID = WorkerID
 	m.Configuration = netConfiguration{NodePublicAddress: NodePublicAddress, NodePublicPort: NodePublicPort}
@@ -55,7 +55,7 @@ Response: 200 or Failure code
 func (m *UnikernelManager) CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /unikernel/deploy")
 
-	if unikernelManager.WorkerID == "" {
+	if *unikernelManager.WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
@@ -111,7 +111,7 @@ Response: 200 or Failure code
 func (m *UnikernelManager) DeleteUnikernelNamespace(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /unikernel/undeploy")
 
-	if m.WorkerID == "" {
+	if *m.WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
