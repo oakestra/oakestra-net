@@ -33,7 +33,7 @@ func (m *ContainerManager) Register(Env *env.Environment, WorkerID *string, Node
 	m.WorkerID = WorkerID
 	m.Configuration = netConfiguration{NodePublicAddress: NodePublicAddress, NodePublicPort: NodePublicPort}
 
-	env.InitUnikernelDeployment(Env)
+	env.InitContainerDeployment(Env)
 	Router.HandleFunc("/container/deploy", m.containerDeploy).Methods("POST")
 	Router.HandleFunc("/container/undeploy", m.containerUndeploy).Methods("POST")
 	Router.HandleFunc("/docker/undeploy", m.containerUndeploy).Methods("POST")
