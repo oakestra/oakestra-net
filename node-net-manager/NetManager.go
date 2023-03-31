@@ -49,7 +49,7 @@ func handleRequests(port int) {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 }
 
-var Env *env.Environment
+var Env env.Environment
 var Proxy proxy.GoProxyTunnel
 var WorkerID string
 var Configuration netConfiguration
@@ -126,9 +126,9 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	Proxy.Listen()
 
 	//initialize the Env Manager
-	Env = env.NewEnvironmentClusterConfigured(Proxy.HostTUNDeviceName)
+	Env = *env.NewEnvironmentClusterConfigured(Proxy.HostTUNDeviceName)
 
-	Proxy.SetEnvironment(Env)
+	Proxy.SetEnvironment(&Env)
 
 	writer.WriteHeader(http.StatusOK)
 }
