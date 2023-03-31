@@ -24,7 +24,7 @@ type DeployResponse struct {
 var AvailableRuntimes = make(map[string]func() ManagerInterface)
 
 type ManagerInterface interface {
-	Register(Env **env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router)
+	Register(Env *env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router)
 }
 
 func GetNetManager(handler string) ManagerInterface {
@@ -34,7 +34,7 @@ func GetNetManager(handler string) ManagerInterface {
 	return nil
 }
 
-func RegisterAllManagers(Env **env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
+func RegisterAllManagers(Env *env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
 	for _, getfunc := range AvailableRuntimes {
 		getfunc().Register(Env, WorkerID, NodePublicAddress, NodePublicPort, Router)
 	}

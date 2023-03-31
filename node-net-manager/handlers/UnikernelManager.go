@@ -12,7 +12,7 @@ import (
 )
 
 type UnikernelManager struct {
-	Env           **env.Environment
+	Env           *env.Environment
 	WorkerID      *string
 	Configuration netConfiguration
 }
@@ -28,7 +28,7 @@ func GetUnikernelManager() ManagerInterface {
 	return unikernelManager
 }
 
-func (m *UnikernelManager) Register(Env **env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
+func (m *UnikernelManager) Register(Env *env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
 	m.Env = Env
 	m.WorkerID = WorkerID
 	m.Configuration = netConfiguration{NodePublicAddress: NodePublicAddress, NodePublicPort: NodePublicPort}
@@ -71,7 +71,7 @@ func (m *UnikernelManager) CreateUnikernelNamesapce(writer http.ResponseWriter, 
 	requestStruct.Runtime = env.UNIKERNEL_RUNTIME
 	requestStruct.PublicAddr = m.Configuration.NodePublicAddress
 	requestStruct.PublicPort = m.Configuration.NodePublicPort
-	requestStruct.Env = *m.Env
+	requestStruct.Env = m.Env
 	requestStruct.Writer = &writer
 	requestStruct.Finish = make(chan TaskReady, 0)
 	logger.DebugLogger().Println(requestStruct)
@@ -126,7 +126,7 @@ func (m *UnikernelManager) DeleteUnikernelNamespace(writer http.ResponseWriter, 
 
 	log.Println(requestStruct)
 
-	(*m.Env).DeleteUnikernelNamespace(requestStruct.Servicename, requestStruct.Instancenumber)
+	m.Env.DeleteUnikernelNamespace(requestStruct.Servicename, requestStruct.Instancenumber)
 
 	writer.WriteHeader(http.StatusOK)
 }

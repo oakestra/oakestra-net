@@ -12,7 +12,7 @@ import (
 )
 
 type ContainerManager struct {
-	Env           **env.Environment
+	Env           *env.Environment
 	WorkerID      *string
 	Configuration netConfiguration
 }
@@ -28,7 +28,7 @@ func GetContainerManager() ManagerInterface {
 	return containerManager
 }
 
-func (m *ContainerManager) Register(Env **env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
+func (m *ContainerManager) Register(Env *env.Environment, WorkerID *string, NodePublicAddress string, NodePublicPort string, Router *mux.Router) {
 	m.Env = Env
 	m.WorkerID = WorkerID
 	m.Configuration = netConfiguration{NodePublicAddress: NodePublicAddress, NodePublicPort: NodePublicPort}
@@ -78,7 +78,7 @@ func (m *ContainerManager) containerDeploy(writer http.ResponseWriter, request *
 	deployTask.Runtime = env.CONTAINER_RUNTIME
 	deployTask.PublicAddr = m.Configuration.NodePublicAddress
 	deployTask.PublicPort = m.Configuration.NodePublicPort
-	deployTask.Env = *m.Env
+	deployTask.Env = m.Env
 	deployTask.Writer = &writer
 	deployTask.Finish = make(chan TaskReady)
 
@@ -137,7 +137,7 @@ func (m *ContainerManager) containerUndeploy(writer http.ResponseWriter, request
 
 	log.Println(requestStruct)
 
-	(*m.Env).DetachContainer(requestStruct.Servicename, requestStruct.Instancenumber)
+	m.Env.DetachContainer(requestStruct.Servicename, requestStruct.Instancenumber)
 
 	writer.WriteHeader(http.StatusOK)
 }

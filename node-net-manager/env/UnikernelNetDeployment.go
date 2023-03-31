@@ -13,7 +13,7 @@ import (
 )
 
 type UnikernelDeyplomentHandler struct {
-	env **Environment
+	env *Environment
 }
 
 var unikernelHandler *UnikernelDeyplomentHandler = nil
@@ -24,14 +24,14 @@ func GetUnikernelNetDeployment() *UnikernelDeyplomentHandler {
 	}
 	return unikernelHandler
 }
-func InitUnikernelDeployment(env **Environment) {
+func InitUnikernelDeployment(env *Environment) {
 	unikernelHandler = &UnikernelDeyplomentHandler{
 		env: env,
 	}
 }
 func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instancenumber int, portmapping string) (net.IP, error) {
 
-	env := *h.env
+	env := h.env
 	name := sname
 	sname = fmt.Sprintf("%s.instance.%d", sname, instancenumber)
 
