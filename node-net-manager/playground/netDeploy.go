@@ -10,7 +10,7 @@ import (
 func attachNetwork(appname string, pid int, instance int, mappings string, iip string, sip string) (string, error) {
 
 	//attach network to the container
-	addr, err := ENV.AttachNetworkToContainer(pid, appname, 0, mappings)
+	addr, addrv6, err := ENV.AttachNetworkToContainer(pid, appname, 0, mappings)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return "", err
@@ -28,6 +28,7 @@ func attachNetwork(appname string, pid int, instance int, mappings string, iip s
 		Nodeip:           net.ParseIP(PUBLIC_ADDRESS),
 		Nodeport:         PUBLIC_PORT,
 		Nsip:             addr,
+		Nsipv6:           addrv6,
 		ServiceIP: []TableEntryCache.ServiceIP{
 			TableEntryCache.ServiceIP{
 				IpType:  TableEntryCache.InstanceNumber,

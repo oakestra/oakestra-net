@@ -6,7 +6,7 @@
   "TunnelPort": 50103,
   "Mtusize": 1450,
 
-  "TunNetIPv6": "fc00::dead:beef",
-  "ProxySubnetworkIPv6": "fc00::",
-  "ProxySubnetworkIPv6Prefix": 8
+  "TunNetIPv6": "fcef::dead:beef",
+  "ProxySubnetworkIPv6": "fcef::",
+  "ProxySubnetworkIPv6Prefix": 21
 }

@@ -159,7 +159,7 @@ func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 		HostBridgeIP:               network.NextIP(net.ParseIP(ipv4_subnet), 1).String(),
 		HostBridgeMask:             "/26",
 		HostBridgeIPv6:             network.NextIPv6(net.ParseIP(ipv6_subnet), 1).String(),
-		HostBridgeIPv6Prefix:       "/64",
+		HostBridgeIPv6Prefix:       "/120",
 		HostTunName:                "goProxyTun",
 		ConnectedInternetInterface: "",
 		Mtusize:                    mtusize,
@@ -213,7 +213,7 @@ func (env *Environment) ConfigureDockerNetwork(containername string) (string, er
 }
 
 // AttachNetworkToContainer Attach a Docker container to the bridge and the current network environment
-func (env *Environment) AttachNetworkToContainer(pid int, sname string, instancenumber int, portmapping string) (net.IP, error) {
+func (env *Environment) AttachNetworkToContainer(pid int, sname string, instancenumber int, portmapping string) (net.IP, net.IP, error) {
 
 	cleanup := func(veth *netlink.Veth) {
 		_ = netlink.LinkDel(veth)
@@ -221,8 +221,8 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 
 	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
 	if err != nil {
-		go cleanup(vethIfce)
-		return nil, err
+		cleanup(vethIfce)
+		return nil, nil, err
 	}
 
 	// Attach veth2 to the docker container
@@ -230,23 +230,23 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 	peerVeth, err := netlink.LinkByName(vethIfce.PeerName)
 	if err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 	if err := netlink.LinkSetNsPid(peerVeth, pid); err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 
 	//generate a new ip for this container
 	ip, err := env.generateAddress()
 	if err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 	ipv6, err := env.generateIPv6Address()
 	if err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 	logger.DebugLogger().Println("IPv6 generated: ", ipv6)
 
@@ -256,14 +256,14 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
 		env.freeContainerAddressIPv6(ipv6)
-		return nil, err
+		return nil, nil, err
 	}
 	logger.DebugLogger().Println("Assigning ipv6 ", ipv6.String()+env.config.HostBridgeIPv6Prefix, " to container ")
 	if err := env.addPeerLinkNetwork(pid, ipv6.String()+env.config.HostBridgeIPv6Prefix, vethIfce.PeerName); err != nil {
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
 		env.freeContainerAddressIPv6(ipv6)
-		return nil, err
+		return nil, nil, err
 	}
 
 	//Add traffic route to bridge
@@ -272,7 +272,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
 		env.freeContainerAddressIPv6(ipv6)
-		return nil, err
+		return nil, nil, err
 	}
 
 	env.BookVethNumber()
@@ -281,7 +281,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		env.freeContainerAddress(ip)
 		env.freeContainerAddressIPv6(ipv6)
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err = network.ManageContainerPorts(ip.String(), portmapping, network.OpenPorts); err != nil {
@@ -289,7 +289,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		env.freeContainerAddress(ip)
 		env.freeContainerAddressIPv6(ipv6)
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 
 	env.deployedServicesLock.Lock()
@@ -300,8 +300,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		portmapping: portmapping,
 		veth:        vethIfce,
 	}
-	env.deployedServicesLock.Unlock()
-	return ip, nil
+	return ip, ipv6, nil
 }
 
 // create veth pair and connect one to the host bridge

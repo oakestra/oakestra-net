@@ -76,7 +76,7 @@ def mongo_remove_job(job_name):
     global mongo_jobs
     mongo_jobs.db.job.delete_one({"job_name", job_name})
 
-
+# TODO IPv6?
 def mongo_update_job_instance(job_name, instance):
     # update if exist otherwise push a new instance
     if mongo_jobs.db.jobs.find_one(
@@ -128,11 +128,17 @@ def mongo_find_job_by_name(job_name):
 
 def mongo_find_job_by_ip(ip):
     global mongo_jobs
-    # Search by Service Ip
+    # Search by Service IP
     job = mongo_jobs.db.jobs.find_one({'service_ip_list.Address': ip})
     if job is None:
-        # Search by instance ip
+        # Search by Service IPv6
+        job = mongo_jobs.db.jobs.find_one({'service_ip_list.Address_v6': ip})
+    if job is None:
+        # Search by instance IP
         job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip': ip})
+    if job is None:
+        # Search by instance IPv6
+        job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
     return job
 
 
