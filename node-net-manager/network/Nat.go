@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/coreos/go-iptables/iptables"
 )
 
 type PortOperation string
@@ -19,8 +21,8 @@ const (
 )
 
 var chain = "OAKESTRA"
-var iptable = NewOakestraIpTable()
-var ip6table = NewOakestraIP6Table()
+var iptable = NewOakestraIpTable(iptables.ProtocolIPv4)
+var ip6table = NewOakestraIpTable(iptables.ProtocolIPv6)
 
 func IptableFlushAll() {
 	_ = iptable.DeleteChain("nat", chain)

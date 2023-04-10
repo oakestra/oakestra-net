@@ -1,8 +1,9 @@
 package network
 
 import (
-	"gotest.tools/assert"
 	"testing"
+
+	"gotest.tools/assert"
 )
 
 func TestPortMappingEmpty(t *testing.T) {
@@ -83,6 +84,17 @@ func TestPortMappingInvalid(t *testing.T) {
 	err = ManageContainerPorts("0.0.0.0", "hello", OpenPorts)
 	if err == nil {
 		t.Fatal("hello must be invalid")
+	}
+}
+
+func TestIncIP(t *testing.T) {
+	ip1 := []byte{0, 0, 0, 2}
+
+	inc := NextIP(ip1, 1)
+	want := []byte{0, 0, 0, 3}
+
+	if !inc.Equal(want) {
+		t.Fatal("Problem in NextIP function.")
 	}
 }
 

@@ -18,24 +18,13 @@ type IpTable interface {
 	AddChain(string, string) error
 }
 
-func NewOakestraIpTable() IpTable {
-	iptable, ipterr := iptables.New()
+func NewOakestraIpTable(protocol iptables.Protocol) IpTable {
+	iptable, ipterr := iptables.NewWithProtocol(protocol)
 	if ipterr != nil {
 		log.Fatalln(ipterr)
 	}
 	oakestraiptable := &oakestraIpTable{
 		iptable: iptable,
-	}
-	return oakestraiptable
-}
-
-func NewOakestraIP6Table() IpTable {
-	ip6table, ipt6err := iptables.NewWithProtocol(iptables.ProtocolIPv6)
-	if ipt6err != nil {
-		log.Fatalln(ipt6err)
-	}
-	oakestraiptable := &oakestraIpTable{
-		iptable: ip6table,
 	}
 	return oakestraiptable
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
-	"math/big"
 	"net"
 	"time"
 
@@ -33,6 +32,7 @@ func GetLocalIPandIface() (string, string) {
 		for _, address := range addrs {
 			// check the address type and if it is not a loopback the display it
 			if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && iface.Name == defaultIfce {
+				// TODO DISCUSS: Should we first check for IPv6 on the interface first and fallback to v4?
 				if ipnet.IP.To4() != nil {
 					log.Println("Local Interface in use: ", iface.Name, " with addr ", ipnet.IP.String())
 					return ipnet.IP.String(), iface.Name
@@ -55,8 +55,21 @@ func NameUniqueHash(name string, size int) string {
 	return hashedAndEncoded[:size]
 }
 
-// Given an ipv4, gives the next IP
 func NextIP(ip net.IP, inc uint) net.IP {
+	ipBytes := ip.To16()
+	for i := len(ipBytes) - 1; i >= 0; i-- {
+		if ipBytes[i] == 255 {
+			ipBytes[i] = 0
+		} else {
+			ipBytes[i] = ipBytes[i] + byte(inc)
+			break
+		}
+	}
+	return net.IP(ipBytes)
+}
+
+// Given an ipv4, gives the next IP
+/*func NextIP(ip net.IP, inc uint) net.IP {
 	i := ip.To4()
 	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
 	v += inc
@@ -79,4 +92,4 @@ func NextIPv6(ip net.IP, inc uint) net.IP {
 	ipInt.FillBytes(ret)
 
 	return ret
-}
+}*/
