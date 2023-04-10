@@ -11,13 +11,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-<<<<<<< HEAD
-	"github.com/gorilla/mux"
-	"github.com/tkanos/gonfig"
 	"io"
-=======
-	"io/ioutil"
->>>>>>> 33ead5c (Added dual-stack functionality to the goProxyBridge)
 	"log"
 	"net/http"
 
