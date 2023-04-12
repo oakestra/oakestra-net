@@ -83,7 +83,7 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
 	}
 
 	//attach network to the container
-	addr, err := requestStruct.Env.AttachNetworkToContainer(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
+	addr, addrv6, err := requestStruct.Env.AttachNetworkToContainer(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
 		return nil, err
@@ -95,6 +95,7 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
 		"DEPLOYED",
 		requestStruct.Instancenumber,
 		addr.String(),
+		addrv6.String(),
 		requestStruct.PublicAddr,
 		requestStruct.PublicPort,
 	)

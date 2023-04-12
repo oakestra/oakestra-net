@@ -18,6 +18,7 @@ type TableEntry struct {
 	Nodeip           net.IP      `json:"nodeip"`
 	Nodeport         int         `json:"nodeport"`
 	Nsip             net.IP      `json:"nsip"`
+	Nsipv6           net.IP      `json:"nsipv6"`
 	ServiceIP        []ServiceIP `json:"serviceIP"`
 }
 
@@ -31,8 +32,9 @@ const (
 
 // If we assume those can be either IPv4 or IPv6, we won't have to do anything here
 type ServiceIP struct {
-	IpType  ServiceIpType `json:"ip_type"`
-	Address net.IP        `json:"address"`
+	IpType     ServiceIpType `json:"ip_type"`
+	Address    net.IP        `json:"address"`
+	Address_v6 net.IP        `json:"address_v6"`
 }
 
 type TableManager struct {
@@ -109,6 +111,7 @@ func (t *TableManager) SearchByServiceIP(ip net.IP) []TableEntry {
 	defer t.rwlock.Unlock()
 	for _, tableElement := range t.translationTable {
 		for _, elemip := range tableElement.ServiceIP {
+			// TODO IPv6
 			if elemip.Address.Equal(ip) {
 				returnEntry := tableElement
 				result = append(result, returnEntry)
@@ -122,6 +125,7 @@ func (t *TableManager) SearchByNsIP(ip net.IP) (TableEntry, bool) {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
 	for _, tableElement := range t.translationTable {
+		// TODO IPv6
 		if tableElement.Nsip.Equal(ip) {
 			returnEntry := tableElement
 			return returnEntry, true

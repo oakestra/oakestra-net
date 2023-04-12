@@ -111,16 +111,34 @@ def mongo_find_job_by_name(job_name):
     global mongo_jobs
     return mongo_jobs.db.jobs.find_one({'job_name': job_name})
 
-
+# TODO maybe explode IPv6? Check format consistency across all requests
 def mongo_find_job_by_ip(ip):
     global mongo_jobs
+    print("Got search job by IP request with IP:", ip)
     # Search by Service Ip
     job = mongo_jobs.db.jobs.find_one({'service_ip_list.Address': ip})
     if job is None:
-        # Search by instance ip
+        # Search by Service IPv6
+        job = mongo_jobs.db.jobs.find_one({'service_ip_list.Address_v6': ip})
+    if job is None:
+        # Search by Instance ip
         job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip': ip})
+    if job is None:
+        # Search by Instance IPv6
+        job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
     return job
 
+"""
+# TODO will need to be reworked, depending on architectural design decisions
+def mongo_find_job_by_ip_v6(ip):
+    global mongo_jobs
+    # Search by Service IPv6
+    job = mongo_jobs.db.jobs.find_one({'service_ip_list.Address_v6': ip})
+    if job is None:
+        # Search by instance IPv6
+        job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
+    return job
+"""
 
 def mongo_update_job_instance(system_job_id, instance):
     global mongo_jobs
@@ -132,6 +150,7 @@ def mongo_update_job_instance(system_job_id, instance):
         {
             '$set': {
                 "instance_list.$.namespace_ip": instance.get('namespace_ip'),
+                "instance_list.$.namespace_ip_v6": instance.get('namespace_ip_v6'),
                 "instance_list.$.host_ip": instance.get('host_ip'),
                 "instance_list.$.host_port": instance.get('host_port'),
             }
@@ -330,8 +349,8 @@ def mongo_free_subnet_address_to_cache(address):
 def mongo_get_service_address_from_cache_v6():
     """
     Pop an available Service address, if any, from the free addresses cache
-    @return: int[16] in the shape [253, 256, 256, 256, 256, 256, a, b, c, d, e, f, g, h, i, j]
-             equal to [fdff:ffff:ffff:ffff::]
+    @return: int[16] in the shape [253, 255, [0, 8], a, b, c, d, e, f, g, h, i, j, k, l, m]
+             equal to [fdff:[00, 08]00::]
     """
     global mongo_net
     netdb = mongo_net.db.netcache
@@ -348,7 +367,7 @@ def mongo_get_service_address_from_cache_v6():
 def mongo_free_service_address_to_cache_v6(address):
     """
     Add back an address to the cache
-    @param address: int[16] in the shape [253, 256, 256, 256, 256, 256, a, b, c, d, e, f, g, h, i, j]
+    @param address: int[16] in the shape [253, 255, [0, 8], a, b, c, d, e, f, g, h, i, j, k, l, m]
     """
     global mongo_net
     netcache = mongo_net.db.netcache
@@ -359,10 +378,7 @@ def mongo_free_service_address_to_cache_v6(address):
     
     assert address[0] == 253
     assert address[1] == 255
-    assert address[2] == 255
-    assert address[3] == 255
-    assert address[4] == 255
-    assert address[5] == 255
+    assert address[2] == 0 or address[2] == 8
 
     netcache.insert_one({
         'type': 'free_service_ipv6',
@@ -373,7 +389,7 @@ def mongo_free_service_address_to_cache_v6(address):
 def mongo_get_next_service_ip_v6():
     """
     Returns the next available ip address from the addressing space fdff:ffff:ffff:ffff::/64
-    @return: int[16] in the shape [253, 255, 255, 255, 255, 255, 255, 255, a, b, c, d, e, f, g, h]
+    @return: int[16] in the shape [253, 255, [0, 8], a, b, c, d, e, f, g, h, i, j, k, l, m]
     """
     global mongo_net
     netcache = mongo_net.db.netcache
@@ -383,7 +399,7 @@ def mongo_get_next_service_ip_v6():
     if next_addr is not None:
         return next_addr["ipv6"]
     else:
-        ipv6arr = [253, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ipv6arr = [253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         netcache = mongo_net.db.netcache
         id = netcache.insert_one({
             'type': 'next_service_ipv6',
@@ -395,7 +411,7 @@ def mongo_get_next_service_ip_v6():
 def mongo_update_next_service_ip_v6(address):
     """
     Update the value for the next service ip available
-    @param address: int[16] in the form [253, 255, 255, 255, 255, 255, a, b, c, d, e, f, g, h, i, j] 
+    @param address: int[16] in the form [253, 255, 0, a, b, c, d, e, f, g, h, i, j, k, l, m] 
         monotonically increasing with respect to the previous address
     """
     global mongo_net
@@ -406,9 +422,9 @@ def mongo_update_next_service_ip_v6(address):
     for n in address:
         assert 0 <= n < 256
 
-    assert address[0] == 254
-    for n in address[1:5]:
-        assert n == 255
+    assert address[0] == 253
+    assert address[1] == 255
+    assert address[2] == 0 or address[2] == 8
 
     netcache.update_one({'type': 'next_service_ipv6'}, {'$set': {'ipv6': address}})
 
@@ -443,13 +459,12 @@ def mongo_update_next_subnet_ip_v6(address):
     """
     global mongo_net
     netcache = mongo_net.db.netcache
-
+    
     # sanity check for the address
     assert len(address) == 16
     for n in address:
         assert 0 <= n < 256
     assert 252 <= address[0] <= 253
-
     netcache.update_one({'type': 'next_subnet_ipv6'}, {'$set': {'ipv6': address}})
 
 

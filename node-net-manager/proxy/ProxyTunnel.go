@@ -29,16 +29,16 @@ var BUFFER_SIZE = 64 * 1024
 
 // Config
 type Configuration struct {
-	HostTUNDeviceName   string
-	ProxySubnetwork     string
-	ProxySubnetworkMask string
-	TunNetIP            string
-	TunnelPort          int
-	Mtusize             string
+	HostTUNDeviceName   string `json:"HostTUNDeviceName"`
+	ProxySubnetwork     string `json:"ProxySubnetwork"`
+	ProxySubnetworkMask string `json:"ProxySubnetworkMask"`
+	TunNetIP            string `json:"TunNetIP"`
+	TunnelPort          int    `json:"TunnelPort"`
+	Mtusize             string `json:"Mtusize"`
 
-	TunNetIPv6                string
-	ProxySubnetworkIPv6Prefix int
-	ProxySubnetworkIPv6       string
+	TunNetIPv6                string `json:"TunNetIPv6"`
+	ProxySubnetworkIPv6Prefix int    `json:"ProxySubnetworkIPv6Prefix"`
+	ProxySubnetworkIPv6       string `json:"ProxySubnetworkIPv6"`
 }
 
 type GoProxyTunnel struct {
@@ -110,8 +110,8 @@ func New() GoProxyTunnel {
 	// IPv6
 	tunNetIPv6 := os.Getenv("TUN_NET_IPv6")
 	if len(tunNetIPv6) == 0 {
-		logger.InfoLogger().Printf("Default to tunNetIPv6 fc00::dead:beef")
-		tunNetIPv6 = "fc00::dead:beef"
+		logger.InfoLogger().Printf("Default to tunNetIPv6 fcef::dead:beef")
+		tunNetIPv6 = "fcef::dead:beef"
 	}
 	proxyIPv6Subnetwork := os.Getenv("PROXY_IPv6_SUBNETWORK")
 	if len(proxyIPv6Subnetwork) == 0 {
@@ -120,8 +120,8 @@ func New() GoProxyTunnel {
 	}
 	proxyIPv6SubnetworkPrefix, err := strconv.Atoi(os.Getenv("PROXY_IPv6_SUBNETWORKPREFIX"))
 	if err != nil {
-		logger.InfoLogger().Printf("Default to proxy IPv6 network prefix 8")
-		proxyIPv6SubnetworkPrefix = 8
+		logger.InfoLogger().Printf("Default to proxy IPv6 network prefix 7")
+		proxyIPv6SubnetworkPrefix = 7
 	}
 
 	tunconfig := Configuration{
@@ -395,6 +395,7 @@ func (proxy *GoProxyTunnel) createTun() {
 
 	logger.InfoLogger().Println("Bringing tun up with addr " + proxy.tunNetIP + "/12")
 	cmd := exec.Command("ip", "addr", "add", proxy.tunNetIP+"/12", "dev", ifce.Name())
+	logger.InfoLogger().Println()
 	err = cmd.Run()
 	if err != nil {
 		log.Fatal(err)
@@ -799,4 +800,10 @@ func decodePacket(msg []byte) (*layers.IPv4, *layers.TCP, *layers.UDP) {
 		return ipdefrag, nil, nil
 	}
 
+}
+
+func (proxy *GoProxyTunnel) Cleanup() {
+	// TODO remove tun Interface
+	// TODO remove firewall rules
+	return
 }

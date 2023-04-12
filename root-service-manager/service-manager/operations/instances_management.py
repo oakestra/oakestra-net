@@ -20,6 +20,7 @@ def update_instance_local_addresses(job_id=None, instances=None):
     for instance in instances:
         assert instance.get("instance_number") is not None
         assert instance.get("namespace_ip") is not None
+        assert instance.get("namespace_ip_v6") is not None
         assert instance.get("host_ip") is not None
         assert instance.get("host_port") is not None
 
@@ -76,5 +77,6 @@ def _prepare_instance_dict(isntance_number, cluster_id):
     return {
         'instance_number': isntance_number,
         'instance_ip': new_instance_ip(),
+        'instance_ip_v6': new_instance_ip_v6(),
         'cluster_id': str(cluster_id),
     }

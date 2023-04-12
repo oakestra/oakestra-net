@@ -148,7 +148,7 @@ func containerDeploy(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	reqBody, _ := io.ReadAll(request.Body)
-	log.Println("ReqBody received :", reqBody)
+	log.Println("ReqBody received :", string(reqBody))
 	var deployTask handlers.ContainerDeployTask
 	err := json.Unmarshal(reqBody, &deployTask)
 	if err != nil {
@@ -263,4 +263,5 @@ func main() {
 
 	log.Println("NetManager started. Waiting for registration.")
 	handleRequests(*localPort)
+	defer Proxy.Cleanup()
 }
