@@ -29,6 +29,7 @@ const (
 	RoundRobin     ServiceIpType = iota
 )
 
+// If we assume those can be either IPv4 or IPv6, we won't have to do anything here
 type ServiceIP struct {
 	IpType  ServiceIpType `json:"ip_type"`
 	Address net.IP        `json:"address"`

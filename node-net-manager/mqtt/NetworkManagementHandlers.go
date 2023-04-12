@@ -9,6 +9,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
+// TODO we can implement our own variant type in order to discriminate between IPv4 only, IPv6 only or dual-stack responses
 var subnetworkResponseChannel chan string
 
 type mqttSubnetworkResponse struct {
@@ -53,6 +54,8 @@ func RequestSubnetworkMqttBlocking() (string, error) {
 	select {
 	case result := <-subnetworkResponseChannel:
 		if result != "" {
+			// add whitespace between networks
+			// TODO make optional, for network-stack adjustment
 			result += " " + <-subnetworkResponseChannel
 			return result, nil
 		}
