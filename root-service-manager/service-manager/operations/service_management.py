@@ -3,12 +3,14 @@ from interfaces.mongodb_requests import *
 
 
 def deploy_request(deployment_descriptor=None, system_job_id=None):
+    print("GOT_DEPLOYMENT_DESC:", deployment_descriptor)
     if deployment_descriptor is None or system_job_id is None:
         return "Invalid input parameters", 400
 
     s_ip = [{
         "IpType": 'RR',
         "Address": new_job_rr_address(deployment_descriptor),
+        "Address_v6": new_job_rr_address_v6(deployment_descriptor)
     }]
     job_id = mongo_insert_job(
         {

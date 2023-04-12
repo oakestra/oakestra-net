@@ -93,8 +93,7 @@ def test_tablequery_service_ip_local(add_interest):
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
-        'instance_list': [job_instance],
-        'query_key': '172.30.0.1',
+        'instance_list': [job_instance]
     })
 
 
@@ -122,8 +121,7 @@ def test_tablequery_service_name_local(add_interest):
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
-        'instance_list': [job_instance],
-        'query_key': 'aaa',
+        'instance_list': [job_instance]
     })
 
 
@@ -159,8 +157,7 @@ def test_tablequery_service_ip_cloud(add_interest, requests_mock):
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
-        'instance_list': [job_instance],
-        'query_key': '172.30.0.1',
+        'instance_list': [job_instance]
     })
 
 @patch('network.tablequery.interests.add_interest')
@@ -195,8 +192,7 @@ def test_tablequery_service_name_cloud(add_interest,requests_mock):
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
-        'instance_list': [job_instance],
-        'query_key': 'aaa',
+        'instance_list': [job_instance]
     })
 
 

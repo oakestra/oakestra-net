@@ -620,7 +620,7 @@ func (env *Environment) generateIPv6Address() (net.IP, error) {
 			logger.ErrorLogger().Printf("exhausted IPv6 address space")
 			return result, errors.New("IPv6 address space exhausted")
 		}
-		env.nextContainerIPv6 = network.NextIPv6(env.nextContainerIPv6, 1)
+		env.nextContainerIPv6 = network.NextIP(env.nextContainerIPv6, 1)
 	}
 	return result, nil
 }
