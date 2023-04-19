@@ -39,7 +39,7 @@ def test_deploy_request():
     mongodb_client.mongo_get_service_address_from_cache = MagicMock(return_value=None)
     mongodb_client.mongo_get_service_address_from_cache_v6 = MagicMock(return_value=None)
     mongodb_client.mongo_get_next_service_ip = MagicMock(return_value=[10, 30, 0, 253])
-    mongodb_client.mongo_get_next_service_ip_v6 = MagicMock(return_value=[[253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]])
+    mongodb_client.mongo_get_next_service_ip_v6 = MagicMock(return_value=[253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1])
     mongodb_client.mongo_update_next_service_ip = MagicMock()
     mongodb_client.mongo_update_next_service_ip_v6 = MagicMock()
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
