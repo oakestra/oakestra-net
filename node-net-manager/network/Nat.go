@@ -165,7 +165,7 @@ func ManageContainerPorts(localContainerAddress string, portmapping string, oper
 			containerPort = ports[1]
 		}
 		if !isValidPort(hostPort) || !isValidPort(containerPort) {
-			return errors.New("invaid Port Mapping")
+			return errors.New("invalid Port Mapping")
 		}
 		destination := fmt.Sprintf("%s:%s", localContainerAddress, containerPort)
 		args := []string{"-p", portType, "--dport", hostPort, "-j", "DNAT", "--to-destination", destination}
@@ -174,8 +174,14 @@ func ManageContainerPorts(localContainerAddress string, portmapping string, oper
 		if operation == OpenPorts {
 			err = iptable.Append("nat", chain, args...)
 		}
+		if operation == OpenPorts {
+			err = ip6table.Append("nat", chain, args...)
+		}
 		if operation == ClosePorts {
 			err = iptable.Delete("nat", chain, args...)
+		}
+		if operation == ClosePorts {
+			err = ip6table.Delete("nat", chain, args...)
 		}
 		if err != nil {
 			log.Printf("ERROR: %v", err)
