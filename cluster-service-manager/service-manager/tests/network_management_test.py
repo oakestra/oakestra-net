@@ -158,15 +158,17 @@ def test_tablequery_service_ip_cloud(add_interest, requests_mock):
     add_interest.assert_called_with("aaa", "baba")
     job_instance['service_ip'] = [
         {
+            "IpType": "RR",
+            "Address": job['service_ip_list'][0]["Address"],
+            "Address_v6": job['service_ip_list'][0]["Address_v6"]
+        },
+        # ordering needs to be changed, since resolution.format_instance_response is appending the instance_ip
+        # to the service_ip list
+        {
             "IpType": "instance_ip",
             "Address": job_instance['instance_ip'],
             "Address_v6": job_instance['instance_ip_v6']
         },
-        {
-            "IpType": "RR",
-            "Address": job['service_ip_list'][0]["Address"],
-            "Address_v6": job['service_ip_list'][0]["Address_v6"]
-        }
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
@@ -196,15 +198,17 @@ def test_tablequery_service_name_cloud(add_interest,requests_mock):
     add_interest.assert_called_with("aaa", "baba")
     job_instance['service_ip'] = [
         {
+            "IpType": "RR",
+            "Address": job['service_ip_list'][0]["Address"],
+            "Address_v6": job['service_ip_list'][0]["Address_v6"]
+        },
+        # ordering needs to be changed, since resolution.format_instance_response is appending the instance_ip
+        # to the service_ip list
+        {
             "IpType": "instance_ip",
             "Address": job_instance['instance_ip'],
             "Address_v6": job_instance['instance_ip_v6']
         },
-        {
-            "IpType": "RR",
-            "Address": job['service_ip_list'][0]["Address"],
-            "Address_v6": job['service_ip_list'][0]["Address_v6"]
-        }
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
