@@ -20,7 +20,9 @@ def _get_fake_job(name):
                 "worker_id": "abab",
                 "instance_number": 0,
                 "namespace_ip": "0.0.0.1",
+                "namespace_ip_v6": "::1",
                 "instance_ip": "172.30.0.2",
+                "instance_ip_v6": "fdff:0000:0000:0000:0000:0000:0000:0002",
                 "host_ip": "0.0.0.0",
                 "host_port": "5000"
             }
@@ -28,35 +30,38 @@ def _get_fake_job(name):
         "service_ip_list": [
             {
                 "IpType": "RR",
-                "Address": "172.30.0.1"
+                "Address": "172.30.0.1",
+                "Address_v6": "fdff:1000:0000:0000:0000:0000:0000:0001"
             }
         ]
     }
 
 
 def test_deployment_status_report(requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR_v6   
     job = _get_fake_job("aaa")
     mongodb_client.mongo_update_job_deployed = MagicMock()
     mongodb_client.mongo_find_job_by_name = MagicMock(return_value=job)
-    adapter = requests_mock.post(ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/net_deploy_status", status_code=200)
+    adapter = requests_mock.post(ROOT_SERVICE_MANAGER_ADDR_v6 + "/api/net/service/net_deploy_status", status_code=200)
     job_instance = job['instance_list'][0]
 
     deployment.deployment_status_report(
         "aaa",
         "DEPLOYED",
         job_instance['namespace_ip'],
+        job_instance['namespace_ip_v6'],
         job_instance['worker_id'],
         job_instance['instance_number'],
         job_instance['host_ip'],
         job_instance['host_port']
     )
 
-    mongodb_client.mongo_update_job_deployed.assert_called_with("aaa", "DEPLOYED", "0.0.0.1", "abab", 0, "0.0.0.0",
+    mongodb_client.mongo_update_job_deployed.assert_called_with("aaa", "DEPLOYED", "0.0.0.1", "::1" "abab", 0, "0.0.0.0",
                                                                 "5000")
     instances = [{
         'instance_number': job_instance['instance_number'],
         'namespace_ip': job_instance['namespace_ip'],
+        'namespace_ip_v6': job_instance['namespace_ip_v6'],
         'host_ip': job_instance['host_ip'],
         'host_port': job_instance['host_port']
     }]
@@ -85,10 +90,12 @@ def test_tablequery_service_ip_local(add_interest):
         {
             "IpType": "instance_ip",
             "Address": job_instance['instance_ip'],
+            "Address_v6": job_instance['instance_ip_v6']
         },
         {
             "IpType": "RR",
             "Address": job['service_ip_list'][0]["Address"],
+            "Address_v6": job['service_ip_list'][0]["Address_v6"],
         }
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
@@ -113,10 +120,12 @@ def test_tablequery_service_name_local(add_interest):
         {
             "IpType": "instance_ip",
             "Address": job_instance['instance_ip'],
+            "Address_v6": job_instance['instance_ip_v6']
         },
         {
             "IpType": "RR",
             "Address": job['service_ip_list'][0]["Address"],
+            "Address_v6": job['service_ip_list'][0]["Address_v6"]
         }
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
@@ -127,11 +136,11 @@ def test_tablequery_service_name_local(add_interest):
 
 @patch('network.tablequery.interests.add_interest')
 def test_tablequery_service_ip_cloud(add_interest, requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR_v6
     job = _get_fake_job("aaa")
     job_instance = job['instance_list'][0]
     adapter = requests_mock.get(
-        ROOT_SERVICE_MANAGER_ADDR +
+        ROOT_SERVICE_MANAGER_ADDR_v6 +
         "/api/net/service/ip/" + job['service_ip_list'][0]["Address"].replace(".", "_") + "/instances",
         status_code=200, json=dict(job)
     )
