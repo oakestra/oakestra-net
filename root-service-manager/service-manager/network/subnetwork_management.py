@@ -135,7 +135,7 @@ def new_job_rr_address_v6(job_data):
         # because shorthand IPv6 addresses can be given in SLA, make sure to use expanded IPv6 notation for consistency with MongoDB requests
         address_arr = ipaddress.ip_address(address).exploded.split(":")
         if len(address_arr) == 8:
-            if address_arr[0] != "fdff" and address_arr[1][0:2] != "10":
+            if address_arr[0] != "fdff" or address_arr[1][0:2] != "10":
                 raise Exception("RR ip address must be in the subnet fdff:1000::/21")
             job = mongodb_requests.mongo_find_job_by_ip(address)
             if job is not None:
@@ -184,7 +184,8 @@ def clear_instance_ip_v6(addr):
 
         # Ensure that the give address is actually before the next address from the pool
         # doing it the ugly way, because for loops are slow
-        assert int(str(addr[6]) 
+        assert int(str(addr[5])
+        + str(addr[6])
         + str(addr[7])
         + str(addr[8])
         + str(addr[9])
@@ -194,8 +195,8 @@ def clear_instance_ip_v6(addr):
         + str(addr[13])
         + str(addr[14])
         + str(addr[15])
-        + str(addr[16])
-        ) < int(str(next_addr[6]) 
+        ) < int(str(next_addr[5])
+        + str(next_addr[6]) 
         + str(next_addr[7])
         + str(next_addr[8])
         + str(next_addr[9])
@@ -205,7 +206,6 @@ def clear_instance_ip_v6(addr):
         + str(next_addr[13])
         + str(next_addr[14])
         + str(next_addr[15])
-        + str(next_addr[16])
         )
 
         mongodb_requests.mongo_free_service_address_to_cache_v6(addr)

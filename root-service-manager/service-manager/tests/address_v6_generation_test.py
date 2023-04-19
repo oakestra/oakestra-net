@@ -13,7 +13,7 @@ def test_instance_address_base():
     ip1 = new_instance_ip_v6()
     assert ip1 == "fdff:0000:0000:0000:0000:0000:0000:0000"
 
-    mongodb_client.mongo_update_next_service_ip_v6.assert_called_with([253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    mongodb_client.mongo_update_next_service_ip_v6.assert_called_with([253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
 
 
 def test_instance_address_complex():
@@ -82,7 +82,7 @@ def test_instance_address_recycle_failure_2():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     # test address generation
-    ip1 = new_instance_ip()
+    ip1 = new_instance_ip_v6()
     assert ip1 == "fdff:0000:0000:0000:0000:0000:0000:0000"
 
     # mock next address
@@ -156,7 +156,7 @@ def test_subnet_address_recycle():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     # test address generation
-    ip1 = new_subnetwork_addr()
+    ip1 = new_subnetwork_addr_v6()
     assert ip1 == "fc00:0000:0000:0000:0000:0000:0000:0100"
 
     # mock next address
@@ -202,7 +202,7 @@ def test_subnet_address_recycle_failure_2():
 
     # test address generation
     ip1 = new_subnetwork_addr_v6()
-    assert ip1 == "fc00:0000:0000:0000:0000:0000:0000:0200"
+    assert ip1 == "fc00:0000:0000:0000:0000:0000:0000:0100"
 
     # mock next address
     mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0])
