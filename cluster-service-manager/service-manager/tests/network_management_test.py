@@ -56,7 +56,7 @@ def test_deployment_status_report(requests_mock):
         job_instance['host_port']
     )
 
-    mongodb_client.mongo_update_job_deployed.assert_called_with("aaa", "DEPLOYED", "0.0.0.1", "::1" "abab", 0, "0.0.0.0",
+    mongodb_client.mongo_update_job_deployed.assert_called_with("aaa", "DEPLOYED", "0.0.0.1", "::1", "abab", 0, "0.0.0.0",
                                                                 "5000")
     instances = [{
         'instance_number': job_instance['instance_number'],
@@ -100,7 +100,8 @@ def test_tablequery_service_ip_local(add_interest):
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
-        'instance_list': [job_instance]
+        'instance_list': [job_instance],
+        'query_key': '172.30.0.1'
     })
 
 
@@ -130,7 +131,8 @@ def test_tablequery_service_name_local(add_interest):
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
-        'instance_list': [job_instance]
+        'instance_list': [job_instance],
+        'query_key': 'aaa'
     })
 
 
@@ -156,12 +158,14 @@ def test_tablequery_service_ip_cloud(add_interest, requests_mock):
     add_interest.assert_called_with("aaa", "baba")
     job_instance['service_ip'] = [
         {
-            "IpType": "RR",
-            "Address": job['service_ip_list'][0]["Address"],
-        },
-        {
             "IpType": "instance_ip",
             "Address": job_instance['instance_ip'],
+            "Address_v6": job_instance['instance_ip_v6']
+        },
+        {
+            "IpType": "RR",
+            "Address": job['service_ip_list'][0]["Address"],
+            "Address_v6": job['service_ip_list'][0]["Address_v6"]
         }
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
@@ -171,11 +175,11 @@ def test_tablequery_service_ip_cloud(add_interest, requests_mock):
 
 @patch('network.tablequery.interests.add_interest')
 def test_tablequery_service_name_cloud(add_interest,requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR_v6
     job = _get_fake_job("aaa")
     job_instance = job['instance_list'][0]
     adapter = requests_mock.get(
-        ROOT_SERVICE_MANAGER_ADDR +
+        ROOT_SERVICE_MANAGER_ADDR_v6 +
         "/api/net/service/" + "aaa" + "/instances",
         status_code=200, json=dict(job)
     )
@@ -191,17 +195,20 @@ def test_tablequery_service_name_cloud(add_interest,requests_mock):
     add_interest.assert_called_with("aaa", "baba")
     job_instance['service_ip'] = [
         {
-            "IpType": "RR",
-            "Address": job['service_ip_list'][0]["Address"],
-        },
-        {
             "IpType": "instance_ip",
             "Address": job_instance['instance_ip'],
+            "Address_v6": job_instance['instance_ip_v6']
+        },
+        {
+            "IpType": "RR",
+            "Address": job['service_ip_list'][0]["Address"],
+            "Address_v6": job['service_ip_list'][0]["Address_v6"]
         }
     ]
     mqtt_client.mqtt_publish_tablequery_result.assert_called_with("baba", {
         'app_name': "aaa",
-        'instance_list': [job_instance]
+        'instance_list': [job_instance],
+        'query_key': '172.30.0.1'
     })
 
 
@@ -220,12 +227,12 @@ def test_register_interest():
 
 
 def test_remove_interest(requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR_v6
 
     # test interested workers >0
     adapter = requests_mock.register_uri(
         'DELETE',
-        ROOT_SERVICE_MANAGER_ADDR +
+        ROOT_SERVICE_MANAGER_ADDR_v6 +
         "/api/net/interest/" + "app1.aa",
         status_code=200
     )
