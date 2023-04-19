@@ -238,7 +238,7 @@ def clear_subnetwork_ip_v6(addr):
     addr = _addr_destringify_v6(addr)
 
     # Check if address is in the correct rage
-    assert 253 < addr[0] < 254
+    assert 252 <= addr[0] < 254
     for n in addr[1:15]:
         assert 0 <= n < 256
 
