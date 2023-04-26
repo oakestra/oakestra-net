@@ -263,5 +263,4 @@ func main() {
 
 	log.Println("NetManager started. Waiting for registration.")
 	handleRequests(*localPort)
-	defer Proxy.Cleanup()
 }

@@ -66,6 +66,7 @@ func (t *TableManager) RemoveByNsip(nsip net.IP) error {
 	defer t.rwlock.Unlock()
 
 	found := -1
+	// this will need to be reworked for IPv6, since that will be hell performance wise
 	for i, tableElement := range t.translationTable {
 		if tableElement.Nsip.Equal(nsip) {
 			found = i
@@ -111,8 +112,11 @@ func (t *TableManager) SearchByServiceIP(ip net.IP) []TableEntry {
 	defer t.rwlock.Unlock()
 	for _, tableElement := range t.translationTable {
 		for _, elemip := range tableElement.ServiceIP {
-			// TODO IPv6
 			if elemip.Address.Equal(ip) {
+				returnEntry := tableElement
+				result = append(result, returnEntry)
+			}
+			if elemip.Address_v6.Equal(ip) {
 				returnEntry := tableElement
 				result = append(result, returnEntry)
 			}
@@ -125,8 +129,11 @@ func (t *TableManager) SearchByNsIP(ip net.IP) (TableEntry, bool) {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
 	for _, tableElement := range t.translationTable {
-		// TODO IPv6
 		if tableElement.Nsip.Equal(ip) {
+			returnEntry := tableElement
+			return returnEntry, true
+		}
+		if tableElement.Nsipv6.Equal(ip) {
 			returnEntry := tableElement
 			return returnEntry, true
 		}
@@ -186,6 +193,10 @@ func (t *TableManager) isValid(entry TableEntry) bool {
 		return false
 	}
 	if entry.Nsip == nil {
+		log.Println("TranslationTable: Invalid Entry, wrong nsip")
+		return false
+	}
+	if entry.Nsipv6 == nil {
 		log.Println("TranslationTable: Invalid Entry, wrong nsip")
 		return false
 	}

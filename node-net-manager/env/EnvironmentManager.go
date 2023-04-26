@@ -186,7 +186,7 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		delete(env.deployedServices, snameAndInstance)
 		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
-		env.freeContainerAddressIPv6(s.ipv6)
+		env.freeContainerAddress(s.ipv6)
 		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
 		//if no interest registered delete all remaining info about the service
@@ -255,14 +255,14 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 	if err := env.addPeerLinkNetwork(pid, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
-		env.freeContainerAddressIPv6(ipv6)
+		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
 	logger.DebugLogger().Println("Assigning ipv6 ", ipv6.String()+env.config.HostBridgeIPv6Prefix, " to container ")
 	if err := env.addPeerLinkNetwork(pid, ipv6.String()+env.config.HostBridgeIPv6Prefix, vethIfce.PeerName); err != nil {
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
-		env.freeContainerAddressIPv6(ipv6)
+		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
 
@@ -271,7 +271,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 	if err = env.setContainerRoutes(pid, vethIfce.PeerName); err != nil {
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
-		env.freeContainerAddressIPv6(ipv6)
+		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
 
@@ -279,7 +279,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
 		env.freeContainerAddress(ip)
-		env.freeContainerAddressIPv6(ipv6)
+		env.freeContainerAddress(ipv6)
 		cleanup(vethIfce)
 		return nil, nil, err
 	}
@@ -287,7 +287,7 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 	if err = network.ManageContainerPorts(ip.String(), portmapping, network.OpenPorts); err != nil {
 		debug.PrintStack()
 		env.freeContainerAddress(ip)
-		env.freeContainerAddressIPv6(ipv6)
+		env.freeContainerAddress(ipv6)
 		cleanup(vethIfce)
 		return nil, nil, err
 	}
@@ -643,10 +643,11 @@ func (env *Environment) generateAddress() (net.IP, error) {
 	return result, nil
 }
 
-func (env *Environment) freeContainerAddressIPv6(ipv6 net.IP) {
-	env.addrCachev6 = append(env.addrCachev6, ipv6)
-}
-
 func (env *Environment) freeContainerAddress(ip net.IP) {
-	env.addrCache = append(env.addrCache, ip)
+	if err := ip.To4(); err == nil {
+		env.addrCache = append(env.addrCache, ip)
+	}
+	if err := ip.To16(); err == nil {
+		env.addrCachev6 = append(env.addrCachev6, ip)
+	}
 }
