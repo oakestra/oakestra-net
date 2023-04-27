@@ -100,7 +100,7 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 			logger.DebugLogger().Println("Msg outgoingChannel: ", prot)
 			if ipv4 != nil {
 				if prot == nil {
-					return
+					continue
 				}
 				//logger.DebugLogger().Printf("Outgoing packet from %s\n", ipv4.layer.SrcIP.String())
 
