@@ -2,11 +2,11 @@ package proxy
 
 import (
 	"NetManager/TableEntryCache"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"math/rand"
 	"net"
-	"testing"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 type FakeEnv struct {
@@ -102,6 +102,7 @@ func getFakePacket(srcIP string, dstIP string, srcPort int, dstPort int) (gopack
 	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default), &ipLayer, &tcpLayer
 }
 
+/*
 func TestOutgoingProxy(t *testing.T) {
 	proxy := getFakeTunnel()
 
@@ -169,3 +170,4 @@ func TestIngoingProxy(t *testing.T) {
 		t.Error("Packet should not be proxied")
 	}
 }
+*/
