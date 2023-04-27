@@ -187,7 +187,8 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
 		env.freeContainerAddress(s.ipv6)
-		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
+		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
+		_ = network.ManageContainerPorts(s.ipv6, s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
 		//if no interest registered delete all remaining info about the service
 		if !mqtt.MqttIsInterestRegistered(sname) {
@@ -284,7 +285,15 @@ func (env *Environment) AttachNetworkToContainer(pid int, sname string, instance
 		return nil, nil, err
 	}
 
-	if err = network.ManageContainerPorts(ip.String(), portmapping, network.OpenPorts); err != nil {
+	if err = network.ManageContainerPorts(ip, portmapping, network.OpenPorts); err != nil {
+		debug.PrintStack()
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		cleanup(vethIfce)
+		return nil, nil, err
+	}
+
+	if err = network.ManageContainerPorts(ipv6, portmapping, network.OpenPorts); err != nil {
 		debug.PrintStack()
 		env.freeContainerAddress(ip)
 		env.freeContainerAddress(ipv6)
@@ -533,7 +542,7 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 	}
 
 	//if no entry available -> TableQuery
-	entryList, err := tableQueryByIP(ip.String())
+	entryList, err := tableQueryByIP(ip)
 
 	if err == nil {
 		var once sync.Once
@@ -644,10 +653,14 @@ func (env *Environment) generateAddress() (net.IP, error) {
 }
 
 func (env *Environment) freeContainerAddress(ip net.IP) {
-	if err := ip.To4(); err == nil {
+	// if ip is an IPv4 addr
+	if err := ip.To4(); err != nil {
 		env.addrCache = append(env.addrCache, ip)
-	}
-	if err := ip.To16(); err == nil {
+	} else
+	// else check whether it is a correct IPv6 address
+	// this cannot be an IPv4-to-IPv6 mapped IPv6 addr, as we handle IPv4 beforehand
+	// this check can be removed if we can be sure not to get garbage in our network
+	if err = ip.To16(); err != nil {
 		env.addrCachev6 = append(env.addrCachev6, ip)
 	}
 }
