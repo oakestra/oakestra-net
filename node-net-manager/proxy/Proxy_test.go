@@ -4,6 +4,7 @@ import (
 	"NetManager/TableEntryCache"
 	"math/rand"
 	"net"
+	"testing"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -102,14 +103,13 @@ func getFakePacket(srcIP string, dstIP string, srcPort int, dstPort int) (gopack
 	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default), &ipLayer, &tcpLayer
 }
 
-/*
 func TestOutgoingProxy(t *testing.T) {
 	proxy := getFakeTunnel()
 
 	_, ip, tcp := getFakePacket("10.19.1.1", "10.30.255.255", 666, 80)
 	_, noip, notcp := getFakePacket("10.19.1.1", "10.20.1.1", 666, 80)
 
-	newpacketproxy := proxy.outgoingProxy(ip, tcp, nil)
+	newpacketproxy := proxy.outgoingProxy(ip, tcp)
 	newpacketnoproxy := proxy.outgoingProxy(noip, notcp, nil)
 
 	if ipLayer := newpacketproxy.Layer(layers.LayerTypeIPv4); ipLayer != nil {
@@ -170,4 +170,3 @@ func TestIngoingProxy(t *testing.T) {
 		t.Error("Packet should not be proxied")
 	}
 }
-*/
