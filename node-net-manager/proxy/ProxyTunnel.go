@@ -102,7 +102,7 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 				continue
 			}
 			logger.DebugLogger().Printf("Outgoing packet from %s\n", ip.getSrcIP().String())
-			logger.DebugLogger().Printf("DATA: ", ip.getLayer())
+			logger.DebugLogger().Println("DATA: ", ip.getLayer())
 			// continue only if the packet is udp or tcp, otherwise just drop it
 			if prot == nil {
 				logger.DebugLogger().Println("Neither TCP, nor UDP packet received. Dropping it.")

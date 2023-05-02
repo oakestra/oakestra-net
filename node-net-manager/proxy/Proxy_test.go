@@ -83,23 +83,26 @@ func getFakeTunnel() GoProxyTunnel {
 	return tunnel
 }
 
-func getFakePacket(srcIP string, dstIP string, srcPort int, dstPort int) (gopacket.Packet, *layers.IPv4, *layers.TCP) {
-	ipLayer := layers.IPv4{
+func getFakePacket(srcIP string, dstIP string, srcPort int, dstPort int) (gopacket.Packet, *networkLayer, *transportLayer) {
+	ipLayer := networkLayer{&IPv4Packet{&layers.IPv4{
 		SrcIP:    net.ParseIP(srcIP),
 		DstIP:    net.ParseIP(dstIP),
 		Protocol: layers.IPProtocolTCP,
-	}
-	tcpLayer := layers.TCP{
+		Version:  4,
+	}}}
+	tcpLayer := transportLayer{&TCPLayer{&layers.TCP{
 		SrcPort: layers.TCPPort(srcPort),
 		DstPort: layers.TCPPort(dstPort),
 		SYN:     true,
-	}
+	}}}
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: false,
 	}
-	_ = gopacket.SerializeLayers(buf, opts, &ipLayer, &tcpLayer)
+	ip := ipLayer.getLayer().(*layers.IPv4)
+	tcpLayer.getTCPLayer().SetNetworkLayerForChecksum(ip)
+	_ = gopacket.SerializeLayers(buf, opts, ipLayer.getLayer().(*layers.IPv4), tcpLayer.getTCPLayer())
 	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default), &ipLayer, &tcpLayer
 }
 
@@ -110,7 +113,10 @@ func TestOutgoingProxy(t *testing.T) {
 	_, noip, notcp := getFakePacket("10.19.1.1", "10.20.1.1", 666, 80)
 
 	newpacketproxy := proxy.outgoingProxy(ip, tcp)
-	newpacketnoproxy := proxy.outgoingProxy(noip, notcp, nil)
+	newpacketnoproxy := proxy.outgoingProxy(noip, notcp)
+	if newpacketnoproxy != nil {
+		t.Error("Packet should not be proxied")
+	}
 
 	if ipLayer := newpacketproxy.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		if tcpLayer := newpacketproxy.Layer(layers.LayerTypeTCP); tcpLayer != nil {
@@ -126,9 +132,7 @@ func TestOutgoingProxy(t *testing.T) {
 			//}
 		}
 	}
-	if newpacketnoproxy != nil {
-		t.Error("Packet should not be proxied")
-	}
+
 }
 
 func TestIngoingProxy(t *testing.T) {
@@ -148,8 +152,8 @@ func TestIngoingProxy(t *testing.T) {
 	}
 	proxy.proxycache.Add(entry)
 
-	newpacketproxy := proxy.ingoingProxy(ip, tcp, nil)
-	newpacketnoproxy := proxy.ingoingProxy(noip, notcp, nil)
+	newpacketproxy := proxy.ingoingProxy(ip, tcp)
+	newpacketnoproxy := proxy.ingoingProxy(noip, notcp)
 
 	if ipLayer := newpacketproxy.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		if tcpLayer := newpacketproxy.Layer(layers.LayerTypeTCP); tcpLayer != nil {

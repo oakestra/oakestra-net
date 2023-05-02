@@ -99,7 +99,7 @@ func (ip *IPv4Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot *transpor
 }
 
 func (ip *IPv4Packet) serializeTCPHeader(tcp *layers.TCP) gopacket.Packet {
-	err := tcp.SetNetworkLayerForChecksum(ip)
+	err := tcp.SetNetworkLayerForChecksum(ip.IPv4)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -107,7 +107,7 @@ func (ip *IPv4Packet) serializeTCPHeader(tcp *layers.TCP) gopacket.Packet {
 }
 
 func (ip *IPv4Packet) serializeUDPHeader(udp *layers.UDP) gopacket.Packet {
-	err := udp.SetNetworkLayerForChecksum(ip)
+	err := udp.SetNetworkLayerForChecksum(ip.IPv4)
 	if err != nil {
 		fmt.Println(err)
 	}
