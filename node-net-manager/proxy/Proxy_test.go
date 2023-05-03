@@ -251,6 +251,9 @@ func TestIngoingV6Proxy(t *testing.T) {
 	proxy.proxycache.Add(entry)
 	newpacketproxy := proxy.ingoingProxy(ip, tcp)
 	newpacketnoproxy := proxy.ingoingProxy(noip, notcp)
+	if newpacketnoproxy != nil {
+		t.Error("Packet should not be proxied")
+	}
 
 	if ipLayer := newpacketproxy.Layer(layers.LayerTypeIPv6); ipLayer != nil {
 		if tcpLayer := newpacketproxy.Layer(layers.LayerTypeTCP); tcpLayer != nil {
@@ -261,8 +264,5 @@ func TestIngoingV6Proxy(t *testing.T) {
 				t.Error("srcIp = ", ipv6.SrcIP.String(), "; want =", srcexpected)
 			}
 		}
-	}
-	if newpacketnoproxy != nil {
-		t.Error("Packet should not be proxied")
 	}
 }
