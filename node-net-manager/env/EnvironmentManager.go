@@ -566,7 +566,8 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 	if len(table) > 0 {
 		for elemindex, elem := range table {
 			for _, elemIp := range elem.ServiceIP {
-				if elemIp.IpType == TableEntryCache.InstanceNumber && elemIp.Address.Equal(ip) {
+				if elemIp.IpType == TableEntryCache.InstanceNumber &&
+					(elemIp.Address.Equal(ip) || elemIp.Address_v6.Equal(ip)) {
 					return table[elemindex], true
 				}
 			}

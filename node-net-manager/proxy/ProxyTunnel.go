@@ -199,6 +199,7 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip *networkLayer, prot *transportLayer
 		//Check if the ServiceIP is known
 		tableEntryList := proxy.environment.GetTableEntryByServiceIP(dstIP)
 		if len(tableEntryList) < 1 {
+			fmt.Println("No entries found for service IP: ", dstIP.String())
 			logger.DebugLogger().Printf("No entries found for this service IP: %s", dstIP.String())
 			return nil
 		}
@@ -212,15 +213,19 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip *networkLayer, prot *transportLayer
 		//Check proxy proxycache (if any active flow is there already)
 		entry, exist := proxy.proxycache.RetrieveByServiceIP(srcIP, instanceIP, srcport, dstIP, dstport)
 		if !exist || entry.dstport < 1 || !TableEntryCache.IsNamespaceStillValid(entry.dstip, &tableEntryList) {
-
 			//Choose between the table entry according to the ServiceIP algorithm
 			//TODO: so far this only uses RR, ServiceIP policies should be implemented here
 			tableEntry := tableEntryList[proxy.randseed.Intn(len(tableEntryList))]
 
+			entryDstIP := tableEntry.Nsipv6
+			if ip.getProtocolVersion() == 4 {
+				entryDstIP = tableEntry.Nsip
+			}
+
 			//Update proxycache
 			entry = ConversionEntry{
 				srcip:         srcIP,
-				dstip:         tableEntry.Nsip,
+				dstip:         entryDstIP,
 				dstServiceIp:  dstIP,
 				srcInstanceIp: instanceIP,
 				srcport:       srcport,
@@ -242,7 +247,10 @@ func (proxy *GoProxyTunnel) convertToInstanceIp(ip *networkLayer) (net.IP, error
 	if instanceexist {
 		for _, sip := range instanceTableEntry.ServiceIP {
 			if sip.IpType == TableEntryCache.InstanceNumber {
-				instanceIP = sip.Address
+				instanceIP = sip.Address_v6
+				if ip.getProtocolVersion() == 4 {
+					instanceIP = sip.Address
+				}
 			}
 		}
 	} else {
@@ -271,7 +279,6 @@ func (proxy *GoProxyTunnel) ingoingProxy(ip *networkLayer, prot *transportLayer)
 		//No proxy proxycache entry, no translation needed
 		return nil
 	}
-
 	//Reverse conversion
 	return ip.SerializePacket(entry.srcip, entry.dstServiceIp, prot)
 
