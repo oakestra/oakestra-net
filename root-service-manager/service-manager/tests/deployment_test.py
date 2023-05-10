@@ -55,7 +55,7 @@ def test_deploy_request():
         instance={
             "instance_number": 0,
             "instance_ip": "10.30.0.253",
-            "instance_ip_v6": "fdff:0000:0000:0000:0000:0000:0001:0101",
+            "instance_ip_v6": "fdff::1:101",
             "cluster_id": "abc"
         }
     )
@@ -80,7 +80,7 @@ def test_deploy_request_2_instances():
         instance={
             "instance_number": 0,
             "instance_ip": "10.30.0.253",
-            "instance_ip_v6": "fdff:00ff:ffff:ffff:ffff:ffff:ffff:ffff",
+            "instance_ip_v6": "fdff:ff:ffff:ffff:ffff:ffff:ffff:ffff",
             "cluster_id": "abc"
         }
     )
@@ -100,7 +100,7 @@ def test_deploy_request_2_instances():
         instance={
             "instance_number": 1,
             "instance_ip": "10.30.1.0",
-            "instance_ip_v6": "fdff:0800:0000:0000:0000:0000:0000:0000",
+            "instance_ip_v6": "fdff:800::",
             "cluster_id": "abc"
         }
     )
@@ -120,7 +120,7 @@ def test_deploy_request_2_instances():
         instance={
             "instance_number": 2,
             "instance_ip": "10.30.1.1",
-            "instance_ip_v6": "fdff:0800:0000:0000:0000:0000:0000:0001",
+            "instance_ip_v6": "fdff:800::1",
             "cluster_id": "abc"
         }
     )
