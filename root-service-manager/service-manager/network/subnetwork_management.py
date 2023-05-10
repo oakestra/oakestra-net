@@ -359,8 +359,9 @@ def _addr_destringify(addrstr):
 
 
 def _addr_destringify_v6(addrstr):
+    addrobj = ipaddress.ip_address(addrstr)
     addr = []
-    for num in addrstr.split(":"):
+    for num in addrobj.exploded.split(":"):
         addr.append(int(num[0:2], 16))
         addr.append(int(num[2:4], 16))
     return addr
