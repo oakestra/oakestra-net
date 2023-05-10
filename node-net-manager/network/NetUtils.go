@@ -11,6 +11,13 @@ import (
 	"tailscale.com/net/interfaces"
 )
 
+const (
+	NetServiceBitmask    int    = 21
+	NetServiceInstance   string = "fdff:0000::"
+	NetServiceRoundRobin string = "fdff:1000::"
+	NetServiceClosest    string = "fdff:2000::"
+)
+
 // GetLocalIP returns the non loopback local IP of the host and the associated interface
 func GetLocalIPandIface() (string, string) {
 	list, err := net.Interfaces()
