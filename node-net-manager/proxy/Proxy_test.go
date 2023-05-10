@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"NetManager/TableEntryCache"
+	"encoding/hex"
 	"math/rand"
 	"net"
 	"testing"
@@ -12,6 +13,10 @@ import (
 
 type FakeEnv struct {
 }
+
+var ipv6Packet string = "600219310028063ffc000000000000000000000000000203fdff1000000000000000000000000001b98400502a8697ed00000000a002ff322a8900000204056e0402080a7fb1168c0000000001030307"
+var ipv4Packet string = "4500003471ab40003f06b54e0a1e00130a120088a8fc0050866d4e41ec673059801001f6a3fd00000101080aac259946269fb537"
+var ipv4SYNPacket string = "4500003cf20440003f0635810a1e00010a120006b5a2005071f2e51a00000000a002fd5c8ee50000020405820402080a3b625f570000000001030307"
 
 func (fakeenv *FakeEnv) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry {
 	entrytable := make([]TableEntryCache.TableEntry, 0)
@@ -264,5 +269,15 @@ func TestIngoingV6Proxy(t *testing.T) {
 				t.Error("srcIp = ", ipv6.SrcIP.String(), "; want =", srcexpected)
 			}
 		}
+	}
+}
+
+func TestIPv6NextHeader(t *testing.T) {
+	// keep this test in, since the IPv6defragmenter seemed to mess up the parsing of the packet afterwards.
+	// for future safery
+	msg, _ := hex.DecodeString(ipv6Packet)
+	ip, _ := decodePacket(msg)
+	if ip.getNextHeader() != 6 {
+		t.Error("Failed to detect TCP Header in IPv6 Next Header field.")
 	}
 }
