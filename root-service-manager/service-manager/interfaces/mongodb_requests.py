@@ -111,7 +111,6 @@ def mongo_find_job_by_name(job_name):
     global mongo_jobs
     return mongo_jobs.db.jobs.find_one({'job_name': job_name})
 
-# TODO maybe explode IPv6? Check format consistency across all requests
 def mongo_find_job_by_ip(ip):
     global mongo_jobs
     print("Got search job by IP request with IP:", ip)
@@ -128,17 +127,6 @@ def mongo_find_job_by_ip(ip):
         job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
     return job
 
-"""
-# TODO will need to be reworked, depending on architectural design decisions
-def mongo_find_job_by_ip_v6(ip):
-    global mongo_jobs
-    # Search by Service IPv6
-    job = mongo_jobs.db.jobs.find_one({'service_ip_list.Address_v6': ip})
-    if job is None:
-        # Search by instance IPv6
-        job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
-    return job
-"""
 
 def mongo_update_job_instance(system_job_id, instance):
     global mongo_jobs

@@ -2,13 +2,13 @@ package mqtt
 
 import (
 	"NetManager/events"
-	"NetManager/logger"
 	"NetManager/utils"
 	"encoding/json"
-	"github.com/eclipse/paho.mqtt.golang"
 	"log"
 	"sync"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 var runningHandlers = utils.NewStringSlice()
@@ -49,7 +49,7 @@ func (jut *jobUpdatesTimer) startSelfDestructTimeout() {
 		select {
 		case <-eventChan:
 			//event received, reset timer
-			logger.DebugLogger().Printf("received packet event from: %s", jut.job)
+			// TODO reenable logger.DebugLogger().Printf("received packet event from: %s", jut.job)
 			continue
 		case <-time.After(10 * time.Second):
 			if !jut.env.IsServiceDeployed(jut.job) {
