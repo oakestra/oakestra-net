@@ -105,6 +105,16 @@ func EnableForwarding(bridgeName string, proxyName string) {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	// https://github.com/oakestra/oakestra-net/issues/116
+	err = iptable.AppendUnique("nat", "OUTPUT", "-j", chain)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	err = ip6table.AppendUnique("nat", "OUTPUT", "-j", chain)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 }
 
 func EnableMasquerading(address string, mask string, addressipv6 string, ipv6prefix string, bridgeName string, internetIfce string) {
