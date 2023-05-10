@@ -1,4 +1,4 @@
-package proxy
+package iputils
 
 import (
 	"net"
@@ -7,26 +7,26 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-type networkLayerPacket interface {
+type NetworkLayerPacket interface {
 	isNetworkLayer() bool
-	getLayer() gopacket.Layer
-	decodeNetworkLayer(p gopacket.Packet)
-	getTransportLayer() transportLayerProtocol
-	defragment() error
-	getSrcIP() net.IP
-	getDestIP() net.IP
-	getProtocolVersion() uint8
-	getNextHeader() uint8
-	SerializePacket(net.IP, net.IP, transportLayerProtocol) gopacket.Packet
+	GetLayer() gopacket.Layer
+	DecodeNetworkLayer(p gopacket.Packet)
+	GetTransportLayer() TransportLayerProtocol
+	Defragment() error
+	GetSrcIP() net.IP
+	GetDestIP() net.IP
+	GetProtocolVersion() uint8
+	GetNextHeader() uint8
+	SerializePacket(net.IP, net.IP, TransportLayerProtocol) gopacket.Packet
 	serializeUDPHeader(*layers.UDP) gopacket.Packet
 	serializeTCPHeader(*layers.TCP) gopacket.Packet
 }
 
-type networkLayer struct {
-	networkLayerPacket
+type NetworkLayer struct {
+	NetworkLayerPacket
 }
 
-func newNetworkLayerPacket(ipt layers.IPProtocol, nl gopacket.NetworkLayer) networkLayerPacket {
+func NewNetworkLayerPacket(ipt layers.IPProtocol, nl gopacket.NetworkLayer) NetworkLayerPacket {
 	if ipt == layers.IPProtocolIPv4 {
 		return newIPv4Packet(nl)
 	}
@@ -36,7 +36,7 @@ func newNetworkLayerPacket(ipt layers.IPProtocol, nl gopacket.NetworkLayer) netw
 	return nil
 }
 
-func newGoPacket(bytes []byte, ipt layers.IPProtocol) gopacket.Packet {
+func NewGoPacket(bytes []byte, ipt layers.IPProtocol) gopacket.Packet {
 	if ipt == layers.IPProtocolIPv4 {
 		return gopacket.NewPacket(bytes, layers.LayerTypeIPv4, gopacket.Default)
 	}

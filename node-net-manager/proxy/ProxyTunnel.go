@@ -4,6 +4,7 @@ import (
 	"NetManager/TableEntryCache"
 	"NetManager/env"
 	"NetManager/logger"
+	"NetManager/proxy/iputils"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -82,7 +83,7 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 			if ip == nil {
 				continue
 			}
-			logger.DebugLogger().Printf("Outgoing packet:\t\t\t%s ---> %s\n", ip.getSrcIP().String(), ip.getDestIP().String())
+			logger.DebugLogger().Printf("Outgoing packet:\t\t\t%s ---> %s\n", ip.GetSrcIP().String(), ip.GetDestIP().String())
 
 			// continue only if the packet is udp or tcp, otherwise just drop it
 			if prot == nil {
@@ -99,7 +100,7 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 			}
 
 			//fetch remote address
-			dstHost, dstPort := proxy.locateRemoteAddress(ip.getDestIP())
+			dstHost, dstPort := proxy.locateRemoteAddress(ip.GetDestIP())
 
 			//packetForwarding to tunnel interface
 			proxy.forward(dstHost, dstPort, newPacket, 0)
@@ -121,7 +122,7 @@ func (proxy *GoProxyTunnel) ingoingMessage() {
 			if ip == nil {
 				continue
 			}
-			logger.DebugLogger().Printf("Ingoing packet:\t\t\t %s <--- %s\n", ip.getDestIP().String(), ip.getSrcIP().String())
+			logger.DebugLogger().Printf("Ingoing packet:\t\t\t %s <--- %s\n", ip.GetDestIP().String(), ip.GetSrcIP().String())
 
 			// continue only if the packet is udp or tcp, otherwise just drop it
 			if prot == nil {
@@ -148,26 +149,26 @@ func (proxy *GoProxyTunnel) ingoingMessage() {
 
 // If packet destination is in the range of proxy.ProxyIpSubnetwork
 // then find enable load balancing policy and find out the actual dstIP address
-func (proxy *GoProxyTunnel) outgoingProxy(ip networkLayerPacket, prot transportLayerProtocol) gopacket.Packet {
-	dstIP := ip.getDestIP()
-	srcIP := ip.getSrcIP()
+func (proxy *GoProxyTunnel) outgoingProxy(ip iputils.NetworkLayerPacket, prot iputils.TransportLayerProtocol) gopacket.Packet {
+	dstIP := ip.GetDestIP()
+	srcIP := ip.GetSrcIP()
 	var semanticRoutingSubnetwork bool
 
 	srcport := -1
 	dstport := -1
 	if prot != nil {
-		srcport = int(prot.getSourcePort())
-		dstport = int(prot.getDestPort())
+		srcport = int(prot.GetSourcePort())
+		dstport = int(prot.GetDestPort())
 	}
 
 	//If packet destination is part of the semantic routing subnetwork let the proxy handle it
-	if ip.getProtocolVersion() == 4 {
+	if ip.GetProtocolVersion() == 4 {
 		semanticRoutingSubnetwork = proxy.ProxyIpSubnetwork.IP.Mask(proxy.ProxyIpSubnetwork.Mask).
-			Equal(ip.getDestIP().Mask(proxy.ProxyIpSubnetwork.Mask))
+			Equal(ip.GetDestIP().Mask(proxy.ProxyIpSubnetwork.Mask))
 	}
-	if ip.getProtocolVersion() == 6 {
+	if ip.GetProtocolVersion() == 6 {
 		semanticRoutingSubnetwork = proxy.ProxyIPv6Subnetwork.IP.Mask(proxy.ProxyIPv6Subnetwork.Mask).
-			Equal(ip.getDestIP().Mask(proxy.ProxyIPv6Subnetwork.Mask))
+			Equal(ip.GetDestIP().Mask(proxy.ProxyIPv6Subnetwork.Mask))
 	}
 
 	if semanticRoutingSubnetwork {
@@ -193,7 +194,7 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip networkLayerPacket, prot transportL
 			tableEntry := tableEntryList[proxy.randseed.Intn(len(tableEntryList))]
 
 			entryDstIP := tableEntry.Nsipv6
-			if ip.getProtocolVersion() == 4 {
+			if ip.GetProtocolVersion() == 4 {
 				entryDstIP = tableEntry.Nsip
 			}
 
@@ -216,40 +217,40 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip networkLayerPacket, prot transportL
 	return nil
 }
 
-func (proxy *GoProxyTunnel) convertToInstanceIp(ip networkLayerPacket) (net.IP, error) {
-	instanceTableEntry, instanceexist := proxy.environment.GetTableEntryByNsIP(ip.getSrcIP())
+func (proxy *GoProxyTunnel) convertToInstanceIp(ip iputils.NetworkLayerPacket) (net.IP, error) {
+	instanceTableEntry, instanceexist := proxy.environment.GetTableEntryByNsIP(ip.GetSrcIP())
 	instanceIP := net.IP{}
 	if instanceexist {
 		for _, sip := range instanceTableEntry.ServiceIP {
 			if sip.IpType == TableEntryCache.InstanceNumber {
 				instanceIP = sip.Address_v6
-				if ip.getProtocolVersion() == 4 {
+				if ip.GetProtocolVersion() == 4 {
 					instanceIP = sip.Address
 				}
 			}
 		}
 	} else {
-		logger.ErrorLogger().Println("Unable to find instance IP for service: ", ip.getSrcIP())
-		return nil, errors.New(fmt.Sprintf("Unable to find instance IP for service: %s ", ip.getSrcIP().String()))
+		logger.ErrorLogger().Println("Unable to find instance IP for service: ", ip.GetSrcIP())
+		return nil, errors.New(fmt.Sprintf("Unable to find instance IP for service: %s ", ip.GetSrcIP().String()))
 	}
 	return instanceIP, nil
 }
 
 // If packet destination port is proxy.tunnelport then is a packet forwarded by the proxy. The src address must beù
 // changed with he original packet destination
-func (proxy *GoProxyTunnel) ingoingProxy(ip networkLayerPacket, prot transportLayerProtocol) gopacket.Packet {
+func (proxy *GoProxyTunnel) ingoingProxy(ip iputils.NetworkLayerPacket, prot iputils.TransportLayerProtocol) gopacket.Packet {
 
 	dstport := -1
 	srcport := -1
 
 	if prot != nil {
-		dstport = int(prot.getDestPort())
-		srcport = int(prot.getSourcePort())
+		dstport = int(prot.GetDestPort())
+		srcport = int(prot.GetSourcePort())
 	}
 
 	//Check proxy proxycache for REVERSE entry conversion
 	//DstIP -> srcip, DstPort->srcport, srcport -> dstport
-	entry, exist := proxy.proxycache.RetrieveByInstanceIp(ip.getDestIP(), dstport, srcport)
+	entry, exist := proxy.proxycache.RetrieveByInstanceIp(ip.GetDestIP(), dstport, srcport)
 
 	if !exist {
 		//No proxy proxycache entry, no translation needed
@@ -495,7 +496,7 @@ func (proxy *GoProxyTunnel) GetFinishCh() <-chan bool {
 	return proxy.finishChannel
 }
 
-func decodePacket(msg []byte) (networkLayerPacket, transportLayerProtocol) {
+func decodePacket(msg []byte) (iputils.NetworkLayerPacket, iputils.TransportLayerProtocol) {
 	// version == true means packet contains IPv4 Header
 	// version == false means packet contains IPv6 Header
 	var ipType layers.IPProtocol
@@ -508,7 +509,7 @@ func decodePacket(msg []byte) (networkLayerPacket, transportLayerProtocol) {
 		return nil, nil
 	}
 
-	packet := newGoPacket(msg, ipType)
+	packet := iputils.NewGoPacket(msg, ipType)
 	if packet == nil {
 		logger.DebugLogger().Println("Error decoding Network Layer of Packet")
 	}
@@ -519,17 +520,17 @@ func decodePacket(msg []byte) (networkLayerPacket, transportLayerProtocol) {
 		return nil, nil
 	}
 
-	res := newNetworkLayerPacket(ipType, ipLayer)
+	res := iputils.NewNetworkLayerPacket(ipType, ipLayer)
 	if ipType == layers.IPProtocolIPv6 {
-		res.decodeNetworkLayer(packet)
+		res.DecodeNetworkLayer(packet)
 	}
 
-	err := res.defragment()
+	err := res.Defragment()
 	if err != nil {
 		logger.ErrorLogger().Println("Error in defragmentation")
 		return nil, nil
 	}
 
-	return res, res.getTransportLayer()
+	return res, res.GetTransportLayer()
 
 }

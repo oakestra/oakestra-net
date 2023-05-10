@@ -1,4 +1,4 @@
-package proxy
+package iputils
 
 import (
 	"NetManager/logger"
@@ -17,13 +17,13 @@ type IPv4Packet struct {
 // IPv4 defragger
 var v4defragger = ip4defrag.NewIPv4Defragmenter()
 
-func newIPv4Packet(nl gopacket.NetworkLayer) networkLayerPacket {
+func newIPv4Packet(nl gopacket.NetworkLayer) NetworkLayerPacket {
 	return &IPv4Packet{
 		IPv4: nl.(*layers.IPv4),
 	}
 }
 
-func (packet *IPv4Packet) decodeNetworkLayer(gop gopacket.Packet) {
+func (packet *IPv4Packet) DecodeNetworkLayer(gop gopacket.Packet) {
 	ipv4 := gop.Layer(layers.LayerTypeIPv4)
 	if ipv4 == nil {
 		// not an IPv4 packet
@@ -37,19 +37,19 @@ func (packet *IPv4Packet) isNetworkLayer() bool {
 	return true
 }
 
-func (packet *IPv4Packet) getLayer() gopacket.Layer {
+func (packet *IPv4Packet) GetLayer() gopacket.Layer {
 	return packet.IPv4
 }
 
-func (packet *IPv4Packet) getProtocolVersion() uint8 {
+func (packet *IPv4Packet) GetProtocolVersion() uint8 {
 	return packet.IPv4.Version
 }
 
-func (packet *IPv4Packet) getNextHeader() uint8 {
+func (packet *IPv4Packet) GetNextHeader() uint8 {
 	return uint8(packet.IPv4.Protocol)
 }
 
-func (packet *IPv4Packet) getTransportLayer() transportLayerProtocol {
+func (packet *IPv4Packet) GetTransportLayer() TransportLayerProtocol {
 	if packet == nil {
 		logger.ErrorLogger().Println("Got a nil packet")
 		return nil
@@ -78,7 +78,7 @@ func (packet *IPv4Packet) getTransportLayer() transportLayerProtocol {
 	}
 }
 
-func (packet *IPv4Packet) defragment() error {
+func (packet *IPv4Packet) Defragment() error {
 	ipv4Defrag, err := v4defragger.DefragIPv4(packet.IPv4)
 	if err != nil {
 		fmt.Println(err)
@@ -90,14 +90,14 @@ func (packet *IPv4Packet) defragment() error {
 	return nil
 }
 
-func (ip *IPv4Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot transportLayerProtocol) gopacket.Packet {
+func (ip *IPv4Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot TransportLayerProtocol) gopacket.Packet {
 	ip.DstIP = dstIp
 	ip.SrcIP = srcIp
 
-	if prot.getProtocol() == "TCP" {
-		return ip.serializeTCPHeader(prot.getTCPLayer())
+	if prot.GetProtocol() == "TCP" {
+		return ip.serializeTCPHeader(prot.GetTCPLayer())
 	} else {
-		return ip.serializeUDPHeader(prot.getUDPLayer())
+		return ip.serializeUDPHeader(prot.GetUDPLayer())
 	}
 }
 
@@ -140,10 +140,10 @@ func (ip *IPv4Packet) serializeIPHeader(transportLayer gopacket.SerializableLaye
 	return gopacket.NewPacket(buffer.Bytes(), layers.LayerTypeIPv4, gopacket.Default)
 }
 
-func (packet *IPv4Packet) getDestIP() net.IP {
+func (packet *IPv4Packet) GetDestIP() net.IP {
 	return packet.DstIP
 }
 
-func (packet *IPv4Packet) getSrcIP() net.IP {
+func (packet *IPv4Packet) GetSrcIP() net.IP {
 	return packet.SrcIP
 }

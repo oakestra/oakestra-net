@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"NetManager/TableEntryCache"
+	"NetManager/proxy/iputils"
 	"encoding/hex"
 	"math/rand"
 	"net"
@@ -99,50 +100,50 @@ func getFakeTunnel() GoProxyTunnel {
 	return tunnel
 }
 
-func getFakePacket(srcIP string, dstIP string, srcPort int, dstPort int) (gopacket.Packet, *networkLayer, *transportLayer) {
-	ipLayer := networkLayer{&IPv4Packet{&layers.IPv4{
+func getFakePacket(srcIP string, dstIP string, srcPort int, dstPort int) (gopacket.Packet, iputils.NetworkLayerPacket, iputils.TransportLayerProtocol) {
+	ipLayer := &iputils.IPv4Packet{IPv4: &layers.IPv4{
 		SrcIP:    net.ParseIP(srcIP),
 		DstIP:    net.ParseIP(dstIP),
 		Protocol: layers.IPProtocolTCP,
 		Version:  4,
-	}}}
-	tcpLayer := transportLayer{&TCPLayer{&layers.TCP{
+	}}
+	tcpLayer := &iputils.TCPLayer{TCP: &layers.TCP{
 		SrcPort: layers.TCPPort(srcPort),
 		DstPort: layers.TCPPort(dstPort),
 		SYN:     true,
-	}}}
+	}}
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: false,
 	}
-	ip := ipLayer.getLayer().(*layers.IPv4)
-	tcpLayer.getTCPLayer().SetNetworkLayerForChecksum(ip)
-	_ = gopacket.SerializeLayers(buf, opts, ipLayer.getLayer().(*layers.IPv4), tcpLayer.getTCPLayer())
-	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default), &ipLayer, &tcpLayer
+	ip := ipLayer.GetLayer().(*layers.IPv4)
+	tcpLayer.GetTCPLayer().SetNetworkLayerForChecksum(ip)
+	_ = gopacket.SerializeLayers(buf, opts, ipLayer.GetLayer().(*layers.IPv4), tcpLayer.GetTCPLayer())
+	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default), ipLayer, tcpLayer
 }
 
-func getFakeV6Packet(srcIP string, dstIP string, srcPort int, dstPort int) (gopacket.Packet, *networkLayer, *transportLayer) {
-	ipLayer := networkLayer{&IPv6Packet{&layers.IPv6{
+func getFakeV6Packet(srcIP string, dstIP string, srcPort int, dstPort int) (gopacket.Packet, iputils.NetworkLayerPacket, iputils.TransportLayerProtocol) {
+	ipLayer := &iputils.IPv6Packet{IPv6: &layers.IPv6{
 		SrcIP:      net.ParseIP(srcIP),
 		DstIP:      net.ParseIP(dstIP),
 		NextHeader: layers.IPProtocolTCP,
 		Version:    6,
-	}, nil}} // no IPv6 fragment in IPv6Packet struct
-	tcpLayer := transportLayer{&TCPLayer{&layers.TCP{
+	}, IPv6Fragment: nil} // no IPv6 fragment in IPv6Packet struct
+	tcpLayer := &iputils.TCPLayer{TCP: &layers.TCP{
 		SrcPort: layers.TCPPort(srcPort),
 		DstPort: layers.TCPPort(dstPort),
 		SYN:     true,
-	}}}
+	}}
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: false,
 	}
-	ip := ipLayer.getLayer().(*layers.IPv6)
-	tcpLayer.getTCPLayer().SetNetworkLayerForChecksum(ip)
-	_ = gopacket.SerializeLayers(buf, opts, ipLayer.getLayer().(*layers.IPv6), tcpLayer.getTCPLayer())
-	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv6, gopacket.Default), &ipLayer, &tcpLayer
+	ip := ipLayer.GetLayer().(*layers.IPv6)
+	tcpLayer.GetTCPLayer().SetNetworkLayerForChecksum(ip)
+	_ = gopacket.SerializeLayers(buf, opts, ipLayer.GetLayer().(*layers.IPv6), tcpLayer.GetTCPLayer())
+	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv6, gopacket.Default), ipLayer, tcpLayer
 }
 
 func TestOutgoingProxy(t *testing.T) {
@@ -277,7 +278,7 @@ func TestIPv6NextHeader(t *testing.T) {
 	// for future safery
 	msg, _ := hex.DecodeString(ipv6Packet)
 	ip, _ := decodePacket(msg)
-	if ip.getNextHeader() != 6 {
+	if ip.GetNextHeader() != 6 {
 		t.Error("Failed to detect TCP Header in IPv6 Next Header field.")
 	}
 }

@@ -1,4 +1,4 @@
-package proxy
+package iputils
 
 import (
 	"NetManager/logger"
@@ -18,7 +18,7 @@ type IPv6Packet struct {
 // IPv6 defragger
 var v6defragger = ip6defrag.NewIPv6Defragmenter()
 
-func newIPv6Packet(nl gopacket.NetworkLayer) networkLayerPacket {
+func newIPv6Packet(nl gopacket.NetworkLayer) NetworkLayerPacket {
 	return &IPv6Packet{
 		IPv6:         nl.(*layers.IPv6),
 		IPv6Fragment: &layers.IPv6Fragment{},
@@ -29,19 +29,19 @@ func (packet *IPv6Packet) isNetworkLayer() bool {
 	return true
 }
 
-func (packet *IPv6Packet) getLayer() gopacket.Layer {
+func (packet *IPv6Packet) GetLayer() gopacket.Layer {
 	return packet.IPv6
 }
 
-func (packet *IPv6Packet) getProtocolVersion() uint8 {
+func (packet *IPv6Packet) GetProtocolVersion() uint8 {
 	return packet.Version
 }
 
-func (packet *IPv6Packet) getNextHeader() uint8 {
+func (packet *IPv6Packet) GetNextHeader() uint8 {
 	return uint8(packet.IPv6.NextHeader)
 }
 
-func (packet *IPv6Packet) decodeNetworkLayer(gop gopacket.Packet) {
+func (packet *IPv6Packet) DecodeNetworkLayer(gop gopacket.Packet) {
 	ipv6 := gop.Layer(layers.LayerTypeIPv6)
 	ipv6Fields := ipv6.(*layers.IPv6)
 	var ipv6FragmentFields *layers.IPv6Fragment
@@ -56,7 +56,7 @@ func (packet *IPv6Packet) decodeNetworkLayer(gop gopacket.Packet) {
 	packet.IPv6Fragment = ipv6FragmentFields
 }
 
-func (packet *IPv6Packet) defragment() error {
+func (packet *IPv6Packet) Defragment() error {
 	/*
 		ipv6Defrag, err := v6defragger.DefragIPv6(packet.IPv6, packet.IPv6Fragment)
 		if err != nil {
@@ -73,7 +73,7 @@ func (packet *IPv6Packet) defragment() error {
 	return nil
 }
 
-func (packet *IPv6Packet) getTransportLayer() transportLayerProtocol {
+func (packet *IPv6Packet) GetTransportLayer() TransportLayerProtocol {
 	switch packet.IPv6.NextHeader {
 	case layers.IPProtocolUDP:
 		udplayer := packet.IPv6.LayerPayload()
@@ -98,14 +98,14 @@ func (packet *IPv6Packet) getTransportLayer() transportLayerProtocol {
 	}
 }
 
-func (ip *IPv6Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot transportLayerProtocol) gopacket.Packet {
+func (ip *IPv6Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot TransportLayerProtocol) gopacket.Packet {
 	ip.DstIP = dstIp
 	ip.SrcIP = srcIp
 
-	if prot.getProtocol() == "TCP" {
-		return ip.serializeTCPHeader(prot.getTCPLayer())
+	if prot.GetProtocol() == "TCP" {
+		return ip.serializeTCPHeader(prot.GetTCPLayer())
 	} else {
-		return ip.serializeUDPHeader(prot.getUDPLayer())
+		return ip.serializeUDPHeader(prot.GetUDPLayer())
 	}
 }
 
@@ -148,10 +148,10 @@ func (ip *IPv6Packet) serializeIPHeader(transportLayer gopacket.SerializableLaye
 	return gopacket.NewPacket(buffer.Bytes(), layers.LayerTypeIPv6, gopacket.Default)
 }
 
-func (packet *IPv6Packet) getDestIP() net.IP {
+func (packet *IPv6Packet) GetDestIP() net.IP {
 	return packet.DstIP
 }
 
-func (packet *IPv6Packet) getSrcIP() net.IP {
+func (packet *IPv6Packet) GetSrcIP() net.IP {
 	return packet.SrcIP
 }
