@@ -18,6 +18,13 @@ type IPv6Packet struct {
 // IPv6 defragger
 var v6defragger = ip6defrag.NewIPv6Defragmenter()
 
+func newIPv6Packet(nl gopacket.NetworkLayer) networkLayerPacket {
+	return &IPv6Packet{
+		IPv6:         nl.(*layers.IPv6),
+		IPv6Fragment: &layers.IPv6Fragment{},
+	}
+}
+
 func (packet *IPv6Packet) isNetworkLayer() bool {
 	return true
 }
@@ -28,6 +35,10 @@ func (packet *IPv6Packet) getLayer() gopacket.Layer {
 
 func (packet *IPv6Packet) getProtocolVersion() uint8 {
 	return packet.Version
+}
+
+func (packet *IPv6Packet) getNextHeader() uint8 {
+	return uint8(packet.IPv6.NextHeader)
 }
 
 func (packet *IPv6Packet) decodeNetworkLayer(gop gopacket.Packet) {
@@ -46,28 +57,33 @@ func (packet *IPv6Packet) decodeNetworkLayer(gop gopacket.Packet) {
 }
 
 func (packet *IPv6Packet) defragment() error {
-	ipv6Defrag, err := v6defragger.DefragIPv6(packet.IPv6, packet.IPv6Fragment)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	} else if ipv6Defrag == nil {
-		return fmt.Errorf("packet was a fragment. Saved state and waiting for rest")
-	}
-	packet.IPv6 = ipv6Defrag
+	/*
+		ipv6Defrag, err := v6defragger.DefragIPv6(packet.IPv6, packet.IPv6Fragment)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		} else if ipv6Defrag == nil {
+			return fmt.Errorf("packet was a fragment. Saved state and waiting for rest")
+		}
+		packet.IPv6 = ipv6Defrag
+		return nil
+	*/
+	// TODO fix broken
+	// overwrites NextHeader Value for whatever reason
 	return nil
 }
 
-func (packet *IPv6Packet) getTransportLayer() *transportLayer {
+func (packet *IPv6Packet) getTransportLayer() transportLayerProtocol {
 	switch packet.IPv6.NextHeader {
 	case layers.IPProtocolUDP:
 		udplayer := packet.IPv6.LayerPayload()
-		// TODO maybe create a New... function, returning a pointer
+		// TODO create factory
 		udp := &UDPLayer{&layers.UDP{}}
 		err := udp.DecodeFromBytes(udplayer, gopacket.NewDecodingLayerParser(layers.LayerTypeUDP))
 		if err != nil {
 			logger.ErrorLogger().Println("Could not decode IPv6 UDP packet.")
 		}
-		return &transportLayer{udp}
+		return udp
 	case layers.IPProtocolTCP:
 		tcplayer := packet.IPv6.LayerPayload()
 		tcp := &TCPLayer{&layers.TCP{}}
@@ -75,13 +91,14 @@ func (packet *IPv6Packet) getTransportLayer() *transportLayer {
 		if err != nil {
 			logger.ErrorLogger().Println("Could not decode IPv6 TCP packet.")
 		}
-		return &transportLayer{tcp}
+		return tcp
 	default:
+		logger.ErrorLogger().Println("Could not determine TransportLayer of IPv6 Packet.")
 		return nil
 	}
 }
 
-func (ip *IPv6Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot *transportLayer) gopacket.Packet {
+func (ip *IPv6Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot transportLayerProtocol) gopacket.Packet {
 	ip.DstIP = dstIp
 	ip.SrcIP = srcIp
 

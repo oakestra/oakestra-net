@@ -17,6 +17,12 @@ type IPv4Packet struct {
 // IPv4 defragger
 var v4defragger = ip4defrag.NewIPv4Defragmenter()
 
+func newIPv4Packet(nl gopacket.NetworkLayer) networkLayerPacket {
+	return &IPv4Packet{
+		IPv4: nl.(*layers.IPv4),
+	}
+}
+
 func (packet *IPv4Packet) decodeNetworkLayer(gop gopacket.Packet) {
 	ipv4 := gop.Layer(layers.LayerTypeIPv4)
 	if ipv4 == nil {
@@ -39,36 +45,33 @@ func (packet *IPv4Packet) getProtocolVersion() uint8 {
 	return packet.IPv4.Version
 }
 
-func (packet *IPv4Packet) getTransportLayer() *transportLayer {
-	// TODO discuss this function with Giovanni, since it is ugly as fuck
+func (packet *IPv4Packet) getNextHeader() uint8 {
+	return uint8(packet.IPv4.Protocol)
+}
+
+func (packet *IPv4Packet) getTransportLayer() transportLayerProtocol {
 	if packet == nil {
 		logger.ErrorLogger().Println("Got a nil packet")
 		return nil
 	}
 	switch packet.Protocol {
 	case layers.IPProtocolUDP:
-		logger.DebugLogger().Println("Got a UDP packet to return: ", packet.Protocol)
 		udplayer := packet.LayerPayload()
-		logger.DebugLogger().Println("UDP packet had payload: ", udplayer)
 		udp := &UDPLayer{&layers.UDP{}}
 		err := udp.UDP.DecodeFromBytes(udplayer, gopacket.NilDecodeFeedback)
 		if err != nil {
 			logger.ErrorLogger().Println("Could not decode IPv4 UDP packet.")
 		}
 		logger.DebugLogger().Println("UDP packet returning: ", udp)
-		return &transportLayer{udp}
+		return udp
 	case layers.IPProtocolTCP:
-		logger.DebugLogger().Println("Got a TCP packet to return: ", packet.Protocol)
 		tcplayer := packet.LayerPayload()
-		logger.DebugLogger().Println("TCP packet had payload: ", tcplayer)
 		tcp := &TCPLayer{&layers.TCP{}}
-		logger.DebugLogger().Println("TCP packet to be filled: ", tcp)
 		err := tcp.TCP.DecodeFromBytes(tcplayer, gopacket.NilDecodeFeedback)
 		if err != nil {
 			logger.ErrorLogger().Println("Could not decode IPv4 TCP packet.")
 		}
-		logger.DebugLogger().Println("TCP packet returning: ", tcp)
-		return &transportLayer{tcp}
+		return tcp
 	default:
 		logger.DebugLogger().Println("Could not determine TransportLayer of IPv4 Packet.")
 		return nil
@@ -87,7 +90,7 @@ func (packet *IPv4Packet) defragment() error {
 	return nil
 }
 
-func (ip *IPv4Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot *transportLayer) gopacket.Packet {
+func (ip *IPv4Packet) SerializePacket(dstIp net.IP, srcIp net.IP, prot transportLayerProtocol) gopacket.Packet {
 	ip.DstIP = dstIp
 	ip.SrcIP = srcIp
 

@@ -144,6 +144,7 @@ def new_job_rr_address_v6(job_data):
             return address
         else:
             raise Exception("Invalid RR_ip_v6 address length")
+        # TODO write new function for correct subnet
     return new_instance_ip_v6()
 
 
@@ -347,7 +348,7 @@ def _increase_subnetwork_address_v6(addr):
 
 
 def _addr_stringify(addr):
-    return ipaddress.ip_address(bytes(addr)).exploded
+    return ipaddress.ip_address(bytes(addr)) #.exploded
 
 
 def _addr_destringify(addrstr):

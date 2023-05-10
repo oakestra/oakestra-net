@@ -202,7 +202,7 @@ func (t *TableManager) isValid(entry TableEntry) bool {
 
 func IsNamespaceStillValid(nsip net.IP, table *[]TableEntry) bool {
 	for _, entry := range *table {
-		if entry.Nsip.Equal(nsip) {
+		if entry.Nsip.Equal(nsip) || entry.Nsipv6.Equal(nsip) {
 			return true
 		}
 	}
