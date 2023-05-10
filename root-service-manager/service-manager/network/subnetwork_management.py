@@ -348,7 +348,7 @@ def _increase_subnetwork_address_v6(addr):
 
 
 def _addr_stringify(addr):
-    return ipaddress.ip_address(bytes(addr)) #.exploded
+    return str(ipaddress.ip_address(bytes(addr)))
 
 
 def _addr_destringify(addrstr):
