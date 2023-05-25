@@ -11,9 +11,9 @@ def test_instance_address_base():
     mongodb_client.mongo_update_next_service_ip_v6 = MagicMock()
 
     ip1 = new_instance_ip_v6()
-    assert ip1 == "fdff::"
+    assert ip1 == "fdff:0000:0000:0000:0000:0000:0000:0000"
 
-    mongodb_client.mongo_update_next_service_ip_v6.assert_called_with([253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    mongodb_client.mongo_update_next_service_ip_v6.assert_called_with([253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
 def test_instance_address_complex():
@@ -23,7 +23,7 @@ def test_instance_address_complex():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     ip1 = new_instance_ip_v6()
-    assert ip1 == "fdff::2:0:101"
+    assert ip1 == "fdff:0000:0000:0000:0000:0002:0000:0101"
 
     mongodb_client.mongo_update_next_service_ip_v6.assert_called_with([253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1, 2])
 
@@ -38,7 +38,7 @@ def test_instance_address_recycle():
 
     # test address generation
     ip1 = new_instance_ip_v6()
-    assert ip1 == "fdff::"
+    assert ip1 == "fdff:0000:0000:0000:0000:0000:0000:0000"
 
     # mock next address
     mongodb_client.mongo_get_next_service_ip_v6 = MagicMock(return_value=[253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
@@ -58,7 +58,7 @@ def test_instance_address_recycle_failure_1():
 
     # test address generation
     ip1 = new_instance_ip_v6()
-    assert ip1 == "fdff::"
+    assert ip1 == "fdff:0000:0000:0000:0000:0000:0000:0000"
 
     # mock next address
     mongodb_client.mongo_get_next_service_ip_v6 = MagicMock(return_value=[253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
@@ -66,7 +66,7 @@ def test_instance_address_recycle_failure_1():
     # test clearance condition
     passed = False
     try:
-        clear_instance_ip_v6("fdff::1")
+        clear_instance_ip_v6("fdff:0000:0000:0000:0000:0000:0000:0001")
         passed = True
     except:
         pass
@@ -82,8 +82,8 @@ def test_instance_address_recycle_failure_2():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     # test address generation
-    ip1 = new_instance_ip_v6()
-    assert ip1 == "fdff::"
+    ip1 = new_instance_ip()
+    assert ip1 == "fdff:0000:0000:0000:0000:0000:0000:0000"
 
     # mock next address
     mongodb_client.mongo_get_next_service_ip = MagicMock(return_value=[253, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
@@ -91,7 +91,7 @@ def test_instance_address_recycle_failure_2():
     # test clearance condition
     passed = False
     try:
-        clear_instance_ip_v6("fdfe::")
+        clear_instance_ip_v6("fdfe:0000:0000:0000:0000:0000:0000:0000")
         passed = True
     except:
         pass
@@ -105,7 +105,7 @@ def test_subnet_address_base():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     ip1 = new_subnetwork_addr_v6()
-    assert ip1 == "fc00::"
+    assert ip1 == "fc00:0000:0000:0000:0000:0000:0000:0000"
 
     mongodb_client.mongo_update_next_subnet_ip_v6.assert_called_with([252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
 
@@ -117,7 +117,7 @@ def test_subnet_address_complex_1():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     ip1 = new_subnetwork_addr_v6()
-    assert ip1 == "fc00::7fff:ffff:ffff:ff00"
+    assert ip1 == "fc00:0000:0000:0000:7fff:ffff:ffff:ff00"
 
     mongodb_client.mongo_update_next_subnet_ip_v6.assert_called_with([252, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0])
 
@@ -129,7 +129,7 @@ def test_subnet_address_complex_2():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     ip1 = new_subnetwork_addr_v6()
-    assert ip1 == "fc00:0:700:1:ff05:403:2ff:ff00"
+    assert ip1 == "fc00:0000:0700:0001:ff05:0403:02ff:ff00"
 
     mongodb_client.mongo_update_next_subnet_ip_v6.assert_called_with([252, 0, 0, 0, 7, 0, 0, 1, 255, 5, 4, 3, 3, 0, 0, 0])
 
@@ -156,8 +156,8 @@ def test_subnet_address_recycle():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     # test address generation
-    ip1 = new_subnetwork_addr_v6()
-    assert ip1 == "fc00::100"
+    ip1 = new_subnetwork_addr()
+    assert ip1 == "fc00:0000:0000:0000:0000:0000:0000:0100"
 
     # mock next address
     mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0])
@@ -178,14 +178,14 @@ def test_subnet_address_recycle_failure_1():
 
     # test address generation
     ip1 = new_subnetwork_addr_v6()
-    assert ip1 == "fc00::100"
+    assert ip1 == "fc00:0000:0000:0000:0000:0000:0000:0100"
 
     # mock next address
     mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0])
 
     passed = False
     try:
-        clear_subnetwork_ip_v6("fc::200")
+        clear_subnetwork_ip_v6("fc00:0000:0000:0000:0000:0000:0000:0200")
         passed = True
     except:
         pass
@@ -202,14 +202,14 @@ def test_subnet_address_recycle_failure_2():
 
     # test address generation
     ip1 = new_subnetwork_addr_v6()
-    assert ip1 == "fc00::100"
+    assert ip1 == "fc00:0000:0000:0000:0000:0000:0000:0200"
 
     # mock next address
     mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0])
 
     passed = False
     try:
-        clear_subnetwork_ip_v6("fc00:0:dead:beef:c01d:c0ff:ee00:0")
+        clear_subnetwork_ip_v6("fc00:0000:dead:beef:c01d:c0ff:ee00:0000")
         passed = True
     except:
         pass
@@ -225,7 +225,7 @@ def test_new_job_rr_address():
 
     file = {
         'RR_ip': '10.30.0.1',
-        'RR_ip_v6': 'fdff:1000::1337',
+        'RR_ip_v6': 'fdff:2000:0000:0000:0000:0000:0000:1337',
         'app_name': 's1',
         'app_ns': 'test',
         'service_name': 's1',
@@ -234,7 +234,7 @@ def test_new_job_rr_address():
 
     addr = new_job_rr_address_v6(file)
 
-    assert 'fdff:1000::1337' == addr
+    assert 'fdff:2000:0000:0000:0000:0000:0000:1337' == addr
 
 
 def test_new_job_rr_address_fail1():
@@ -246,7 +246,7 @@ def test_new_job_rr_address_fail1():
 
     file = {
         'RR_ip': '10.20.0.1',
-        'RR_ip_v6': 'fdff:2000::1337',
+        'RR_ip_v6': 'fdff:2000:0000:0000:0000:0000:0000:1337',
         'app_name': 's1',
         'app_ns': 'test',
         'service_name': 's1',
@@ -272,7 +272,7 @@ def test_new_job_rr_address_fail2():
 
     file = {
         'RR_ip': '173.30.0.1',
-        'RR_ip_v6': '2001:db80::1337',
+        'RR_ip_v6': '2001:db80:0000:0000:0000:0000:0000:1337',
         'app_name': 's1',
         'app_ns': 'test',
         'service_name': 's1',
@@ -304,6 +304,5 @@ def test_new_job_rr_address_fail3():
     }
 
     addr = new_job_rr_address_v6(file)
-    # TODO fix this. It should be fdff:1000:: . see function implementation commentary
-    assert addr == 'fdff::'
+    assert addr == 'fdff:2000:0000:0000:0000:0000:0000:0000'
 

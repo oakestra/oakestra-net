@@ -127,6 +127,17 @@ def mongo_find_job_by_ip(ip):
         job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
     return job
 
+"""
+# TODO will need to be reworked, depending on architectural design decisions
+def mongo_find_job_by_ip_v6(ip):
+    global mongo_jobs
+    # Search by Service IPv6
+    job = mongo_jobs.db.jobs.find_one({'service_ip_list.Address_v6': ip})
+    if job is None:
+        # Search by instance IPv6
+        job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
+    return job
+"""
 
 def mongo_update_job_instance(system_job_id, instance):
     global mongo_jobs
@@ -334,6 +345,11 @@ def mongo_free_subnet_address_to_cache(address):
 # ........... IPv6 ................................#
 ####################################################
 
+# ....... Instance IP ........#
+###############################
+
+# TODO rename functions and db entries to instance IP
+
 def mongo_get_service_address_from_cache_v6():
     """
     Pop an available Service address, if any, from the free addresses cache
@@ -350,7 +366,7 @@ def mongo_get_service_address_from_cache_v6():
         return entry["ipv6"]
     else:
         return None
-
+    
 
 def mongo_free_service_address_to_cache_v6(address):
     """
@@ -416,6 +432,94 @@ def mongo_update_next_service_ip_v6(address):
 
     netcache.update_one({'type': 'next_service_ipv6'}, {'$set': {'ipv6': address}})
 
+
+# ....... Round Robin IP ........#
+##################################
+
+def mongo_get_rr_address_from_cache_v6():
+    """
+    Pop an available Round Robin address, if any, from the free addresses cache
+    @return: int[16] in the shape [253, 255, 32, a, b, c, d, e, f, g, h, i, j, k, l, m]
+             equal to [fdff:2000::]"""
+    global mongo_net
+    netdb = mongo_net.db.netcache
+
+    entry = netdb.find_one({'type': 'free_rr_ipv6'})
+
+    if entry is not None:
+        netdb.delete_one({"_id": entry["_id"]})
+        return entry["ipv6"]
+    else:
+        return None
+
+def mongo_free_rr_address_to_cache_v6(address):
+    """
+    Add back a Round Robin address to the cache
+    @param address: int[16] in the shape [253, 255, 32, a, b, c, d, e, f, g, h, i, j, k, l, m]
+    """
+    global mongo_net
+    netcache = mongo_net.db.netcache
+
+    assert len(address) == 16
+    for n in address:
+        assert 0 <= n < 256
+    
+    assert address[0] == 253
+    assert address[1] == 255
+    assert address[2] == 32
+    assert 0 <= address[3] < 8
+
+    netcache.insert_one({
+        'type': 'free_rr_ipv6',
+        'ipv6': address
+    })
+
+
+def mongo_get_next_rr_ip_v6():
+    """
+    Returns the next available ip address from the Round Robin addressing space fdff:2000::/21
+    @return: int[16] in the shape [253, 255, 32, a, b, c, d, e, f, g, h, i, j, k, l, m]
+    """
+    global mongo_net
+    netcache = mongo_net.db.netcache
+
+    next_addr = netcache.find_one({'type': 'next_rr_ipv6'})
+
+    if next_addr is not None:
+        return next_addr["ipv6"]
+    else:
+        ipv6arr = [253, 255, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        netcache = mongo_net.db.netcache
+        id = netcache.insert_one({
+            'type': 'next_rr_ipv6',
+            'ipv6': ipv6arr
+        })
+        return ipv6arr
+
+
+def mongo_update_next_rr_ip_v6(address):
+    """
+    Update the value for the next Round Robin ip available
+    @param address: int[16] in the form [253, 255, 32, a, b, c, d, e, f, g, h, i, j, k, l, m] 
+        monotonically increasing with respect to the previous address
+    """
+    global mongo_net
+    netcache = mongo_net.db.netcache
+
+    # sanity check for the address
+    assert len(address) == 16
+    for n in address:
+        assert 0 <= n < 256
+
+    assert address[0] == 253
+    assert address[1] == 255
+    assert address[2] == 32
+    assert 0 <= address[3] < 8
+
+    netcache.update_one({'type': 'next_service_ipv6'}, {'$set': {'ipv6': address}})
+    
+# ....... Subnet ........#
+##########################
 
 def mongo_get_next_subnet_ip_v6():
     """
