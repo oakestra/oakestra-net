@@ -415,7 +415,7 @@ def mongo_get_next_service_ip_v6():
 def mongo_update_next_service_ip_v6(address):
     """
     Update the value for the next service ip available
-    @param address: int[16] in the form [253, 255, 0, a, b, c, d, e, f, g, h, i, j, k, l, m] 
+    @param address: int[16] in the form [253, 255, [0, 8], a, b, c, d, e, f, g, h, i, j, k, l, m] 
         monotonically increasing with respect to the previous address
     """
     global mongo_net
@@ -516,8 +516,9 @@ def mongo_update_next_rr_ip_v6(address):
     assert address[2] == 32
     assert 0 <= address[3] < 8
 
-    netcache.update_one({'type': 'next_service_ipv6'}, {'$set': {'ipv6': address}})
+    netcache.update_one({'type': 'next_rr_ipv6'}, {'$set': {'ipv6': address}})
     
+
 # ....... Subnet ........#
 ##########################
 

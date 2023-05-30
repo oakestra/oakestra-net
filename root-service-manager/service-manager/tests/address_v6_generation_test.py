@@ -217,10 +217,10 @@ def test_subnet_address_recycle_failure_2():
 
 
 def test_new_job_rr_address():
-    mongodb_client.mongo_get_subnet_address_from_cache_v6 = MagicMock(return_value=None)
-    mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
-    mongodb_client.mongo_update_next_subnet_ip_v6 = MagicMock()
-    mongodb_client.mongo_free_subnet_address_to_cache_v6 = MagicMock()
+    mongodb_client.mongo_get_rr_address_from_cache_v6 = MagicMock(return_value=None)
+    mongodb_client.mongo_get_next_rr_ip_v6 = MagicMock(return_value=[253, 255, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    mongodb_client.mongo_update_next_rr_ip_v6 = MagicMock()
+    mongodb_client.mongo_free_rr_address_to_cache_v6 = MagicMock()
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {
@@ -238,10 +238,10 @@ def test_new_job_rr_address():
 
 
 def test_new_job_rr_address_fail1():
-    mongodb_client.mongo_get_subnet_address_from_cache_v6 = MagicMock(return_value=None)
-    mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
-    mongodb_client.mongo_update_next_subnet_ip_v6 = MagicMock()
-    mongodb_client.mongo_free_subnet_address_to_cache_v6 = MagicMock()
+    mongodb_client.mongo_get_rr_address_from_cache_v6 = MagicMock(return_value=None)
+    mongodb_client.mongo_get_next_rr_ip_v6 = MagicMock(return_value=[253, 255, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    mongodb_client.mongo_update_next_rr_ip_v6 = MagicMock()
+    mongodb_client.mongo_free_rr_address_to_cache_v6 = MagicMock()
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {
@@ -264,10 +264,10 @@ def test_new_job_rr_address_fail1():
 
 
 def test_new_job_rr_address_fail2():
-    mongodb_client.mongo_get_subnet_address_from_cache_v6 = MagicMock(return_value=None)
-    mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
-    mongodb_client.mongo_update_next_subnet_ip_v6 = MagicMock()
-    mongodb_client.mongo_free_subnet_address_to_cache_v6 = MagicMock()
+    mongodb_client.mongo_get_rr_address_from_cache_v6 = MagicMock(return_value=None)
+    mongodb_client.mongo_get_next_rr_ip_v6 = MagicMock(return_value=[253, 255, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    mongodb_client.mongo_update_next_rr_ip_v6 = MagicMock()
+    mongodb_client.mongo_free_rr_address_to_cache_v6 = MagicMock()
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {
@@ -290,10 +290,10 @@ def test_new_job_rr_address_fail2():
 
 
 def test_new_job_rr_address_fail3():
-    mongodb_client.mongo_get_service_address_from_cache_v6 = MagicMock(return_value=None)
-    mongodb_client.mongo_get_next_subnet_ip_v6 = MagicMock(return_value=[252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
-    mongodb_client.mongo_update_next_service_ip_v6 = MagicMock()
-    mongodb_client.mongo_free_service_address_to_cache_v6 = MagicMock()
+    mongodb_client.mongo_get_rr_address_from_cache_v6 = MagicMock(return_value=None)
+    mongodb_client.mongo_get_next_rr_ip_v6 = MagicMock(return_value=[253, 255, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    mongodb_client.mongo_update_next_rr_ip_v6 = MagicMock()
+    mongodb_client.mongo_free_rr_address_to_cache_v6 = MagicMock()
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {

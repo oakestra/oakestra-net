@@ -137,7 +137,6 @@ def new_job_rr_address_v6(job_data):
         address_arr = ipaddress.ip_address(address).exploded.split(":")
         if len(address_arr) == 8:
             if address_arr[0] != "fdff" or address_arr[1][0:2] != "20":
-                print("got exception")
                 raise Exception("RR ip address must be in the subnet fdff:2000::/21")
             job = mongodb_requests.mongo_find_job_by_ip(address)
             if job is not None:
@@ -147,6 +146,24 @@ def new_job_rr_address_v6(job_data):
         else:
             raise Exception("Invalid RR_ip_v6 address length")
     return new_rr_ip_v6()
+
+def new_rr_ip_v6():
+    """
+    Return a free Round Robin Service IPv6 for a Service that is going to be deployed.
+    @return: string,
+        A new Round Robin address from the address pool. This address is now removed from the pool of available addresses.
+    """
+    with rr_ip_lock:
+        addr = mongodb_requests.mongo_get_rr_address_from_cache_v6()
+        while addr is None:
+            addr = mongodb_requests.mongo_get_next_rr_ip_v6()
+            next_addr = _increase_service_address_v6(addr)
+            mongodb_requests.mongo_update_next_rr_ip_v6(next_addr)
+            job = mongodb_requests.mongo_find_job_by_ip(addr)
+            if job is not None:
+                addr = None
+
+        return _addr_stringify(addr)
 
 def new_rr_ip_v6():
     """
