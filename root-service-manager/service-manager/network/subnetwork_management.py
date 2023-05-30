@@ -230,7 +230,6 @@ def clear_instance_ip_v6(addr):
         + str(addr[13])
         + str(addr[14])
         + str(addr[15])
-        + str(addr[16])
         ) < int(str(next_addr[6]) 
         + str(next_addr[7])
         + str(next_addr[8])
@@ -241,7 +240,6 @@ def clear_instance_ip_v6(addr):
         + str(next_addr[13])
         + str(next_addr[14])
         + str(next_addr[15])
-        + str(next_addr[16])
         )
 
         mongodb_requests.mongo_free_service_address_to_cache_v6(addr)
