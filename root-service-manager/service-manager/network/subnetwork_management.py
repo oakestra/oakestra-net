@@ -211,7 +211,7 @@ def clear_instance_ip_v6(addr):
     """
     addr = _addr_destringify_v6(addr)
 
-    # Check if address is in the correct rage
+    # Check if address is in the correct range
     assert addr[0] == 253
     assert addr[1] == 255
     assert addr[2] == 0 or addr[2] == 8
@@ -274,7 +274,7 @@ def clear_subnetwork_ip_v6(addr):
     addr = _addr_destringify_v6(addr)
 
     # Check if address is in the correct rage
-    assert 253 < addr[0] < 254
+    assert 252 <= addr[0] < 254
     for n in addr[1:15]:
         assert 0 <= n < 256
 
@@ -397,7 +397,8 @@ def _addr_destringify(addrstr):
 
 def _addr_destringify_v6(addrstr):
     addr = []
-    for num in addrstr.split(":"):
+    # get long notation of IPv6 addrstr
+    for num in ipaddress.ip_address(addrstr).exploded.split(":"):
         addr.append(int(num[0:2], 16))
         addr.append(int(num[2:4], 16))
     return addr
