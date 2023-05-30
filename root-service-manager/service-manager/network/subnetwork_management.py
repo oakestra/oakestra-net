@@ -4,6 +4,7 @@ from interfaces import mongodb_requests
 
 instance_ip_lock = threading.Lock()
 subnetip_ip_lock = threading.Lock()
+rr_ip_lock = threading.Lock()
 
 
 def new_job_rr_address(job_data):
@@ -118,7 +119,7 @@ def clear_subnetwork_ip(addr):
 '''
 ###################### IPv6
 '''
-# TODO tests
+
 def new_job_rr_address_v6(job_data):
     """
     This method is called at deploy time. Given the deployment descriptor check if a custom valid RR ip has been assigned
@@ -135,8 +136,8 @@ def new_job_rr_address_v6(job_data):
         # because shorthand IPv6 addresses can be given in SLA, make sure to use expanded IPv6 notation for consistency with MongoDB requests
         address_arr = ipaddress.ip_address(address).exploded.split(":")
         if len(address_arr) == 8:
-            if address_arr[0] != "fdff" or address_arr[1][0:2] != "10":
-                raise Exception("RR ip address must be in the subnet fdff:1000::/21")
+            if address_arr[0] != "fdff" or address_arr[1][0:2] != "20":
+                raise Exception("RR ip address must be in the subnet fdff:2000::/21")
             job = mongodb_requests.mongo_find_job_by_ip(address)
             if job is not None:
                 if job['job_name'] != job_name:
@@ -144,8 +145,25 @@ def new_job_rr_address_v6(job_data):
             return address
         else:
             raise Exception("Invalid RR_ip_v6 address length")
-        # TODO write new function for correct subnet
-    return new_instance_ip_v6()
+    return new_rr_ip_v6()
+
+def new_rr_ip_v6():
+    """
+    Return a free Round Robin Service IPv6 for a Service that is going to be deployed.
+    @return: string,
+        A new Round Robin address from the address pool. This address is now removed from the pool of available addresses.
+    """
+    with rr_ip_lock:
+        addr = mongodb_requests.mongo_get_rr_address_from_cache_v6()
+        while addr is None:
+            addr = mongodb_requests.mongo_get_next_rr_ip_v6()
+            next_addr = _increase_service_address_v6(addr)
+            mongodb_requests.mongo_update_next_rr_ip_v6(next_addr)
+            job = mongodb_requests.mongo_find_job_by_ip(addr)
+            if job is not None:
+                addr = None
+
+        return _addr_stringify(addr)
 
 
 def new_instance_ip_v6():
@@ -308,6 +326,7 @@ def _increase_service_address_v6(addr):
         return new_addr
     except OverflowError:
         # if first fdff:0000::/21 block is full, use next one: fdff:0800::/21
+        # for other service address subnets this will still throw the correct exception
         if addr[2] == 0:
             return [253, 255, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         # if that one is also full, no more addresses
@@ -341,7 +360,8 @@ def _increase_subnetwork_address_v6(addr):
     if new_subnet[0] == 253 and new_subnet[1] == 254:
         # if the first 16 bits are fdfe, we reached the limit of worker subnetworks
         # fc00::/120 is the first available subnetwork
-        # fdfe:ffff:ffff:ffff:ffff:ffff:ffff:ff00/120 is the last available subnetwork
+        # fdfd:ffff:ffff:ffff:ffff:ffff:ffff:ff00/120 is the last available subnetwork
+        # fdfe::/16 is reserved for future use
         raise RuntimeError("Exhausted IPv6 Address Space for workers")
 
     return new_subnet
