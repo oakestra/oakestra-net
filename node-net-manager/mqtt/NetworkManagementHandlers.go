@@ -23,6 +23,7 @@ type mqttDeployNotification struct {
 	Status         string `json:"status"`
 	Instancenumber int    `json:"instance_number"`
 	Nsip           string `json:"nsip"`
+	Nsipv6         string `json:"nsipv6"`
 	Hostport       string `json:"host_port"`
 	Hostip         string `json:"host_ip"`
 }

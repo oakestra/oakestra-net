@@ -4,11 +4,12 @@ import (
 	"NetManager/logger"
 	"encoding/json"
 	"errors"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"log"
 	"net"
 	"sync"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 /*---- Singleton cache instance  ----*/
@@ -42,14 +43,16 @@ type TableQueryResponse struct {
 type ServiceInstance struct {
 	InstanceNumber int    `json:"instance_number"`
 	NamespaceIp    string `json:"namespace_ip"`
+	NamespaceIpv6  string `json:"namespace_ip_v6"`
 	HostIp         string `json:"host_ip"`
 	HostPort       int    `json:"host_port"`
 	ServiceIp      []Sip  `json:"service_ip"`
 }
 
 type Sip struct {
-	Type    string `json:"IpType"`
-	Address string `json:"Address"`
+	Type       string `json:"IpType"`
+	Address    string `json:"Address"`
+	Address_v6 string `json:"Address_v6"`
 }
 
 type tableQueryRequest struct {
