@@ -189,7 +189,8 @@ def subnet_request():
     Returns a new subnetwork address
     """
     addr = subnetwork_management.new_subnetwork_addr()
-    return {'subnet_addr': addr}
+    addrv6 = subnetwork_management.new_subnetwork_addr_v6()
+    return {'subnet_addr': addr, 'subnet_addr_v6': addrv6}
 
 
 if __name__ == '__main__':

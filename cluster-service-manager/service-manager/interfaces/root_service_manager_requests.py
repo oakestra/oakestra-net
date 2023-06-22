@@ -5,15 +5,18 @@ import json
 
 ROOT_SERVICE_MANAGER_ADDR = 'http://' + os.environ.get('ROOT_SERVICE_MANAGER_URL', "0.0.0.0") + ':' + os.environ.get(
     'ROOT_SERVICE_MANAGER_PORT', "5000")
+ROOT_SERVICE_MANAGER_ADDR_v6 = 'http://' + os.environ.get('ROOT_SERVICE_MANAGER_URL_v6', "0.0.0.0") + ':' + os.environ.get(
+    'ROOT_SERVICE_MANAGER_PORT', "5000")
 
 
 def root_service_manager_get_subnet():
     print('Asking the System Manager for a subnet')
     try:
-        response = requests.get(ROOT_SERVICE_MANAGER_ADDR + '/api/net/subnet')
+        response = requests.get(ROOT_SERVICE_MANAGER_ADDR_v6 + '/api/net/subnet')
         addr = json.loads(response.text).get('subnet_addr')
-        if len(addr) > 0:
-            return addr
+        addrv6 = json.loads(response.text).get('subnet_addr_v6')
+        if len(addr) > 0 and len(addrv6) > 0:
+            return [addr, addrv6]
         else:
             raise requests.exceptions.RequestException('No address found')
     except requests.exceptions.RequestException as e:
@@ -39,7 +42,7 @@ def system_manager_notify_deployment_status(job, worker_id):
     try:
         logging.info("Sending deployment information to the root")
         logging.debug(job)
-        requests.post(ROOT_SERVICE_MANAGER_ADDR + '/api/net/service/net_deploy_status', json=data)
+        requests.post(ROOT_SERVICE_MANAGER_ADDR_v6 + '/api/net/service/net_deploy_status', json=data)
     except requests.exceptions.RequestException as e:
         print('Calling System Manager /api/result/cluster_deploy not successful.')
 
@@ -47,7 +50,7 @@ def system_manager_notify_deployment_status(job, worker_id):
 def cloud_table_query_ip(ip):
     print('table query to the System Manager...')
     job_ip = ip.replace(".", "_")
-    request_addr = ROOT_SERVICE_MANAGER_ADDR + '/api/net/service/ip/' + str(job_ip) + '/instances'
+    request_addr = ROOT_SERVICE_MANAGER_ADDR_v6 + '/api/net/service/ip/' + str(job_ip) + '/instances'
     print(request_addr)
     try:
         return requests.get(request_addr).json()
@@ -58,7 +61,7 @@ def cloud_table_query_ip(ip):
 def cloud_table_query_service_name(name):
     print('table query to the System Manager...')
     job_name = name.replace(".", "_")
-    request_addr = ROOT_SERVICE_MANAGER_ADDR + '/api/net/service/' + str(job_name) + '/instances'
+    request_addr = ROOT_SERVICE_MANAGER_ADDR_v6 + '/api/net/service/' + str(job_name) + '/instances'
     print(request_addr)
     try:
         resp = requests.get(request_addr)
@@ -69,7 +72,7 @@ def cloud_table_query_service_name(name):
 
 
 def cloud_remove_interest(job_name):
-    request_addr = ROOT_SERVICE_MANAGER_ADDR + '/api/net/interest/' + str(job_name)
+    request_addr = ROOT_SERVICE_MANAGER_ADDR_v6 + '/api/net/interest/' + str(job_name)
     try:
         result = requests.delete(request_addr)
         if result.status_code == 404:

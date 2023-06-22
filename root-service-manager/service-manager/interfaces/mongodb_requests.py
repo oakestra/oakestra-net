@@ -250,6 +250,9 @@ def mongo_update_next_service_ip(address):
     netcache.update_one({'type': 'next_service_ip'}, {'$set': {'ipv4': address}})
 
 
+# ....... Subnet v4 ........#
+#############################
+
 def mongo_get_next_subnet_ip():
     """
     Returns the next available subnetwork ip address from the addressing space 10.16.y.z/12
@@ -324,6 +327,82 @@ def mongo_free_subnet_address_to_cache(address):
         'ipv4': address
     })
 
+
+# ....... Subnet v6 ........#
+#############################
+
+def mongo_get_next_subnet_ip_v6():
+    """
+    Returns the next available subnetwork ip address from the addressing space fc00::/7
+    @return: int[16] in the shape [25[2-3], a, b, c, d, e, f, g, h, i, j, k, l, m, n, 0] 
+    """
+    global mongo_net
+    netcache = mongo_net.db.netcache
+
+    next_addr = netcache.find_one({'type': 'next_subnet_ipv6'})
+
+    if next_addr is not None:
+        return next_addr["ipv6"]
+    else:
+        ipv6arr = [252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        netcache = mongo_net.db.netcache
+        id = netcache.insert_one({
+            'type': 'next_subnet_ipv6',
+            'ipv6': ipv6arr
+        })
+        return ipv6arr
+
+
+def mongo_update_next_subnet_ip_v6(address):
+    """
+    Update the value for the next subnet ip available
+    @param address: int[16] in the form [252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    monotonically increasing with respect to the previous address
+    """
+    global mongo_net
+    netcache = mongo_net.db.netcache
+    
+    # sanity check for the address
+    assert len(address) == 16
+    for n in address:
+        assert 0 <= n < 256
+    assert 252 <= address[0] <= 253
+    netcache.update_one({'type': 'next_subnet_ipv6'}, {'$set': {'ipv6': address}})
+
+
+def mongo_get_subnet_address_from_cache_v6():
+    """
+    Pop an available Subnet address, if any, from the free addresses cache
+    @return: int[16] in the shape [252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0]
+    """
+    global mongo_net
+    netcache = mongo_net.db.netcache
+
+    entry = netcache.find_one({'type': 'free_subnet_ipv6'})
+
+    if entry is not None:
+        netcache.delete_one({"_id": entry["_id"]})
+        return entry["ipv6"]
+    else:
+        return None
+
+
+def mongo_free_subnet_address_to_cache_v6(address):
+    """
+    Add back a subnetwork address to the cache
+    @param address: int[16] in the shape [252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0]
+    """
+    global mongo_net
+    netcache = mongo_net.db.netcache
+
+    assert len(address) == 16
+    for n in address:
+        assert 0 <= n < 256
+
+    netcache.insert_one({
+        'type': 'free_subnet_ipv6',
+        'ipv6': address
+    })
 
 # ......... CLUSTER OPERATIONS ....................#
 ####################################################

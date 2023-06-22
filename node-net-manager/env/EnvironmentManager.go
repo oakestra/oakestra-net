@@ -8,15 +8,17 @@ import (
 	"NetManager/network"
 	"errors"
 	"fmt"
-	"github.com/vishvananda/netlink"
- 	"github.com/vishvananda/netns"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
+
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 )
 
 const NamespaceAlreadyDeclared string = "namespace already declared"
@@ -31,6 +33,8 @@ type Configuration struct {
 	HostBridgeName             string
 	HostBridgeIP               string
 	HostBridgeMask             string
+	HostBridgeIPv6             string
+	HostBridgeIPv6Prefix       string
 	HostTunName                string
 	ConnectedInternetInterface string
 	Mtusize                    int
@@ -39,6 +43,7 @@ type Configuration struct {
 type Environment struct {
 	//### Environment management variables
 	nodeNetwork       net.IPNet
+	nodeNetworkv6     net.IPNet
 	nameSpaces        []string
 	networkInterfaces []networkInterface
 	nextVethNumber    int
@@ -48,9 +53,12 @@ type Environment struct {
 	//### Deployment management variables
 	deployedServices     map[string]service //all the deployed services with the ip and ports
 	deployedServicesLock sync.RWMutex
-	nextContainerIP      net.IP   //next address for the next container to be deployed
-	totNextAddr          int      //number of addresses currently generated, max 62
+	nextContainerIP      net.IP //next address for the next container to be deployed
+	nextContainerIPv6    net.IP
+	totNextAddr          int //number of addresses currently generated, max 62
+	totNextAddrv6        int
 	addrCache            []net.IP //Cache used to store the free addresses available for new containers
+	addrCachev6          []net.IP
 	//### Communication variables
 	clusterPort string
 	clusterAddr string
@@ -59,6 +67,7 @@ type Environment struct {
 
 type service struct {
 	ip          net.IP
+	ipv6        net.IP
 	sname       string
 	portmapping string
 	veth        *netlink.Veth
@@ -86,8 +95,11 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 		config:            customConfig,
 		translationTable:  TableEntryCache.NewTableManager(),
 		nextContainerIP:   network.NextIP(net.ParseIP(customConfig.HostBridgeIP), 1),
+		nextContainerIPv6: network.NextIP(net.ParseIP(customConfig.HostBridgeIPv6), 1),
 		totNextAddr:       1,
+		totNextAddrv6:     1,
 		addrCache:         make([]net.IP, 0),
+		addrCachev6:       make([]net.IP, 0),
 		deployedServices:  make(map[string]service, 0),
 		clusterAddr:       os.Getenv("CLUSTER_MANAGER_IP"),
 		clusterPort:       os.Getenv("CLUSTER_MANAGER_PORT"),
@@ -97,6 +109,8 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 	//Get Connected Internet Interface
 	if e.config.ConnectedInternetInterface == "" {
 		_, e.config.ConnectedInternetInterface = network.GetLocalIPandIface()
+		logger.InfoLogger().Println(e.config.ConnectedInternetInterface)
+
 	}
 
 	//create bridge
@@ -115,7 +129,7 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 
 	//Enable bridge MASQUERADING
 	logger.InfoLogger().Println("Enabling packet masquerading")
-	network.EnableMasquerading(e.config.HostBridgeIP, e.config.HostBridgeMask, e.config.HostBridgeName, e.config.ConnectedInternetInterface)
+	network.EnableMasquerading(e.config.HostBridgeIP, e.config.HostBridgeMask, e.config.HostBridgeIPv6, e.config.HostBridgeIPv6Prefix, e.config.HostBridgeName, e.config.ConnectedInternetInterface)
 
 	//update status with current network configuration
 	logger.InfoLogger().Println("Reading the current environment configuration")
@@ -126,10 +140,14 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 // NewEnvironmentClusterConfigured Creates a new environment using the default configuration and asking the cluster for a new subnetwork
 func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 	logger.InfoLogger().Println("Asking the cluster for a new subnetwork")
-	subnetwork, err := mqtt.RequestSubnetworkMqttBlocking()
+	subnetwork_response, err := mqtt.RequestSubnetworkMqttBlocking()
 	if err != nil {
 		log.Fatal("Invalid subnetwork received. Can't proceed.")
 	}
+	logger.InfoLogger().Println("got subnetwork data: ", subnetwork_response)
+	subnetworks := strings.Fields(subnetwork_response)
+	ipv4_subnet := subnetworks[0]
+	ipv6_subnet := subnetworks[1]
 
 	logger.InfoLogger().Println("Creating with default config")
 	mtusize, err := strconv.Atoi(os.Getenv("TUN_MTU_SIZE"))
@@ -139,8 +157,10 @@ func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 	}
 	config := Configuration{
 		HostBridgeName:             "goProxyBridge",
-		HostBridgeIP:               network.NextIP(net.ParseIP(subnetwork), 1).String(),
+		HostBridgeIP:               network.NextIP(net.ParseIP(ipv4_subnet), 1).String(),
 		HostBridgeMask:             "/26",
+		HostBridgeIPv6:             network.NextIP(net.ParseIP(ipv6_subnet), 1).String(),
+		HostBridgeIPv6Prefix:       "/120",
 		HostTunName:                "goProxyTun",
 		ConnectedInternetInterface: "",
 		Mtusize:                    mtusize,
@@ -155,7 +175,6 @@ func (env *Environment) Destroy() {
 		},
 	})
 }
-
 
 func (env *Environment) IsServiceDeployed(jobName string) bool {
 	env.deployedServicesLock.RLock()
@@ -378,10 +397,18 @@ func (env *Environment) CreateHostBridge() error {
 	}
 
 	//assign ip to the bridge
-	logger.DebugLogger().Println("Assigning IP to the new bridge")
+	logger.DebugLogger().Println("Assigning IPv4 to the new bridge")
 	bridgeIpCmd := exec.Command("ip", "a", "add",
 		env.config.HostBridgeIP+env.config.HostBridgeMask, "dev", env.config.HostBridgeName)
 	_, err = bridgeIpCmd.Output()
+	if err != nil {
+		return err
+	}
+
+	logger.DebugLogger().Println("Assigning IPv6 to the new bridge")
+	bridgeIpv6Cmd := exec.Command("ip", "a", "add",
+		env.config.HostBridgeIPv6+env.config.HostBridgeIPv6Prefix, "dev", env.config.HostBridgeName)
+	_, err = bridgeIpv6Cmd.Output()
 	if err != nil {
 		return err
 	}
@@ -497,10 +524,27 @@ func (env *Environment) generateAddress() (net.IP, error) {
 		if env.totNextAddr < 62 {
 			env.totNextAddr++
 		} else {
-			logger.ErrorLogger().Printf("exhausted address space")
-			return result, errors.New("address space exhausted")
+			logger.ErrorLogger().Printf("exhausted IPv4 address space")
+			return result, errors.New("IPv4 address space exhausted")
 		}
 		env.nextContainerIP = network.NextIP(env.nextContainerIP, 1)
+	}
+	return result, nil
+}
+
+func (env *Environment) generateIPv6Address() (net.IP, error) {
+	var result net.IP
+	if len(env.addrCachev6) > 0 {
+		result, env.addrCachev6 = env.addrCachev6[0], env.addrCachev6[1:]
+	} else {
+		result = env.nextContainerIPv6
+		if env.totNextAddrv6 < 255 {
+			env.totNextAddrv6++
+		} else {
+			logger.ErrorLogger().Printf("exhausted IPv6 address space")
+			return result, errors.New("IPv6 address space exhausted")
+		}
+		env.nextContainerIPv6 = network.NextIP(env.nextContainerIPv6, 1)
 	}
 	return result, nil
 }
@@ -508,4 +552,3 @@ func (env *Environment) generateAddress() (net.IP, error) {
 func (env *Environment) freeContainerAddress(ip net.IP) {
 	env.addrCache = append(env.addrCache, ip)
 }
-
