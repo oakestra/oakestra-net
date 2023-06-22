@@ -73,19 +73,19 @@ def mqtt_init(flask_app):
 
 
 def _deployment_handler(client_id, payload):
-    appname = payload.get("appname")
-    status = payload.get("status")
-    nsIp = payload.get("nsip")
-    instance_number = payload.get("instance_number")
-    host_ip = payload.get("host_ip")
-    host_port = payload.get("host_port")
+    appname = payload.get('appname')
+    status = payload.get('status')
+    nsIp = payload.get('nsip')
+    nsIPv6 = payload.get('nsipv6')
+    instance_number = payload.get('instance_number')
+    host_ip = payload.get('host_ip')
+    host_port = payload.get('host_port')
     try:
-        deployment_status_report(
-            appname, status, nsIp, client_id, instance_number, host_ip, host_port
-        )
+        deployment_status_report(appname, status, nsIp, nsIPv6, client_id, instance_number, host_ip, host_port)
     except Exception as e:
         traceback.print_exc()
         print(e)
+    
 
 
 def _undeployment_handler(client_id, payload):
