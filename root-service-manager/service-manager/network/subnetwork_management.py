@@ -1,4 +1,5 @@
 import threading
+import ipaddress
 
 from interfaces import mongodb_requests
 
@@ -346,15 +347,40 @@ def _increase_subnetwork_address(addr):
     return [addr[0], new1, new2, new3]
 
 
+def _increase_subnetwork_address_v6(addr):
+    # convert subnet portion of addr to int and increase by one
+    addr_int = int.from_bytes(addr[0:15], byteorder='big')
+    addr_int += 1
+
+    # reconvert new subnet part to bytearray and right pad it with 0 to length 16
+    new_subnet = addr_int.to_bytes(15, byteorder='big')
+    new_subnet += bytes(16 - (len(new_subnet) % 16))
+
+    if new_subnet[0] == 253 and new_subnet[1] == 254:
+        # if the first 16 bits are fdfd, we reached the limit of worker subnetworks
+        # fc00::/120 is the first available subnetwork
+        # fdfd:ffff:ffff:ffff:ffff:ffff:ffff:ff00/120 is the last available subnetwork
+        # fdfe::/16 is reserved for future use
+        raise RuntimeError("Exhausted IPv6 Address Space for workers")
+
+    return new_subnet
+
+
 def _addr_stringify(addr):
-    res = ""
-    for n in addr:
-        res = res + str(n) + "."
-    return res[0:len(res) - 1]
+    return str(ipaddress.ip_address(bytes(addr)))
 
 
 def _addr_destringify(addrstr):
     addr = []
     for num in addrstr.split("."):
         addr.append(int(num))
+    return addr
+
+
+def _addr_destringify_v6(addrstr):
+    addr = []
+    # get long notation of IPv6 addrstr
+    for num in ipaddress.ip_address(addrstr).exploded.split(":"):
+        addr.append(int(num[0:2], 16))
+        addr.append(int(num[2:4], 16))
     return addr
