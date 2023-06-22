@@ -5,6 +5,7 @@ from interfaces import mongodb_requests
 
 instance_ip_lock = threading.Lock()
 subnetip_ip_lock = threading.Lock()
+rr_ip_lock = threading.Lock()
 
 
 def new_job_rr_address(job_data):
@@ -116,6 +117,117 @@ def clear_subnetwork_ip(addr):
         mongodb_requests.mongo_free_subnet_address_to_cache(addr)
 
 
+
+###################### IPv6
+
+def new_job_rr_address_v6(job_data):
+    """
+    This method is called at deploy time. Given the deployment descriptor check if a custom valid RR ip has been assigned
+    by the user and returns that to the service. Otherwise a new RR address will be returned.
+    @return: string, a new address
+    @raise: exception if an invalid RR address has been provided by the user
+    """
+    
+    address = job_data.get('RR_ip_v6')
+    job_name = job_data['app_name'] + "." + job_data['app_ns'] + "." + job_data['service_name'] + "." + job_data[
+        'service_ns']
+
+    if address is not None:
+        # because shorthand IPv6 addresses can be given in SLA, make sure to use expanded IPv6 notation for consistency with MongoDB requests
+        address_arr = ipaddress.ip_address(address).exploded.split(":")
+        if len(address_arr) == 8:
+            if address_arr[0] != "fdff" or address_arr[1][0:2] != "20":
+                raise Exception("RR ip address must be in the subnet fdff:2000::/21")
+            job = mongodb_requests.mongo_find_job_by_ip(address)
+            if job is not None:
+                if job['job_name'] != job_name:
+                    raise Exception("RR_ip_v6 address already used by another service")
+            return address
+        else:
+            raise Exception("Invalid RR_ip_v6 address length")
+    return new_rr_ip_v6()
+
+
+def new_rr_ip_v6():
+    """
+    Return a free Round Robin Service IPv6 for a Service that is going to be deployed.
+    @return: string,
+        A new Round Robin address from the address pool. This address is now removed from the pool of available addresses.
+    """
+    with rr_ip_lock:
+        addr = mongodb_requests.mongo_get_rr_address_from_cache_v6()
+        while addr is None:
+            addr = mongodb_requests.mongo_get_next_rr_ip_v6()
+            next_addr = _increase_service_address_v6(addr)
+            mongodb_requests.mongo_update_next_rr_ip_v6(next_addr)
+            job = mongodb_requests.mongo_find_job_by_ip(addr)
+            if job is not None:
+                addr = None
+
+        return _addr_stringify(addr)
+
+def new_instance_ip_v6():
+    """
+    Function used to assign a new instance IPv6 address for a Service that is going to be deployed.
+    An instance address is a static address bounded with a single replica of a service
+    @return: string,
+        A new address from the address pool. This address is now removed from the pool of available addresses
+    """
+    with instance_ip_lock:
+        addr = mongodb_requests.mongo_get_service_address_from_cache_v6()
+        while addr is None:
+            addr = mongodb_requests.mongo_get_next_service_ip_v6()
+            next_addr = _increase_service_address_v6(addr)
+            mongodb_requests.mongo_update_next_service_ip_v6(next_addr)
+            job = mongodb_requests.mongo_find_job_by_ip(addr)
+            if job is not None:
+                addr = None
+
+        return _addr_stringify(addr)
+
+
+def clear_instance_ip_v6(addr):
+    """
+    Function used to give back an Instance address to the pool of available addresses
+    @param addr: string,
+        the address that is going to be added back to the pool
+    """
+    addr = _addr_destringify_v6(addr)
+
+    # Check if address is in the correct range
+    assert addr[0] == 253
+    assert addr[1] == 255
+    assert addr[2] == 0 or addr[2] == 8
+    with instance_ip_lock:
+        next_addr = mongodb_requests.mongo_get_next_service_ip_v6()
+
+        # Ensure that the give address is actually before the next address from the pool
+        # doing it the ugly way, because for loops are slow
+        assert int(str(addr[6]) 
+        + str(addr[7])
+        + str(addr[8])
+        + str(addr[9])
+        + str(addr[10])
+        + str(addr[11])
+        + str(addr[12])
+        + str(addr[13])
+        + str(addr[14])
+        + str(addr[15])
+        ) < int(str(next_addr[6]) 
+        + str(next_addr[7])
+        + str(next_addr[8])
+        + str(next_addr[9])
+        + str(next_addr[10])
+        + str(next_addr[11])
+        + str(next_addr[12])
+        + str(next_addr[13])
+        + str(next_addr[14])
+        + str(next_addr[15])
+        )
+
+        mongodb_requests.mongo_free_service_address_to_cache_v6(addr)
+
+
 def new_subnetwork_addr_v6():
     """
     Function used to generate a new subnetwork address for any worker node
@@ -186,9 +298,9 @@ def clear_subnetwork_ip_v6(addr):
         mongodb_requests.mongo_free_subnet_address_to_cache_v6(addr)
 
 
+
+
 ############ Utils
-
-
 
 def _increase_service_address(addr):
     new2 = addr[2]
@@ -198,6 +310,27 @@ def _increase_service_address(addr):
         if new2 == 0:
             raise RuntimeError("Exhausted Address Space")
     return [addr[0], addr[1], new2, new3]
+
+
+def _increase_service_address_v6(addr):
+    # convert subnet portion of addr to int and increase by one
+    addr_int = int.from_bytes(addr[6:16], byteorder='big')
+    addr_int += 1
+
+    # reconvert new address part to bytearray and concatenate it with the network part of addr
+    # will raise RuntimeError if address space is exhausted
+    try:
+        new_addr = addr_int.to_bytes(10, byteorder='big')
+        new_addr = addr[0:6] + list(new_addr)
+        return new_addr
+    except OverflowError:
+        # if first fdff:0000::/21 instance ip block is full, use next one: fdff:0800::/21
+        # for every other balancing strategy, this also decides correctly and throws the below RuntimeError
+        if addr[2] == 0:
+            return [253, 255, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        # if that one is also full, no more addresses
+        else:
+            raise RuntimeError("Exhausted Instance IP address space")
 
 
 def _increase_subnetwork_address(addr):
