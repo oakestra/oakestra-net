@@ -233,7 +233,7 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 	return veth, nil
 }
 
-// sets the FPRWARD firewall rules for the bridge veth
+// sets the FORWARD firewall rules for the bridge veth
 func (env *Environment) setVethFirewallRules(bridgeVethName string) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -276,6 +276,28 @@ func (env *Environment) setContainerRoutes(containerPid int, peerVeth string) er
 		logger.ErrorLogger().Printf("Impossible to setup route inside the netns: %v\n", err)
 		return err
 	}
+
+	err = env.execInsideNs(containerPid, func() error {
+		link, err := netlink.LinkByName(peerVeth)
+		if err != nil {
+			return err
+		}
+		dstv6, err := netlink.ParseIPNet("::/0")
+		if err != nil {
+			return err
+		}
+		gwv6 := net.ParseIP(env.config.HostBridgeIPv6)
+		return netlink.RouteAdd(&netlink.Route{
+			LinkIndex: link.Attrs().Index,
+			Dst:       dstv6,
+			Gw:        gwv6,
+		})
+	})
+	if err != nil {
+		logger.ErrorLogger().Printf("Impossible to setup IPv6 route inside the netns: %v\n", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -439,7 +461,7 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 	}
 
 	//if no entry available -> TableQuery
-	entryList, err := tableQueryByIP(ip.String())
+	entryList, err := tableQueryByIP(ip)
 
 	if err == nil {
 		var once sync.Once
@@ -463,7 +485,8 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 	if len(table) > 0 {
 		for elemindex, elem := range table {
 			for _, elemIp := range elem.ServiceIP {
-				if elemIp.IpType == TableEntryCache.InstanceNumber && elemIp.Address.Equal(ip) {
+				if elemIp.IpType == TableEntryCache.InstanceNumber &&
+					(elemIp.Address.Equal(ip) || elemIp.Address_v6.Equal(ip)) {
 					return table[elemindex], true
 				}
 			}
@@ -550,5 +573,13 @@ func (env *Environment) generateIPv6Address() (net.IP, error) {
 }
 
 func (env *Environment) freeContainerAddress(ip net.IP) {
-	env.addrCache = append(env.addrCache, ip)
+	// if ip is an IPv4 addr
+	if err := ip.To4(); err != nil {
+		env.addrCache = append(env.addrCache, ip)
+	} else
+	// else check whether it is a correct IPv6 address
+	// this cannot be an IPv4-to-IPv6 mapped IPv6 addr, as we handle IPv4 beforehand
+	if err = ip.To16(); err != nil {
+		env.addrCachev6 = append(env.addrCachev6, ip)
+	}
 }

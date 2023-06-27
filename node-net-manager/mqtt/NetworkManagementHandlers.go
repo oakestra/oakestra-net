@@ -66,12 +66,13 @@ func RequestSubnetworkMqttBlocking() (string, error) {
 	return "", net.UnknownNetworkError("Invalid Subnetwork received")
 }
 
-func NotifyDeploymentStatus(appname string, status string, instance int, nsip string, hostip string, hostport string) error {
+func NotifyDeploymentStatus(appname string, status string, instance int, nsip string, nsipv6 string, hostip string, hostport string) error {
 	request := mqttDeployNotification{
 		Appname:        appname,
 		Status:         status,
 		Instancenumber: instance,
 		Nsip:           nsip,
+		Nsipv6:         nsipv6,
 		Hostip:         hostip,
 		Hostport:       hostport,
 	}
