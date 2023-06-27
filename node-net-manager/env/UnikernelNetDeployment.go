@@ -29,7 +29,7 @@ func InitUnikernelDeployment(env *Environment) {
 		env: env,
 	}
 }
-func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instancenumber int, portmapping string) (net.IP, error) {
+func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instancenumber int, portmapping string) (net.IP, net.IP, error) {
 
 	env := h.env
 	name := sname
@@ -43,13 +43,13 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
 	if err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 
 	peerVeth, err := netlink.LinkByName(vethIfce.PeerName)
 	if err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 
 	logger.DebugLogger().Printf("Creating Namespace for unikernel (%s)", sname)
@@ -58,12 +58,12 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	//ns, err := netns.NewNamed(sname) ## Changes Namespace of current application
 	if err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 	ns, err := netns.GetFromName(sname)
 	if err != nil {
 		logger.DebugLogger().Printf("Unable to find namespace: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	cleanup = func(veth *netlink.Veth) {
@@ -78,22 +78,40 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	if err := netlink.LinkSetNsFd(peerVeth, int(ns)); err != nil {
 		logger.DebugLogger().Printf("Error %s: %v", peerVeth.Attrs().Name, err)
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
 
 	//Get IP for veth interface
 	ip, err := env.generateAddress()
 	if err != nil {
 		cleanup(vethIfce)
-		return nil, err
+		return nil, nil, err
 	}
+
+	//Get IPv6 for veth interface
+	ipv6, err := env.generateIPv6Address()
+	if err != nil {
+		cleanup(vethIfce)
+		return nil, nil, err
+	}
+
 	if err := env.addPeerLinkNetworkByNsName(sname, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
 		logger.DebugLogger().Println("Unable to configure Peer")
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
-		return nil, err
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
 	}
 
+	if err := env.addPeerLinkNetworkByNsName(sname, ipv6.String()+env.config.HostBridgeIPv6Prefix, vethIfce.PeerName); err != nil {
+		logger.DebugLogger().Println("Unable to configure Peer")
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
+	}
+
+	// TODO IPv6 bridge support needs testing - routes inside Ns?
 	//Create Bridge and tap within Ns
 	logger.DebugLogger().Println("Creating Bridge and Tap inside of Ns")
 	labr := netlink.NewLinkAttrs()
@@ -156,6 +174,22 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 			return err
 		}
 
+		dstv6, err := netlink.ParseIPNet("::/0")
+		if err != nil {
+			return err
+		}
+		gwv6 := net.ParseIP(env.config.HostBridgeIPv6)
+		netlink.RouteAdd(&netlink.Route{
+			LinkIndex: peerVeth.Attrs().Index,
+			Dst:       dstv6,
+			Gw:        gwv6,
+		})
+		if err != nil {
+			logger.DebugLogger().Printf("Failed to set route in Ns: %v", err)
+			return err
+		}
+
+		// TODO IPv6
 		//Set NAT for Unikernel
 		cmd = exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vethIfce.PeerName, "-j", "SNAT", "--to", ip.String())
 		err = cmd.Run()
@@ -173,33 +207,46 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		logger.DebugLogger().Printf("Failed to configure Ns for Unikernel\n")
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
-		return nil, err
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
 	}
 
 	env.BookVethNumber()
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
-		env.freeContainerAddress(ip)
 		cleanup(vethIfce)
-		return nil, err
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
 	}
 
-	if err = network.ManageContainerPorts(ip.String(), portmapping, network.OpenPorts); err != nil {
+	if err = network.ManageContainerPorts(ip, portmapping, network.OpenPorts); err != nil {
 		debug.PrintStack()
-		env.freeContainerAddress(ip)
 		cleanup(vethIfce)
-		return nil, err
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
 	}
+
+	if err = network.ManageContainerPorts(ipv6, portmapping, network.OpenPorts); err != nil {
+		debug.PrintStack()
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
+	}
+
 	env.deployedServicesLock.Lock()
 	env.deployedServices[sname] = service{
 		ip:          ip,
+		ipv6:        ipv6,
 		sname:       name,
 		portmapping: portmapping,
 		veth:        vethIfce,
 	}
 	env.deployedServicesLock.Unlock()
 	logger.DebugLogger().Println("Successful Network creation for Unikernel")
-	return ip, nil
+	return ip, ipv6, nil
 
 }
 
@@ -207,12 +254,15 @@ func (env *Environment) DeleteUnikernelNamespace(sname string, instance int) {
 	name := fmt.Sprintf("%s.instance.%d", sname, instance)
 	s, ok := env.deployedServices[name]
 	if ok {
+		// TODO Remove ipv6?
 		_ = env.translationTable.RemoveByNsip(s.ip)
 		env.deployedServicesLock.Lock()
 		delete(env.deployedServices, name)
 		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
-		_ = network.ManageContainerPorts(s.ip.String(), s.portmapping, network.ClosePorts)
+		env.freeContainerAddress(s.ipv6)
+		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
+		_ = network.ManageContainerPorts(s.ipv6, s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
 		_ = netns.DeleteNamed(name)
 	}

@@ -166,6 +166,7 @@ func (cache *TableQueryRequestCache) TablequeryResultMqttHandler(client mqtt.Cli
 	for _, instance := range responseStruct.InstanceList {
 		for _, sip := range instance.ServiceIp {
 			querykeys = append(querykeys, sip.Address)
+			querykeys = append(querykeys, sip.Address_v6)
 		}
 	}
 

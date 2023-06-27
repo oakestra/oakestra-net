@@ -26,8 +26,9 @@ type ContainerDeployTask struct {
 }
 
 type TaskReady struct {
-	IP  net.IP
-	Err error
+	IP   net.IP
+	IPv6 net.IP
+	Err  error
 }
 
 type deployTaskQueue struct {
@@ -61,13 +62,14 @@ func (t *deployTaskQueue) taskExecutor() {
 		select {
 		case task := <-t.newTask:
 			//deploy the network stack in the container
-			addr, err := deploymentHandler(task)
+			addr, addrv6, err := deploymentHandler(task)
 			if err != nil {
 				logger.ErrorLogger().Println("[ERROR]: ", err)
 			}
 			task.Finish <- TaskReady{
-				IP:  addr,
-				Err: err,
+				IP:   addr,
+				IPv6: addrv6,
+				Err:  err,
 			}
 			//asynchronously update proxy tables
 			updateInternalProxyDataStructures(task)
@@ -75,21 +77,21 @@ func (t *deployTaskQueue) taskExecutor() {
 	}
 }
 
-func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
+func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, net.IP, error) {
 
 	//get app full name
 	appCompleteName := strings.Split(requestStruct.ServiceName, ".")
 	if len(appCompleteName) != 4 {
-		return nil, errors.New(fmt.Sprintf("Invalid app name: %s", appCompleteName))
+		return nil, nil, errors.New(fmt.Sprintf("Invalid app name: %s", appCompleteName))
 	}
 
 	//attach network to the container
 	netHandler := env.GetNetDeployment(requestStruct.Runtime)
-	addr, err := netHandler.DeployNetwork(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
+	addr, addrv6, err := netHandler.DeployNetwork(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
 
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	//notify to net-component
@@ -98,15 +100,16 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, error) {
 		"DEPLOYED",
 		requestStruct.Instancenumber,
 		addr.String(),
+		addrv6.String(),
 		requestStruct.PublicAddr,
 		requestStruct.PublicPort,
 	)
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return addr, nil
+	return addr, addrv6, nil
 }
 
 func updateInternalProxyDataStructures(requestStruct *ContainerDeployTask) {

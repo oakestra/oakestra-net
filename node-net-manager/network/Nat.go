@@ -153,7 +153,7 @@ func EnableMasquerading(address string, mask string, addressipv6 string, ipv6pre
 }
 
 // ManageContainerPorts open or close container port with the nat rules
-func ManageContainerPorts(localContainerAddress string, portmapping string, operation PortOperation) error {
+func ManageContainerPorts(localContainerAddress net.IP, portmapping string, operation PortOperation) error {
 	if portmapping == "" {
 		return nil
 	}
@@ -178,17 +178,27 @@ func ManageContainerPorts(localContainerAddress string, portmapping string, oper
 			containerPort = ports[1]
 		}
 		if !isValidPort(hostPort) || !isValidPort(containerPort) {
-			return errors.New("invaid Port Mapping")
+			return errors.New("invalid Port Mapping")
 		}
 		destination := fmt.Sprintf("%s:%s", localContainerAddress, containerPort)
 		args := []string{"-p", portType, "--dport", hostPort, "-j", "DNAT", "--to-destination", destination}
 
 		err := errors.New("invalid Operation")
-		if operation == OpenPorts {
-			err = iptable.Append("nat", chain, args...)
-		}
-		if operation == ClosePorts {
-			err = iptable.Delete("nat", chain, args...)
+		// Make operation on table according to IP address version
+		if ok4 := localContainerAddress.To4(); ok4 != nil {
+			if operation == OpenPorts {
+				err = iptable.Append("nat", chain, args...)
+			}
+			if operation == ClosePorts {
+				err = iptable.Delete("nat", chain, args...)
+			}
+		} else if ok6 := localContainerAddress.To16(); ok6 != nil {
+			if operation == OpenPorts {
+				err = ip6table.Append("nat", chain, args...)
+			}
+			if operation == ClosePorts {
+				err = ip6table.Delete("nat", chain, args...)
+			}
 		}
 		if err != nil {
 			log.Printf("ERROR: %v", err)
