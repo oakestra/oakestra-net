@@ -12,13 +12,9 @@ import (
 	"sync"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/ip4defrag"
 	"github.com/google/gopacket/layers"
 	"github.com/songgao/water"
 )
-
-// Ipv4 defragger
-var defragger = ip4defrag.NewIPv4Defragmenter()
 
 // const
 var BUFFER_SIZE = 64 * 1024
@@ -106,37 +102,6 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 
 			//packetForwarding to tunnel interface
 			proxy.forward(dstHost, dstPort, newPacket, 0)
-
-			/*
-				logger.DebugLogger().Println("outgoingChannelSize: ", len(proxy.outgoingChannel))
-				ipv4, tcp, udp := decodePacket(*msg.content)
-
-				if ipv4 != nil {
-
-					logger.DebugLogger().Printf("Outgoing packet from %s\n", ipv4.SrcIP.String())
-
-					// continue only if the packet is udp or tcp, otherwise just drop it
-					if tcp != nil || udp != nil {
-
-						//proxyConversion
-						newPacket := proxy.outgoingProxy(ipv4, tcp, udp)
-						if newPacket == nil {
-							//if not proxy conversion available, drop it
-							logger.ErrorLogger().Println("Unable to convert the packet")
-							continue
-						}
-
-						//newTcpLayer := newPacket.Layer(layers.LayerTypeTCP)
-						newIpLayer := newPacket.Layer(layers.LayerTypeIPv4)
-
-						//fetch remote address
-						dstHost, dstPort := proxy.locateRemoteAddress(newIpLayer.(*layers.IPv4).DstIP)
-						logger.DebugLogger().Println("Sending incoming packet to: ", dstHost.String(), ":", dstPort)
-
-						//packetForwarding to tunnel interface
-						proxy.forward(dstHost, dstPort, newPacket, 0)
-					}
-				}*/
 		}
 	}
 }
@@ -175,37 +140,6 @@ func (proxy *GoProxyTunnel) ingoingMessage() {
 			if err != nil {
 				logger.ErrorLogger().Println(err)
 			}
-
-			/*
-				logger.DebugLogger().Println("ingoingChannelSize: ", len(proxy.incomingChannel))
-				ipv4, tcp, udp := decodePacket(*msg.content)
-				//from := msg.from
-
-				// proceed only if this is a valid ipv4 packet
-				if ipv4 != nil {
-					logger.DebugLogger().Printf("Ingoing packet to %s\n", ipv4.DstIP.String())
-
-					// continue only if the packet is udp or tcp, otherwise just drop it
-					if tcp != nil || udp != nil {
-
-						// proxyConversion
-						newPacket := proxy.ingoingProxy(ipv4, tcp, udp)
-						var packetBytes []byte
-						if newPacket == nil {
-							//no conversion data, forward as is
-							packetBytes = *msg.content
-						} else {
-							packetBytes = packetToByte(newPacket)
-						}
-
-						// output to bridge interface
-						_, err := proxy.ifce.Write(packetBytes)
-						if err != nil {
-							logger.ErrorLogger().Println(err)
-						}
-
-					}
-				}*/
 		}
 	}
 }
