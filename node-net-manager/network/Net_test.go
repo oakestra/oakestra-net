@@ -1,15 +1,17 @@
 package network
 
 import (
-	"gotest.tools/assert"
+	"net"
 	"testing"
+
+	"gotest.tools/assert"
 )
 
 func TestPortMappingEmpty(t *testing.T) {
 	mock := &mockiptable{}
 	iptable = mock
 	//empty string
-	err := ManageContainerPorts("0.0.0.0", "", OpenPorts)
+	err := ManageContainerPorts(net.ParseIP("0.0.0.0"), "", OpenPorts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +22,7 @@ func TestPortMappingUdp(t *testing.T) {
 	mock := &mockiptable{}
 	iptable = mock
 	//udp 80
-	err := ManageContainerPorts("0.0.0.0", "80:80/udp", OpenPorts)
+	err := ManageContainerPorts(net.ParseIP("0.0.0.0"), "80:80/udp", OpenPorts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +30,7 @@ func TestPortMappingUdp(t *testing.T) {
 		assert.Equal(t, arg, mock.CalledWith[i])
 	}
 	//udp 80 and 90
-	err = ManageContainerPorts("0.0.0.0", "80:80/udp;90:100/udp", OpenPorts)
+	err = ManageContainerPorts(net.ParseIP("0.0.0.0"), "80:80/udp;90:100/udp", OpenPorts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +43,7 @@ func TestPortMappingTcp(t *testing.T) {
 	mock := &mockiptable{}
 	iptable = mock
 	//tcp 80
-	err := ManageContainerPorts("0.0.0.0", "80", OpenPorts)
+	err := ManageContainerPorts(net.ParseIP("0.0.0.0"), "80", OpenPorts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +51,7 @@ func TestPortMappingTcp(t *testing.T) {
 		assert.Equal(t, arg, mock.CalledWith[i])
 	}
 	//tcp 80:80
-	err = ManageContainerPorts("0.0.0.0", "80:80", OpenPorts)
+	err = ManageContainerPorts(net.ParseIP("0.0.0.0"), "80:80", OpenPorts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +59,7 @@ func TestPortMappingTcp(t *testing.T) {
 		assert.Equal(t, arg, mock.CalledWith[i])
 	}
 	//tcp 80 and 90
-	err = ManageContainerPorts("0.0.0.0", "80:80/tcp;90:100/tcp", OpenPorts)
+	err = ManageContainerPorts(net.ParseIP("0.0.0.0"), "80:80/tcp;90:100/tcp", OpenPorts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,19 +72,30 @@ func TestPortMappingInvalid(t *testing.T) {
 	mock := &mockiptable{}
 	iptable = mock
 
-	err := ManageContainerPorts("0.0.0.0", "80:80-80", OpenPorts)
+	err := ManageContainerPorts(net.ParseIP("0.0.0.0"), "80:80-80", OpenPorts)
 	if err == nil {
 		t.Fatal("80:80-80 must be invalid")
 	}
 
-	err = ManageContainerPorts("0.0.0.0", " ", OpenPorts)
+	err = ManageContainerPorts(net.ParseIP("0.0.0.0"), " ", OpenPorts)
 	if err == nil {
 		t.Fatal("space must be invalid")
 	}
 
-	err = ManageContainerPorts("0.0.0.0", "hello", OpenPorts)
+	err = ManageContainerPorts(net.ParseIP("0.0.0.0"), "hello", OpenPorts)
 	if err == nil {
 		t.Fatal("hello must be invalid")
+	}
+}
+
+func TestIncIP_simple(t *testing.T) {
+	ip1 := []byte{0, 0, 0, 2}
+
+	inc := NextIP(ip1, 1)
+	want := []byte{0, 0, 0, 3}
+
+	if !inc.Equal(want) {
+		t.Fatal("Problem in NextIP function.")
 	}
 }
 
