@@ -2,19 +2,24 @@ package proxy
 
 import (
 	"NetManager/TableEntryCache"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	"NetManager/proxy/iputils"
 	"math/rand"
 	"net"
 	"testing"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
-type FakeEnv struct {
-}
+type FakeEnv struct{}
+
+var ipv4Packet string = "4500003471ab40003f06b54e0a1e00130a120088a8fc0050866d4e41ec673059801001f6a3fd00000101080aac259946269fb537"
+
+var ipv4SYNPacket string = "4500003cf20440003f0635810a1e00010a120006b5a2005071f2e51a00000000a002fd5c8ee50000020405820402080a3b625f570000000001030307"
 
 func (fakeenv *FakeEnv) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry {
 	entrytable := make([]TableEntryCache.TableEntry, 0)
-	//If entry already available
+	// If entry already available
 	entry := TableEntryCache.TableEntry{
 		Appname:          "a",
 		Appns:            "a",
@@ -24,14 +29,16 @@ func (fakeenv *FakeEnv) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 		Cluster:          0,
 		Nodeip:           net.ParseIP("10.0.0.1"),
 		Nsip:             net.ParseIP("10.19.2.12"),
-		ServiceIP: []TableEntryCache.ServiceIP{{
-			IpType:  TableEntryCache.Closest,
-			Address: net.ParseIP("10.30.255.255"),
-		},
+		ServiceIP: []TableEntryCache.ServiceIP{
+			{
+				IpType:  TableEntryCache.Closest,
+				Address: net.ParseIP("10.30.255.255"),
+			},
 			{
 				IpType:  TableEntryCache.InstanceNumber,
 				Address: net.ParseIP("10.30.255.254"),
-			}},
+			},
+		},
 	}
 	entrytable = append(entrytable, entry)
 	return entrytable
@@ -47,20 +54,26 @@ func (fakeenv *FakeEnv) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEnt
 		Cluster:          0,
 		Nodeip:           net.ParseIP("10.0.0.1"),
 		Nsip:             net.ParseIP("10.19.1.1"),
-		ServiceIP: []TableEntryCache.ServiceIP{{
-			IpType:  TableEntryCache.Closest,
-			Address: net.ParseIP("10.30.255.252"),
-		},
+		ServiceIP: []TableEntryCache.ServiceIP{
+			{
+				IpType:  TableEntryCache.Closest,
+				Address: net.ParseIP("10.30.255.252"),
+			},
 			{
 				IpType:  TableEntryCache.InstanceNumber,
 				Address: net.ParseIP("10.30.255.253"),
-			}},
+			},
+		},
 	}
 	return entry, true
 }
 
 func (fakeenv *FakeEnv) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool) {
 	return TableEntryCache.TableEntry{}, false
+}
+
+func (fakeenv *FakeEnv) AddTableQueryEntry(entry TableEntryCache.TableEntry) {
+	// interface satisfaction
 }
 
 func getFakeTunnel() GoProxyTunnel {
@@ -82,24 +95,41 @@ func getFakeTunnel() GoProxyTunnel {
 	return tunnel
 }
 
-func getFakePacket(srcIP string, dstIP string, srcPort int, dstPort int) (gopacket.Packet, *layers.IPv4, *layers.TCP) {
-	ipLayer := layers.IPv4{
+func getFakePacket(
+	srcIP string,
+	dstIP string,
+	srcPort int,
+	dstPort int,
+) (gopacket.Packet, iputils.NetworkLayerPacket, iputils.TransportLayerProtocol) {
+	ipLayer := &iputils.IPv4Packet{IPv4: &layers.IPv4{
 		SrcIP:    net.ParseIP(srcIP),
 		DstIP:    net.ParseIP(dstIP),
 		Protocol: layers.IPProtocolTCP,
-	}
-	tcpLayer := layers.TCP{
+		Version:  4,
+	}}
+	tcpLayer := &iputils.TCPLayer{TCP: &layers.TCP{
 		SrcPort: layers.TCPPort(srcPort),
 		DstPort: layers.TCPPort(dstPort),
 		SYN:     true,
-	}
+	}}
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: false,
 	}
-	_ = gopacket.SerializeLayers(buf, opts, &ipLayer, &tcpLayer)
-	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeIPv4, gopacket.Default), &ipLayer, &tcpLayer
+	ip := ipLayer.Layer().(*layers.IPv4)
+	tcpLayer.TCPLayer().SetNetworkLayerForChecksum(ip)
+	_ = gopacket.SerializeLayers(
+		buf,
+		opts,
+		ipLayer.Layer().(*layers.IPv4),
+		tcpLayer.TCPLayer(),
+	)
+	return gopacket.NewPacket(
+		buf.Bytes(),
+		layers.LayerTypeIPv4,
+		gopacket.Default,
+	), ipLayer, tcpLayer
 }
 
 func TestOutgoingProxy(t *testing.T) {
@@ -108,8 +138,11 @@ func TestOutgoingProxy(t *testing.T) {
 	_, ip, tcp := getFakePacket("10.19.1.1", "10.30.255.255", 666, 80)
 	_, noip, notcp := getFakePacket("10.19.1.1", "10.20.1.1", 666, 80)
 
-	newpacketproxy := proxy.outgoingProxy(ip, tcp, nil)
-	newpacketnoproxy := proxy.outgoingProxy(noip, notcp, nil)
+	newpacketproxy := proxy.outgoingProxy(ip, tcp)
+	newpacketnoproxy := proxy.outgoingProxy(noip, notcp)
+	if newpacketnoproxy != nil {
+		t.Error("Packet should not be proxied")
+	}
 
 	if ipLayer := newpacketproxy.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		if tcpLayer := newpacketproxy.Layer(layers.LayerTypeTCP); tcpLayer != nil {
@@ -125,9 +158,6 @@ func TestOutgoingProxy(t *testing.T) {
 			//}
 		}
 	}
-	if newpacketnoproxy != nil {
-		t.Error("Packet should not be proxied")
-	}
 }
 
 func TestIngoingProxy(t *testing.T) {
@@ -136,7 +166,7 @@ func TestIngoingProxy(t *testing.T) {
 	_, ip, tcp := getFakePacket("10.30.0.5", "10.19.1.15", 666, 777)
 	_, noip, notcp := getFakePacket("10.19.2.1", "10.19.1.12", 666, 80)
 
-	//update proxy proxycache
+	// update proxy proxycache
 	entry := ConversionEntry{
 		srcip:         net.ParseIP("10.19.1.15"),
 		dstip:         net.ParseIP("10.19.2.1"),
@@ -147,8 +177,8 @@ func TestIngoingProxy(t *testing.T) {
 	}
 	proxy.proxycache.Add(entry)
 
-	newpacketproxy := proxy.ingoingProxy(ip, tcp, nil)
-	newpacketnoproxy := proxy.ingoingProxy(noip, notcp, nil)
+	newpacketproxy := proxy.ingoingProxy(ip, tcp)
+	newpacketnoproxy := proxy.ingoingProxy(noip, notcp)
 
 	if ipLayer := newpacketproxy.Layer(layers.LayerTypeIPv4); ipLayer != nil {
 		if tcpLayer := newpacketproxy.Layer(layers.LayerTypeTCP); tcpLayer != nil {

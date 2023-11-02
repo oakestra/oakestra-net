@@ -16,13 +16,13 @@ type ConversionEntry struct {
 }
 
 type ConversionList struct {
+	conversionList []ConversionEntry
 	nextEntry      int
 	lastUsed       int64
-	conversionList []ConversionEntry
 }
 
 type ProxyCache struct {
-	//One position for each port number. Higher mem usage but lower cpu usage
+	// One position for each port number. Higher mem usage but lower cpu usage
 	cache                 []ConversionList
 	conversionListMaxSize int
 	rwlock                sync.RWMutex
@@ -93,7 +93,7 @@ func (cache *ProxyCache) addToConversionList(entry ConversionEntry) {
 	elem.lastUsed = time.Now().Unix()
 	alreadyExist := false
 	alreadyExistPosition := 0
-	//check if used port is already in proxycache
+	// check if used port is already in proxycache
 	for i, elementry := range elem.conversionList {
 		if elementry.dstport == entry.dstport {
 			alreadyExistPosition = i
@@ -102,11 +102,10 @@ func (cache *ProxyCache) addToConversionList(entry ConversionEntry) {
 		}
 	}
 	if alreadyExist {
-		//if sourceport already in proxycache overwrite the proxycache entry
+		// if sourceport already in proxycache overwrite the proxycache entry
 		elem.conversionList[alreadyExistPosition] = entry
-
 	} else {
-		//otherwise add a new proxycache entry in the next slot available
+		// otherwise add a new proxycache entry in the next slot available
 		elem.conversionList[elem.nextEntry] = entry
 		elem.nextEntry = (elem.nextEntry + 1) % cache.conversionListMaxSize
 	}
