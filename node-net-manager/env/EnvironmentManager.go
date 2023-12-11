@@ -20,8 +20,6 @@ import (
 	"sync"
 )
 
-const NamespaceAlreadyDeclared string = "namespace already declared"
-
 type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
