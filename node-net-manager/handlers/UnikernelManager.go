@@ -55,7 +55,7 @@ Response: 200 or Failure code
 func (m *UnikernelManager) CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /unikernel/deploy")
 
-	if *unikernelManager.WorkerID == "" {
+	if *m.WorkerID == "" {
 		log.Printf("[ERROR] Node not initialized")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
