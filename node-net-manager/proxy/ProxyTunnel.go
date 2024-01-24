@@ -110,45 +110,6 @@ func (c *Configuration) String() string {
 			"MTUSize: %d", c.HostTUNDeviceName, c.TunNetIP, c.ProxySubnetwork, c.ProxySubnetworkMask, c.TunnelPort, c.Mtusize)
 }
 
-/*
-func New() GoProxyTunnel {
-	port, err := strconv.Atoi(os.Getenv("PUBLIC_WORKER_PORT"))
-	if err != nil {
-		logger.InfoLogger().Printf("Default to tunport 50103")
-		port = 50103
-	}
-	mtusize, err := strconv.Atoi(os.Getenv("TUN_MTU_SIZE"))
-	if err != nil {
-		logger.InfoLogger().Printf("Default to mtusize 1450")
-		mtusize = 1450
-	}
-	proxySubnetworkMask := os.Getenv("PROXY_SUBNETWORK_MASK")
-	if len(proxySubnetworkMask) == 0 {
-		logger.InfoLogger().Printf("Default proxy subnet mask to 255.255.0.0")
-		proxySubnetworkMask = "255.255.0.0"
-	}
-	proxySubnetwork := os.Getenv("PROXY_SUBNETWORK")
-	if len(proxySubnetwork) == 0 {
-		logger.InfoLogger().Printf("Default proxy subnetwork to 10.30.0.0")
-		proxySubnetwork = "10.30.0.0"
-	}
-	tunNetIP := os.Getenv("TUN_NET_IP")
-	if len(tunNetIP) == 0 {
-		logger.InfoLogger().Printf("Default to tunNetIP 10.19.1.254")
-		tunNetIP = "10.19.1.254"
-	}
-	tunconfig := Configuration{
-		HostTUNDeviceName:   "goProxyTun",
-		ProxySubnetwork:     proxySubnetwork,
-		ProxySubnetworkMask: proxySubnetworkMask,
-		TunNetIP:            tunNetIP,
-		TunnelPort:          port,
-		Mtusize:             mtusize,
-	}
-	return NewCustom(tunconfig)
-}
-*/
-
 // create a  new GoProxyTunnel with a custom configuration
 func NewCustom(configuration Configuration) GoProxyTunnel {
 	proxy := GoProxyTunnel{
