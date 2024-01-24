@@ -81,7 +81,7 @@ func New() GoProxyTunnel {
 	}
 	defer cfg.Close()
 
-	config := &Configuration{
+	config := Configuration{
 		HostTUNDeviceName:   "goProxyTun",
 		TunNetIP:            "10.19.1.254",
 		ProxySubnetwork:     "10.30.0.0",
@@ -91,12 +91,12 @@ func New() GoProxyTunnel {
 	}
 
 	jsonparser := json.NewDecoder(cfg)
-	if err = jsonparser.Decode(config); err != nil {
+	if err = jsonparser.Decode(&config); err != nil {
 		logger.ErrorLogger().Println("error parsing tuncfg.json", err)
 	}
 
 	logger.InfoLogger().Printf("Utilizing config: %v", config)
-	return NewCustom(*config)
+	return NewCustom(config)
 }
 
 // Configuration implements Stringer interface
