@@ -1,26 +1,19 @@
-from unittest.mock import MagicMock
-import operations.instances_management
-import operations.cluster_management
-import interfaces.clusters_interface
 import sys
+from unittest.mock import MagicMock
 
-mongodb_client = sys.modules['interfaces.mongodb_requests']
+import interfaces.clusters_interface
+import operations.cluster_management
+import operations.instances_management
+
+mongodb_client = sys.modules["interfaces.mongodb_requests"]
 
 
 def _get_fake_job(name):
     return {
         "job_name": name,
         "system_job_id": "123",
-        "instance_list": [
-            {
-                "instance_number": 1
-            }
-        ],
-        "service_ip_list": [
-            {
-                "type": "RR"
-            }
-        ]
+        "instance_list": [{"instance_number": 1}],
+        "service_ip_list": [{"type": "RR"}],
     }
 
 
@@ -43,7 +36,9 @@ def test_interest_register():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=fake_job)
     mongodb_client.mongo_register_cluster_job_interest = MagicMock()
 
-    result, code = operations.instances_management.get_service_instances(name="aaa", cluster_ip="123")
+    result, code = operations.instances_management.get_service_instances(
+        name="aaa", cluster_ip="123"
+    )
 
     assert code == 200
     assert result["instance_list"] is not None
@@ -51,9 +46,6 @@ def test_interest_register():
     assert result["system_job_id"] == "123"
     assert result["job_name"] == "aaa"
 
-    mongodb_client. \
-        mongo_register_cluster_job_interest. \
-        assert_called_with(
-        fake_cluster["cluster_id"],
-        fake_job["job_name"]
+    mongodb_client.mongo_register_cluster_job_interest.assert_called_with(
+        fake_cluster["cluster_id"], fake_job["job_name"]
     )

@@ -1,7 +1,8 @@
-import logging
-import requests
-import os
 import json
+import logging
+import os
+
+import requests
 
 ROOT_SERVICE_MANAGER_ADDR = (
     "http://"

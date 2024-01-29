@@ -1,3 +1,6 @@
+import os
+import socket
+
 from flask import Flask, request
 from flask_socketio import SocketIO
 from interfaces.mongodb_requests import mongo_init
@@ -7,8 +10,10 @@ from network.utils import sanitize
 from operations import instances_management, cluster_management
 from operations import service_management
 from net_logging import configure_logging
-import os
-import socket
+from network import routes_interests, subnetwork_management
+from network.tablequery import *
+from operations import (cluster_management, instances_management,
+                        service_management)
 
 my_logger = configure_logging()
 
@@ -216,7 +221,7 @@ def subnet_request():
     """
     addr = subnetwork_management.new_subnetwork_addr()
     addrv6 = subnetwork_management.new_subnetwork_addr_v6()
-    return {'subnet_addr': addr, 'subnet_addr_v6': addrv6}
+    return {"subnet_addr": addr, "subnet_addr_v6": addrv6}
 
 
 if __name__ == "__main__":

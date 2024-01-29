@@ -1,12 +1,13 @@
 import json
-import time
-from unittest.mock import MagicMock, patch
-from unittest import mock
 import sys
-from network import deployment
-from network.tablequery import resolution, interests
-from interfaces.mqtt_client import _tablequery_handler
+import time
+from unittest import mock
+from unittest.mock import MagicMock, patch
+
 from interfaces import mqtt_client
+from interfaces.mqtt_client import _tablequery_handler
+from network import deployment
+from network.tablequery import interests, resolution
 
 mongodb_client = sys.modules["interfaces.mongodb_requests"]
 
@@ -38,7 +39,8 @@ def _get_fake_job(name):
 
 
 def test_deployment_status_report(requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import \
+        ROOT_SERVICE_MANAGER_ADDR
 
     job = _get_fake_job("aaa")
     mongodb_client.mongo_update_job_deployed = MagicMock(return_value=job)
@@ -144,7 +146,8 @@ def test_tablequery_service_name_local(add_interest):
 
 @patch("network.tablequery.interests.add_interest")
 def test_tablequery_service_ip_cloud(add_interest, requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import \
+        ROOT_SERVICE_MANAGER_ADDR
 
     job = _get_fake_job("aaa")
     job_instance = job["instance_list"][0]
@@ -188,7 +191,8 @@ def test_tablequery_service_ip_cloud(add_interest, requests_mock):
 
 @patch("network.tablequery.interests.add_interest")
 def test_tablequery_service_name_cloud(add_interest, requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import \
+        ROOT_SERVICE_MANAGER_ADDR
 
     job = _get_fake_job("aaa")
     job_instance = job["instance_list"][0]
@@ -242,7 +246,8 @@ def test_register_interest():
 
 
 def test_remove_interest(requests_mock):
-    from interfaces.root_service_manager_requests import ROOT_SERVICE_MANAGER_ADDR
+    from interfaces.root_service_manager_requests import \
+        ROOT_SERVICE_MANAGER_ADDR
 
     # test interested workers >0
     adapter = requests_mock.register_uri(
