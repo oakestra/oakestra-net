@@ -1,10 +1,12 @@
+import logging
 import re
 import traceback
-from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork
-from network.deployment import *
-from network.tablequery import resolution, interests
+
 import paho.mqtt.client as paho_mqtt
-import logging
+from interfaces.mongodb_requests import \
+    mongo_find_node_by_id_and_update_subnetwork
+from network.deployment import *
+from network.tablequery import interests, resolution
 
 mqtt = None
 app = None
@@ -24,12 +26,9 @@ def handle_mqtt_message(client, userdata, message):
 
     topic = data["topic"]
 
-    re_job_deployment_topic = re.search(
-        "^nodes/.*/net/service/deployed", topic)
-    re_job_undeployment_topic = re.search(
-        "^nodes/.*/net/service/undeployed", topic)
-    re_job_tablequery_topic = re.search(
-        "^nodes/.*/net/tablequery/request", topic)
+    re_job_deployment_topic = re.search("^nodes/.*/net/service/deployed", topic)
+    re_job_undeployment_topic = re.search("^nodes/.*/net/service/undeployed", topic)
+    re_job_tablequery_topic = re.search("^nodes/.*/net/tablequery/request", topic)
     re_job_subnet_topic = re.search("^nodes/.*/net/subnet", topic)
     re_job_interest_remove = re.search("^nodes/.*/net/interest/remove", topic)
 
@@ -73,19 +72,27 @@ def mqtt_init(flask_app):
 
 
 def _deployment_handler(client_id, payload):
-    appname = payload.get('appname')
-    status = payload.get('status')
-    nsIp = payload.get('nsip')
-    nsIPv6 = payload.get('nsipv6')
-    instance_number = payload.get('instance_number')
-    host_ip = payload.get('host_ip')
-    host_port = payload.get('host_port')
+    appname = payload.get("appname")
+    status = payload.get("status")
+    nsIp = payload.get("nsip")
+    nsIPv6 = payload.get("nsipv6")
+    instance_number = payload.get("instance_number")
+    host_ip = payload.get("host_ip")
+    host_port = payload.get("host_port")
     try:
-        deployment_status_report(appname, status, nsIp, nsIPv6, client_id, instance_number, host_ip, host_port)
+        deployment_status_report(
+            appname,
+            status,
+            nsIp,
+            nsIPv6,
+            client_id,
+            instance_number,
+            host_ip,
+            host_port,
+        )
     except Exception as e:
         traceback.print_exc()
         print(e)
-    
 
 
 def _undeployment_handler(client_id, payload):
@@ -111,8 +118,7 @@ def _tablequery_handler(client_id, payload):
     try:
         if sip is not None and sip != "":
             query_key = str(sip)
-            serviceName, instances, siplist = resolution.service_resolution_ip(
-                sip)
+            serviceName, instances, siplist = resolution.service_resolution_ip(sip)
         elif serviceName is not None and serviceName != "":
             query_key = str(serviceName)
             instances, siplist = resolution.service_resolution(serviceName)
@@ -136,8 +142,10 @@ def _subnet_handler(client_id, payload):
         # associate new subnetwork to the node
         addr = root_service_manager_get_subnet()
         mongo_find_node_by_id_and_update_subnetwork(client_id, addr[0], addr[1])
-        mqtt_publish_subnetwork_result(client_id, {"address": addr[0], "addressv6": addr[1]})
-    elif method == 'DELETE':
+        mqtt_publish_subnetwork_result(
+            client_id, {"address": addr[0], "addressv6": addr[1]}
+        )
+    elif method == "DELETE":
         # remove subnetwork from node
         pass
 
