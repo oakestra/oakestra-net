@@ -8,9 +8,11 @@ MONGO_PORT = os.environ.get("CLUSTER_MONGO_PORT")
 
 MONGO_ADDR_NODES = "mongodb://" + str(MONGO_URL) + ":" + str(MONGO_PORT) + "/nodes"
 MONGO_ADDR_JOBS = "mongodb://" + str(MONGO_URL) + ":" + str(MONGO_PORT) + "/jobs"
+MONGO_ADDR_CLUSTER = "mongodb://" + str(MONGO_URL) + ":" + str(MONGO_PORT) + "/cluster"
 
 mongo_nodes = None
 mongo_jobs = None
+mongo_cluster = None
 app = None
 
 
@@ -22,6 +24,7 @@ def mongo_init(flask_app):
 
     mongo_nodes = PyMongo(app, uri=MONGO_ADDR_NODES)
     mongo_jobs = PyMongo(app, uri=MONGO_ADDR_JOBS)
+    mongo_cluster = PyMongo(app, uri=MONGO_ADDR_CLUSTER)
 
     # initialize jobs db
     mongo_jobs.db.jobs.drop()
@@ -102,10 +105,10 @@ def mongo_update_job(job):
 def mongo_update_job_instance(job_name, instance):
     # update if exist otherwise push a new instance
     if mongo_jobs.db.jobs.find_one(
-        {
-            "job_name": job_name,
-            "instance_list.instance_number": instance["instance_number"],
-        }
+            {
+                "job_name": job_name,
+                "instance_list.instance_number": instance["instance_number"],
+            }
     ):
         mongo_jobs.db.jobs.update_one(
             {
@@ -176,7 +179,7 @@ def mongo_find_job_by_ip(ip):
 
 
 def mongo_update_job_deployed(
-    job_name, status, ns_ip, ns_ipv6, node_id, instance_number, host_ip, host_port
+        job_name, status, ns_ip, ns_ipv6, node_id, instance_number, host_ip, host_port
 ):
     global mongo_jobs
     job = mongo_jobs.db.jobs.find_one({"job_name": job_name})
@@ -235,3 +238,17 @@ def mongo_remove_interest(job_name, clientid):
             mongo_jobs.db.jobs.update_one(
                 {"job_name": job_name}, {"$set": {"interested_nodes": interested_nodes}}
             )
+
+
+# ..... Init Operation s ..... #
+# ............................#
+def mongo_update_cluster_info(cluster_id):
+    mongo_cluster.db.cluster.find_one_and_update(
+        {"_id": ObjectId(cluster_id)},
+        {"$set": {"cluster_id": cluster_id, "cluster_type": "current"}},
+        upsert=True,
+    )
+
+
+def get_current_cluster():
+    return mongo_cluster.db.cluster.find_one({"cluster_type": "current"})

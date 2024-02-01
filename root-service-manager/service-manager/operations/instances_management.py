@@ -51,10 +51,10 @@ def undeploy_request(sys_job_id=None, instance_number=None):
     return "Instance not found", 400
 
 
-def get_service_instances(name=None, ip=None, cluster_ip=None):
-    if cluster_ip is None:
+def get_service_instances(name=None, ip=None, cluster_id=None):
+    if cluster_id is None:
         return "Invalid address", 400
-    cluster = mongodb_requests.mongo_get_cluster_by_ip(cluster_ip)
+    cluster = mongodb_requests.mongo_get_cluster_by_id(cluster_id)
 
     if cluster is None:
         return "Invalid cluster address, is the cluster registered?", 400
