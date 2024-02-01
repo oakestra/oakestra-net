@@ -87,7 +87,6 @@ def update_instance_local_deployment_addresses():
         'instances:[{
             'instance_number':int
             'namespace_ip':string
-            'namespace_ip_v6':string
             'host_ip':string
             'host_port':string
         }]
@@ -188,12 +187,9 @@ def table_query_resolution_by_jobname(service_name):
     Get all the instances of a job given the complete name
     """
     service_name = service_name.replace("_", ".")
-    app.logger.info(
-        "Incoming Request /api/net/service/" + str(service_name) + "/instances"
-    )
-    return instances_management.get_service_instances(
-        name=service_name, cluster_ip=request.remote_addr
-    )
+    cluster_id = str(request.args.get('cluster_id'))
+    app.logger.info("Incoming Request /api/net/service/" + str(service_name) + "/instances?id="+cluster_id)
+    return instances_management.get_service_instances(name=service_name, cluster_id=cluster_id)
 
 
 @app.route("/api/net/service/ip/<service_ip>/instances", methods=["GET"])
@@ -202,12 +198,9 @@ def table_query_resolution_by_ip(service_ip):
     Get all the instances of a job given a Service IP in 172_30_x_y notation
     """
     service_ip = service_ip.replace("_", ".")
-    app.logger.info(
-        "Incoming Request /api/net/service/ip/" + str(service_ip) + "/instances"
-    )
-    return instances_management.get_service_instances(
-        ip=service_ip, cluster_ip=request.remote_addr
-    )
+    cluster_id = str(request.args.get('cluster_id'))
+    app.logger.info("Incoming Request /api/net/service/ip/" + str(service_ip) + "/instances"+cluster_id)
+    return instances_management.get_service_instances(ip=service_ip, cluster_id=cluster_id)
 
 
 # ........ Subnetwork management endpoints .............#

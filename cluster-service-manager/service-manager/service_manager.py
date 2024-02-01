@@ -6,6 +6,7 @@ from flask_socketio import SocketIO
 from interfaces.mongodb_requests import mongo_init
 from interfaces.mqtt_client import mqtt_init
 from net_logging import configure_logging
+from operations import cluster_management
 from operations.instances_management import instance_updates
 from operations.service_management import create_service, remove_service
 
@@ -24,6 +25,25 @@ app.config["LOGGING_FILTERS"] = ["flask.logging.threaded"]
 app.logger.addHandler(my_logger)
 mongo_init(app)
 mqtt_init(app)
+
+
+# ............. Initialization Endpoint .......... #
+# ...............................................#
+@app.route('/api/net/init', methods=['POST'])
+def register_new_cluster():
+    """
+        Registration of the new cluster
+        json file structure:{
+            'cluster_id':str
+        }
+    """
+    app.logger.info("Incoming Request /api/net/init")
+    data = request.json
+    app.logger.info(data)
+
+    return cluster_management.init_cluster(
+        cluster_id=str(data.get("cluster_id")),
+    )
 
 
 # ............. Deployment Endpoints ............#
