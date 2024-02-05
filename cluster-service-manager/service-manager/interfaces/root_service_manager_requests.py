@@ -1,8 +1,7 @@
-import json
 import logging
-import os
-
 import requests
+import os
+import json
 
 from interfaces import mongodb_requests
 

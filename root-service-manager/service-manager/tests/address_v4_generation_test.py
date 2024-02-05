@@ -1,9 +1,8 @@
-import sys
 from unittest.mock import MagicMock
-
+import sys
 from network.subnetwork_management import *
 
-mongodb_client = sys.modules["interfaces.mongodb_requests"]
+mongodb_client = sys.modules['interfaces.mongodb_requests']
 
 
 def test_instance_address_base():
@@ -48,9 +47,7 @@ def test_instance_address_recycle():
     # test clearance condition
     clear_instance_ip(ip1)
 
-    mongodb_client.mongo_free_service_address_to_cache.assert_called_with(
-        [10, 30, 0, 0]
-    )
+    mongodb_client.mongo_free_service_address_to_cache.assert_called_with([10, 30, 0, 0])
 
 
 def test_instance_address_recycle_failure_1():
@@ -229,16 +226,16 @@ def test_new_job_rr_address():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {
-        "RR_ip": "10.30.0.1",
-        "app_name": "s1",
-        "app_ns": "test",
-        "service_name": "s1",
-        "service_ns": "test",
+        'RR_ip': '10.30.0.1',
+        'app_name': 's1',
+        'app_ns': 'test',
+        'service_name': 's1',
+        'service_ns': 'test'
     }
 
     addr = new_job_rr_address(file)
 
-    assert "10.30.0.1" == addr
+    assert '10.30.0.1' == addr
 
 
 def test_new_job_rr_address_fail1():
@@ -249,11 +246,11 @@ def test_new_job_rr_address_fail1():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {
-        "RR_ip": "10.20.0.1",
-        "app_name": "s1",
-        "app_ns": "test",
-        "service_name": "s1",
-        "service_ns": "test",
+        'RR_ip': '10.20.0.1',
+        'app_name': 's1',
+        'app_ns': 'test',
+        'service_name': 's1',
+        'service_ns': 'test'
     }
 
     passed = False
@@ -274,11 +271,11 @@ def test_new_job_rr_address_fail2():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {
-        "RR_ip": "173.30.0.1",
-        "app_name": "s1",
-        "app_ns": "test",
-        "service_name": "s1",
-        "service_ns": "test",
+        'RR_ip': '173.30.0.1',
+        'app_name': 's1',
+        'app_ns': 'test',
+        'service_name': 's1',
+        'service_ns': 'test'
     }
 
     passed = False
@@ -299,12 +296,13 @@ def test_new_job_rr_address_fail3():
     mongodb_client.mongo_find_job_by_ip = MagicMock(return_value=None)
 
     file = {
-        "app_name": "s1",
-        "app_ns": "test",
-        "service_name": "s1",
-        "service_ns": "test",
+        'app_name': 's1',
+        'app_ns': 'test',
+        'service_name': 's1',
+        'service_ns': 'test'
     }
 
     addr = new_job_rr_address(file)
 
-    assert addr == "10.30.0.0"
+    assert addr == '10.30.0.0'
+
