@@ -64,7 +64,7 @@ def get_service_instances(name=None, ip=None, cluster_ip=None):
         return "Job not found", 404
 
     # route interest registration for this route
-    mongodb_requests.mongo_register_cluster_job_interest(cluster.get("cluster_ip"), job.get("job_name"))
+    mongodb_requests.mongo_register_cluster_job_interest(cluster.get("cluster_id"), job.get("job_name"))
 
     if job.get("_id") is not None:
         job["_id"] = str(job["_id"])
