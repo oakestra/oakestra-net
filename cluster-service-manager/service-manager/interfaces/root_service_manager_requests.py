@@ -3,8 +3,6 @@ import requests
 import os
 import json
 
-from interfaces import mongodb_requests
-
 ROOT_SERVICE_MANAGER_ADDR = (
     "http://"
     + os.environ.get("ROOT_SERVICE_MANAGER_URL", "0.0.0.0")
@@ -57,8 +55,9 @@ def system_manager_notify_deployment_status(job, worker_id):
 def cloud_table_query_ip(ip):
     print("table query to the System Manager...")
     job_ip = ip.replace(".", "_")
-    cluster = mongodb_requests.get_current_cluster()
-    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/ip/" + str(job_ip) + "/instances?cluster_id=" + str(cluster.get('cluster_id'))
+    request_addr = (
+        ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/ip/" + str(job_ip) + "/instances"
+    )
     print(request_addr)
     try:
         return requests.get(request_addr).json()
@@ -69,9 +68,8 @@ def cloud_table_query_ip(ip):
 def cloud_table_query_service_name(name):
     print("table query to the System Manager...")
     job_name = name.replace(".", "_")
-    cluster = mongodb_requests.get_current_cluster()
     request_addr = (
-        ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/" + str(job_name) + "/instances?cluster_id=" + str(cluster.get('cluster_id'))
+        ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/" + str(job_name) + "/instances"
     )
     print(request_addr)
     try:
