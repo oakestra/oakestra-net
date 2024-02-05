@@ -68,9 +68,8 @@ func (packet *IPv6Packet) Defragment() error {
 		packet.IPv6 = ipv6Defrag
 		return nil
 	*/
-	// TODO: fix broken if needed
+	// TODO fix broken
 	// overwrites NextHeader Value for whatever reason
-	// however, should not be needed
 	return nil
 }
 

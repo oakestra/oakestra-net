@@ -1,5 +1,3 @@
-from interfaces import mongodb_requests
-from network import routes_interests, tablequery
 from network.routes_interests import notify_job_instance_deployment
 from network.subnetwork_management import *
 from interfaces import mongodb_requests
@@ -12,7 +10,7 @@ def deploy_request(sys_job_id=None, instance_number=None, cluster_id=None):
         return "Invalid input parameters", 400
     mongodb_requests.mongo_create_job_instance(
         system_job_id=sys_job_id,
-        instance=_prepare_instance_dict(instance_number, cluster_id),
+        instance=_prepare_instance_dict(instance_number, cluster_id)
     )
     return "Instance info added", 200
 
@@ -28,7 +26,8 @@ def update_instance_local_addresses(job_id=None, instances=None):
         assert instance.get("host_port") is not None
 
     job = mongodb_requests.mongo_update_job_net_status(
-        job_id=job_id, instances=instances
+        job_id=job_id,
+        instances=instances
     )
 
     if job is None:
@@ -43,13 +42,11 @@ def update_instance_local_addresses(job_id=None, instances=None):
 def undeploy_request(sys_job_id=None, instance_number=None):
     if sys_job_id is None or instance_number is None:
         return "Invalid input parameters", 400
-    if mongodb_requests.mongo_update_clean_one_instance(
-        system_job_id=sys_job_id, instance_number=instance_number
-    ):
+    if (mongodb_requests.mongo_update_clean_one_instance(
+            system_job_id=sys_job_id,
+            instance_number=instance_number)):
         job = mongodb_requests.mongo_find_job_by_systemid(sys_job_id)
-        routes_interests.notify_job_instance_undeployment(
-            job.get("job_name"), instance_number
-        )
+        routes_interests.notify_job_instance_undeployment(job.get("job_name"), instance_number)
         return "Instance info cleared", 200
     return "Instance not found", 400
 
@@ -70,9 +67,7 @@ def get_service_instances(name=None, ip=None, cluster_id=None):
         return "Job not found", 404
 
     # route interest registration for this route
-    mongodb_requests.mongo_register_cluster_job_interest(
-        cluster.get("cluster_id"), job.get("job_name")
-    )
+    mongodb_requests.mongo_register_cluster_job_interest(cluster.get("cluster_id"), job.get("job_name"))
 
     if job.get("_id") is not None:
         job["_id"] = str(job["_id"])
