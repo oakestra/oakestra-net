@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/vishvananda/netlink"
@@ -106,32 +105,32 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 		mtusize:           customConfig.Mtusize,
 	}
 
-	//Get Connected Internet Interface
+	// Get Connected Internet Interface
 	if e.config.ConnectedInternetInterface == "" {
 		_, e.config.ConnectedInternetInterface = network.GetLocalIPandIface()
 		logger.InfoLogger().Println(e.config.ConnectedInternetInterface)
 
 	}
 
-	//create bridge
+	// create bridge
 	logger.InfoLogger().Println("Creation of goProxyBridge")
 	if err := e.CreateHostBridge(); err != nil {
 		log.Fatal(err)
 	}
 
-	//disable reverse path filtering
+	// disable reverse path filtering
 	logger.InfoLogger().Println("Disabling reverse path filtering")
 	network.DisableReversePathFiltering(e.config.HostBridgeName)
 
-	//Enable tun device forwarding
+	// Enable tun device forwarding
 	logger.InfoLogger().Println("Enabling packet forwarding")
 	network.EnableForwarding(e.config.HostBridgeName, proxyname)
 
-	//Enable bridge MASQUERADING
+	// Enable bridge MASQUERADING
 	logger.InfoLogger().Println("Enabling packet masquerading")
 	network.EnableMasquerading(e.config.HostBridgeIP, e.config.HostBridgeMask, e.config.HostBridgeIPv6, e.config.HostBridgeIPv6Prefix, e.config.HostBridgeName, e.config.ConnectedInternetInterface)
 
-	//update status with current network configuration
+	// update status with current network configuration
 	logger.InfoLogger().Println("Reading the current environment configuration")
 
 	return &e
@@ -144,10 +143,8 @@ func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 	if err != nil {
 		log.Fatal("Invalid subnetwork received. Can't proceed.")
 	}
-	logger.InfoLogger().Println("got subnetwork data: ", subnetwork_response)
-	subnetworks := strings.Fields(subnetwork_response)
-	ipv4_subnet := subnetworks[0]
-	ipv6_subnet := subnetworks[1]
+	ipv4_subnet := subnetwork_response.Address
+	ipv6_subnet := subnetwork_response.Address_v6
 
 	logger.InfoLogger().Println("Creating with default config")
 	mtusize, err := strconv.Atoi(os.Getenv("TUN_MTU_SIZE"))
@@ -211,7 +208,8 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
 			Name: veth1name,
-			MTU:  mtu},
+			MTU:  mtu,
+		},
 		PeerName: veth2name,
 	}
 	err = netlink.LinkAdd(veth)
@@ -254,8 +252,8 @@ func (env *Environment) setVethFirewallRules(bridgeVethName string) error {
 
 // add routes inside the container namespace to forward the traffic using the bridge
 func (env *Environment) setContainerRoutes(containerPid int, peerVeth string) error {
-	//Add route to bridge
-	//sudo nsenter -n -t 5565 ip route add 0.0.0.0/0 via 127.19.x.y dev veth013
+	// Add route to bridge
+	// sudo nsenter -n -t 5565 ip route add 0.0.0.0/0 via 127.19.x.y dev veth013
 	err := env.execInsideNs(containerPid, func() error {
 		link, err := netlink.LinkByName(peerVeth)
 		if err != nil {
@@ -395,14 +393,13 @@ func (env *Environment) BookVethNumber() {
 
 // CreateHostBridge create host bridge if it has not been created yet, return the current host bridge name or the newly created one
 func (env *Environment) CreateHostBridge() error {
-
-	//check current declared bridges
+	// check current declared bridges
 	devices, err := net.Interfaces()
 	if err != nil {
 		return err
 	}
 
-	//is HostBridgeName already created? DESTROY IT
+	// is HostBridgeName already created? DESTROY IT
 	for _, ifce := range devices {
 		if ifce.Name == env.config.HostBridgeName {
 			logger.DebugLogger().Println("Removing previous bridge")
@@ -410,7 +407,7 @@ func (env *Environment) CreateHostBridge() error {
 		}
 	}
 
-	//otherwise create it
+	// otherwise create it
 	logger.DebugLogger().Printf("Creating new bridge: %s\n", env.config.HostBridgeName)
 	createbridgeCmd := exec.Command("ip", "link", "add", "name", env.config.HostBridgeName, "mtu", strconv.Itoa(env.mtusize), "type", "bridge")
 	_, err = createbridgeCmd.Output()
@@ -418,7 +415,7 @@ func (env *Environment) CreateHostBridge() error {
 		return err
 	}
 
-	//assign ip to the bridge
+	// assign ip to the bridge
 	logger.DebugLogger().Println("Assigning IPv4 to the new bridge")
 	bridgeIpCmd := exec.Command("ip", "a", "add",
 		env.config.HostBridgeIP+env.config.HostBridgeMask, "dev", env.config.HostBridgeName)
@@ -435,7 +432,7 @@ func (env *Environment) CreateHostBridge() error {
 		return err
 	}
 
-	//bring the bridge up
+	// bring the bridge up
 	logger.DebugLogger().Println("Setting bridge UP")
 	bridgeUpCmd := exec.Command("ip", "link", "set", "dev", env.config.HostBridgeName, "up")
 	_, err = bridgeUpCmd.Output()
@@ -449,10 +446,10 @@ func (env *Environment) CreateHostBridge() error {
 // GetTableEntryByServiceIP Given a ServiceIP this method performs a search in the local ServiceCache
 // If the entry is not present a TableQuery is performed and the interest registered
 func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry {
-	//If entry already available
+	// If entry already available
 	table := env.translationTable.SearchByServiceIP(ip)
 	if len(table) > 0 {
-		//Fire table instance usage event
+		// Fire table instance usage event
 		events.GetInstance().Emit(events.Event{
 			EventType:   events.TableQuery,
 			EventTarget: table[0].JobName,
@@ -460,7 +457,7 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 		return table
 	}
 
-	//if no entry available -> TableQuery
+	// if no entry available -> TableQuery
 	entryList, err := tableQueryByIP(ip)
 
 	if err == nil {
@@ -470,7 +467,7 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 			env.AddTableQueryEntry(tableEntry)
 		}
 		table = env.translationTable.SearchByServiceIP(ip)
-		//register interest for sip as well to avoid querying the address too many times
+		// register interest for sip as well to avoid querying the address too many times
 		mqtt.MqttRegisterInterest(ip.String(), env)
 	}
 
@@ -480,7 +477,7 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 // GetTableEntryByInstanceIP Given a ServiceIP this method performs a search in the local ServiceCache
 // If the entry is not present a TableQuery is performed and the interest registered
 func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool) {
-	//If entry already available
+	// If entry already available
 	table := env.translationTable.SearchByServiceIP(ip)
 	if len(table) > 0 {
 		for elemindex, elem := range table {
@@ -498,7 +495,7 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 // GetTableEntryByNsIP Given a NamespaceIP finds the table entry. This search is local because the networking component MUST have all
 // the entries for the local deployed services.
 func (env *Environment) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool) {
-	//If entry already available
+	// If entry already available
 	entry, exist := env.translationTable.SearchByNsIP(ip)
 	if exist {
 		return entry, true
