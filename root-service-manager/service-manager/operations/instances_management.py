@@ -2,7 +2,7 @@ from network.routes_interests import notify_job_instance_deployment
 from network.subnetwork_management import *
 from interfaces import mongodb_requests
 from network import tablequery, routes_interests
-from interfaces.clusters_interface import sanitize as sanitize_address
+from network.utils import sanitize
 
 
 def deploy_request(sys_job_id=None, instance_number=None, cluster_id=None):
@@ -55,7 +55,7 @@ def get_service_instances(name=None, ip=None, cluster_ip=None):
     if cluster_ip is None:
         return "Invalid address", 400
 
-    cluster_ip = sanitize_address(cluster_ip)
+    cluster_ip = sanitize(cluster_ip)
     cluster = mongodb_requests.mongo_get_cluster_by_ip(cluster_ip)
 
     if cluster is None:
