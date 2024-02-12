@@ -1,11 +1,11 @@
 package network
 
 import (
-	"NetManager/logger"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
 	"log"
+	"math/big"
 	"net"
 	"time"
 
@@ -56,26 +56,8 @@ func NameUniqueHash(name string, size int) string {
 	return hashedAndEncoded[:size]
 }
 
-// Given an IP, give IP+inc
-// TODO rework, since it is not safe for use
-func NextIP(ip net.IP, inc uint) net.IP {
-	logger.DebugLogger().Printf("NextIP: %s + %d", ip.String(), inc)
-	ipBytes := ip.To16()
-	for i := len(ipBytes) - 1; i >= 0; i-- {
-		if ipBytes[i] == 255 {
-			ipBytes[i] = 0
-		} else {
-			ipBytes[i] = ipBytes[i] + byte(inc)
-			break
-		}
-	}
-	logger.DebugLogger().Printf("NextIP return > %s", net.IP(ipBytes))
-	return net.IP(ipBytes)
-}
-
-//Given an ipv4, gives the next IP
-/*
-func NextIP(ip net.IP, inc uint) net.IP {
+// Given an ipv4, gives the next IP
+func NextIPv4(ip net.IP, inc uint) net.IP {
 	i := ip.To4()
 	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
 	v += inc
@@ -91,11 +73,11 @@ func NextIPv6(ip net.IP, inc uint) net.IP {
 
 	// transform IP address to 128 bit Integer and increment by one
 	ipInt := new(big.Int).SetBytes(i)
-	ipInt.Add(ipInt, big.NewInt(1))
+	ipInt.Add(ipInt, big.NewInt(int64(inc)))
 
 	// transform new incremented IP address back to net.IP format and return
 	ret := make(net.IP, net.IPv6len)
 	ipInt.FillBytes(ret)
 
 	return ret
-}*/
+}

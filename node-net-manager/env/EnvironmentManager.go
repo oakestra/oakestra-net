@@ -93,8 +93,8 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 		proxyName:         proxyname,
 		config:            customConfig,
 		translationTable:  TableEntryCache.NewTableManager(),
-		nextContainerIP:   network.NextIP(net.ParseIP(customConfig.HostBridgeIP), 1),
-		nextContainerIPv6: network.NextIP(net.ParseIP(customConfig.HostBridgeIPv6), 1),
+		nextContainerIP:   network.NextIPv4(net.ParseIP(customConfig.HostBridgeIP), 1),
+		nextContainerIPv6: network.NextIPv6(net.ParseIP(customConfig.HostBridgeIPv6), 1),
 		totNextAddr:       1,
 		totNextAddrv6:     1,
 		addrCache:         make([]net.IP, 0),
@@ -154,9 +154,9 @@ func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 	}
 	config := Configuration{
 		HostBridgeName:             "goProxyBridge",
-		HostBridgeIP:               network.NextIP(net.ParseIP(ipv4_subnet), 1).String(),
+		HostBridgeIP:               network.NextIPv4(net.ParseIP(ipv4_subnet), 1).String(),
 		HostBridgeMask:             "/26",
-		HostBridgeIPv6:             network.NextIP(net.ParseIP(ipv6_subnet), 1).String(),
+		HostBridgeIPv6:             network.NextIPv6(net.ParseIP(ipv6_subnet), 1).String(),
 		HostBridgeIPv6Prefix:       "/120",
 		HostTunName:                "goProxyTun",
 		ConnectedInternetInterface: "",
@@ -549,7 +549,7 @@ func (env *Environment) generateAddress() (net.IP, error) {
 			logger.ErrorLogger().Printf("exhausted IPv4 address space")
 			return result, errors.New("IPv4 address space exhausted")
 		}
-		env.nextContainerIP = network.NextIP(env.nextContainerIP, 1)
+		env.nextContainerIP = network.NextIPv4(env.nextContainerIP, 1)
 	}
 	logger.DebugLogger().Printf("deployedServices after address generation: %v", env.deployedServices)
 	return result, nil
@@ -569,7 +569,7 @@ func (env *Environment) generateIPv6Address() (net.IP, error) {
 			logger.ErrorLogger().Printf("exhausted IPv6 address space")
 			return result, errors.New("IPv6 address space exhausted")
 		}
-		env.nextContainerIPv6 = network.NextIP(env.nextContainerIPv6, 1)
+		env.nextContainerIPv6 = network.NextIPv6(env.nextContainerIPv6, 1)
 	}
 	logger.DebugLogger().Printf("deployedServices after address v6 generation: %v", env.deployedServices)
 	return result, nil
