@@ -1,6 +1,7 @@
 package network
 
 import (
+	"NetManager/logger"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -46,7 +47,7 @@ func GetLocalIPandIface() (string, string) {
 
 func NameUniqueHash(name string, size int) string {
 	shaHashFunc := sha1.New()
-	shaHashFunc.Write([]byte(fmt.Sprintf("%s,%s", time.Now().String(), name)))
+	fmt.Fprintf(shaHashFunc, "%s,%s", time.Now().String(), name)
 	hashed := shaHashFunc.Sum(nil)
 	for size > len(hashed) {
 		hashed = append(hashed, hashed...)
@@ -58,6 +59,7 @@ func NameUniqueHash(name string, size int) string {
 // Given an IP, give IP+inc
 // TODO rework, since it is not safe for use
 func NextIP(ip net.IP, inc uint) net.IP {
+	logger.DebugLogger().Printf("NextIP: %s + %d", ip.String(), inc)
 	ipBytes := ip.To16()
 	for i := len(ipBytes) - 1; i >= 0; i-- {
 		if ipBytes[i] == 255 {
@@ -67,6 +69,7 @@ func NextIP(ip net.IP, inc uint) net.IP {
 			break
 		}
 	}
+	logger.DebugLogger().Printf("NextIP return > %s", net.IP(ipBytes))
 	return net.IP(ipBytes)
 }
 

@@ -4,7 +4,6 @@ import (
 	"NetManager/env"
 	"NetManager/logger"
 	"NetManager/mqtt"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -39,11 +38,12 @@ type DeployTaskQueue interface {
 	NewTask(request *ContainerDeployTask)
 }
 
-var once sync.Once
-var taskQueue deployTaskQueue
+var (
+	once      sync.Once
+	taskQueue deployTaskQueue
+)
 
 func NewDeployTaskQueue() DeployTaskQueue {
-
 	once.Do(func() {
 		taskQueue = deployTaskQueue{
 			newTask: make(chan *ContainerDeployTask, 50),
@@ -58,10 +58,10 @@ func (t *deployTaskQueue) NewTask(request *ContainerDeployTask) {
 }
 
 func (t *deployTaskQueue) taskExecutor() {
-	for true {
+	for {
 		select {
 		case task := <-t.newTask:
-			//deploy the network stack in the container
+			// deploy the network stack in the container
 			addr, addrv6, err := deploymentHandler(task)
 			if err != nil {
 				logger.ErrorLogger().Println("[ERROR]: ", err)
@@ -71,30 +71,29 @@ func (t *deployTaskQueue) taskExecutor() {
 				IPv6: addrv6,
 				Err:  err,
 			}
-			//asynchronously update proxy tables
+			// asynchronously update proxy tables
 			updateInternalProxyDataStructures(task)
 		}
 	}
 }
 
 func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, net.IP, error) {
-
-	//get app full name
+	// get app full name
 	appCompleteName := strings.Split(requestStruct.ServiceName, ".")
 	if len(appCompleteName) != 4 {
-		return nil, nil, errors.New(fmt.Sprintf("Invalid app name: %s", appCompleteName))
+		return nil, nil, fmt.Errorf("invalid app name: %s", appCompleteName)
 	}
 
-	//attach network to the container
+	// attach network to the container
 	netHandler := env.GetNetDeployment(requestStruct.Runtime)
+	logger.DebugLogger().Printf("Got netHandler: %v", netHandler)
 	addr, addrv6, err := netHandler.DeployNetwork(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
-
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
 		return nil, nil, err
 	}
 
-	//notify to net-component
+	// notify to net-component
 	err = mqtt.NotifyDeploymentStatus(
 		requestStruct.ServiceName,
 		"DEPLOYED",
@@ -113,8 +112,8 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, net.IP, erro
 }
 
 func updateInternalProxyDataStructures(requestStruct *ContainerDeployTask) {
-	//Update internal table entry if an interest has not been set already.
-	//Otherwise, do nothing, the net will autonomously update.
+	// Update internal table entry if an interest has not been set already.
+	// Otherwise, do nothing, the net will autonomously update.
 	if !mqtt.MqttIsInterestRegistered(requestStruct.ServiceName) {
 		requestStruct.Env.RefreshServiceTable(requestStruct.ServiceName)
 		mqtt.MqttRegisterInterest(requestStruct.ServiceName, requestStruct.Env, requestStruct.Instancenumber)

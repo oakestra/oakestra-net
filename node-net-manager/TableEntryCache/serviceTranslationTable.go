@@ -1,6 +1,7 @@
 package TableEntryCache
 
 import (
+	"NetManager/logger"
 	"errors"
 	"log"
 	"net"
@@ -46,7 +47,7 @@ func NewTableManager() TableManager {
 		translationTable: make([]TableEntry, 0),
 		rwlock:           sync.RWMutex{},
 	}
-	//TODO cleanup of old entry every X seconds
+	// TODO cleanup of old entry every X seconds
 }
 
 func (t *TableManager) Add(entry TableEntry) error {
@@ -61,6 +62,7 @@ func (t *TableManager) Add(entry TableEntry) error {
 
 // remove by Namespace IP, which can be either in IPv4 or IPv6 format
 func (t *TableManager) RemoveByNsip(nsip net.IP) error {
+	logger.DebugLogger().Printf("Remove by Nsip tableManager: %v", t)
 
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
@@ -97,16 +99,17 @@ func (t *TableManager) RemoveByJobName(jobname string) error {
 
 func (t *TableManager) removeByIndex(index int) error {
 	if index > -1 {
+		logger.DebugLogger().Printf("Removing from TableManager: %v", t.translationTable[index])
 		t.translationTable[index] = t.translationTable[len(t.translationTable)-1]
 		t.translationTable = t.translationTable[:len(t.translationTable)-1]
 		return nil
 	}
-	return errors.New("Entry not found")
+	return errors.New("entry not found")
 }
 
 func (t *TableManager) SearchByServiceIP(ip net.IP) []TableEntry {
-	//log.Println("Table research, table length: ", len(t.translationTable))
-	//log.Println(t.translationTable)
+	// log.Println("Table research, table length: ", len(t.translationTable))
+	// log.Println(t.translationTable)
 	result := make([]TableEntry, 0)
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
