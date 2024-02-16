@@ -537,8 +537,6 @@ func (env *Environment) RemoveNsIPEntries(nsip string) {
 
 func (env *Environment) generateAddress() (net.IP, error) {
 	var result net.IP
-	logger.DebugLogger().Printf("env.AddrCache: %v", env.addrCache)
-	logger.DebugLogger().Printf("deployedServices before address generation: %v", env.deployedServices)
 	if len(env.addrCache) > 0 {
 		result, env.addrCache = env.addrCache[0], env.addrCache[1:]
 	} else {
@@ -551,14 +549,11 @@ func (env *Environment) generateAddress() (net.IP, error) {
 		}
 		env.nextContainerIP = network.NextIPv4(env.nextContainerIP, 1)
 	}
-	logger.DebugLogger().Printf("deployedServices after address generation: %v", env.deployedServices)
 	return result, nil
 }
 
 func (env *Environment) generateIPv6Address() (net.IP, error) {
 	var result net.IP
-	logger.DebugLogger().Printf("env.AddrCachev6: %v", env.addrCachev6)
-	logger.DebugLogger().Printf("deployedServices before address v6 generation: %v", env.deployedServices)
 	if len(env.addrCachev6) > 0 {
 		result, env.addrCachev6 = env.addrCachev6[0], env.addrCachev6[1:]
 	} else {
@@ -571,25 +566,17 @@ func (env *Environment) generateIPv6Address() (net.IP, error) {
 		}
 		env.nextContainerIPv6 = network.NextIPv6(env.nextContainerIPv6, 1)
 	}
-	logger.DebugLogger().Printf("deployedServices after address v6 generation: %v", env.deployedServices)
 	return result, nil
 }
 
 func (env *Environment) freeContainerAddress(ip net.IP) {
 	// if ip is an IPv4 addr
-	logger.DebugLogger().Printf("addrCache: %v", env.addrCache)
-	logger.DebugLogger().Printf("addrCachev6: %v", env.addrCachev6)
-	logger.DebugLogger().Printf("Freeing address: %s", ip.String())
 	if err := ip.To4(); err != nil {
-		logger.DebugLogger().Printf("Appending to IPv4 cache: %s", ip.String())
-		logger.DebugLogger().Printf("New IPv4 address cache: %v", env.addrCache)
 		env.addrCache = append(env.addrCache, ip)
 	} else
 	// else check whether it is a correct IPv6 address
 	// this cannot be an IPv4-to-IPv6 mapped IPv6 addr, as we handle IPv4 beforehand
 	if err = ip.To16(); err != nil {
 		env.addrCachev6 = append(env.addrCachev6, ip)
-		logger.DebugLogger().Printf("Appending to IPv6 cache: %s", ip.String())
-		logger.DebugLogger().Printf("New IPv6 address cache: %v", env.addrCachev6)
 	}
 }
