@@ -109,6 +109,14 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
+	if err = env.setIPv6ContainerRoutes(pid, vethIfce.PeerName); err != nil {
+		logger.ErrorLogger().Println("Error in setIPv6ContainerRoutes")
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
+	}
+
 	env.BookVethNumber()
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {

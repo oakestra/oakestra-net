@@ -274,8 +274,11 @@ func (env *Environment) setContainerRoutes(containerPid int, peerVeth string) er
 		logger.ErrorLogger().Printf("Impossible to setup route inside the netns: %v\n", err)
 		return err
 	}
+	return nil
+}
 
-	err = env.execInsideNs(containerPid, func() error {
+func (env *Environment) setIPv6ContainerRoutes(containerPid int, peerVeth string) error {
+	err := env.execInsideNs(containerPid, func() error {
 		link, err := netlink.LinkByName(peerVeth)
 		if err != nil {
 			return err
@@ -295,7 +298,6 @@ func (env *Environment) setContainerRoutes(containerPid int, peerVeth string) er
 		logger.ErrorLogger().Printf("Impossible to setup IPv6 route inside the netns: %v\n", err)
 		return err
 	}
-
 	return nil
 }
 
