@@ -81,6 +81,15 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
+	logger.DebugLogger().Println("Disabling DAD for IPv6")
+	if err := env.disableDAD(pid, vethIfce.PeerName); err != nil {
+		logger.ErrorLogger().Println("Error in Disabling DAD")
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
+	}
+
 	logger.DebugLogger().Println("Assigning ipv6 ", ipv6.String()+env.config.HostBridgeIPv6Prefix, " to container ")
 	if err := env.addPeerLinkNetwork(pid, ipv6.String()+env.config.HostBridgeIPv6Prefix, vethIfce.PeerName); err != nil {
 		logger.ErrorLogger().Println("Error in addPeerLinkNetworkv6")

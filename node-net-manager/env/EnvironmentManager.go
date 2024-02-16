@@ -342,6 +342,22 @@ func (env *Environment) addPeerLinkNetworkByNsName(NsName string, addr string, v
 	return err
 }
 
+// disable Duplicate Address Detection (DAD) for IPv6 interfaces in namespace
+// to prevent interface startup delay
+func (env *Environment) disableDAD(pid int, vethname string) error {
+	err := env.execInsideNs(pid, func() error {
+		cmd := exec.Command("sysctl", "-w", "net.ipv6.conf.default.accept_dad=0")
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
+		cmd = exec.Command("sysctl", "-w", "net.ipv6.conf."+vethname+".accept_dad=0")
+		err = cmd.Run()
+		return err
+	})
+	return err
+}
+
 // Execute function inside a namespace
 func (env *Environment) execInsideNs(pid int, function func() error) error {
 	var containerNs netns.NsHandle
