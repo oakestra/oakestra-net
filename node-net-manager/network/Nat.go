@@ -20,13 +20,19 @@ const (
 	ClosePorts PortOperation = "-D"
 )
 
-var chain = "OAKESTRA"
-var iptable = NewOakestraIPTable(iptables.ProtocolIPv4)
-var ip6table = NewOakestraIPTable(iptables.ProtocolIPv6)
+var (
+	chain    = "OAKESTRA"
+	iptable  = NewOakestraIPTable(iptables.ProtocolIPv4)
+	ip6table = NewOakestraIPTable(iptables.ProtocolIPv6)
+)
 
 func IptableFlushAll() {
 	_ = iptable.DeleteChain("nat", chain)
 	_ = iptable.Delete("nat", "PREROUTING", "-j", chain)
+	_ = iptable.Delete("nat", "POSTROUTING", "-j", chain)
+	_ = ip6table.DeleteChain("nat", chain)
+	_ = ip6table.Delete("nat", "PREROUTING", "-j", chain)
+	_ = ip6table.Delete("nat", "PREROUTING", "-j", chain)
 }
 
 func DisableReversePathFiltering(bridgeName string) {
@@ -118,7 +124,6 @@ func EnableForwarding(bridgeName string, proxyName string) {
 }
 
 func EnableMasquerading(address string, mask string, addressipv6 string, ipv6prefix string, bridgeName string, internetIfce string) {
-
 	log.Printf("add NAT ip MASQUERADING towards %s\n", internetIfce)
 	err := iptable.AppendUnique("nat", "POSTROUTING", "-s", address+mask, "-o", internetIfce, "-j", "MASQUERADE")
 	if err != nil {
@@ -130,7 +135,7 @@ func EnableMasquerading(address string, mask string, addressipv6 string, ipv6pre
 		log.Fatal(err.Error())
 	}
 
-	//masquerating towards additional interfaces
+	// masquerating towards additional interfaces
 	ifaces := []string{"en", "eth", "wl"}
 	localifces, _ := net.Interfaces()
 	for _, ifc := range localifces {
@@ -149,7 +154,6 @@ func EnableMasquerading(address string, mask string, addressipv6 string, ipv6pre
 			}
 		}
 	}
-
 }
 
 // ManageContainerPorts open or close container port with the nat rules
