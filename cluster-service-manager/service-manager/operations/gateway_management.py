@@ -28,6 +28,8 @@ def deploy_gateway(gateway_info):
 
     mqtt_msg = _prepare_mqtt_deploy_message(gw_job)
     mqtt_publish_gateway_deploy(gw_job["gateway_id"], mqtt_msg)
+    print(gw_job)
+    del gw_job["_id"]
     return gw_job, 200
 
 

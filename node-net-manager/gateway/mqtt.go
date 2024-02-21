@@ -44,7 +44,7 @@ func GatewayDeploymentHandler(_ pmqtt.Client, msg pmqtt.Message) {
 
 	// setup MQTT topics
 	mqtt.GetNetMqttClient().RegisterTopic(fmt.Sprintf("nodes/%s/net/gateway/expose", mqtt.GetNetMqttClient().ClientID()), GatewayFirewallExposeHandler)
-	mqtt.GetNetMqttClient().RegisterTopic(fmt.Sprintf("nodes/%s/net/tablequery/result", mqtt.GetNetMqttClient().ClientID()), mqtt.GetNetMqttClient().TableQueryRequestCache().TablequeryResultMqttHandler)
+	mqtt.GetNetMqttClient().RegisterTopic(fmt.Sprintf("nodes/%s/net/tablequery/result", mqtt.GetNetMqttClient().ClientID()), mqtt.GetTableQueryRequestCacheInstance().TablequeryResultMqttHandler)
 
 	gateway := StartGatewayProcess(req.GatewayID, req.ServiceJobName, req.GatewayIPv4, req.GatewayIPv6, req.InstanceIPv4, req.InstanceIPv6)
 	if gateway == nil {

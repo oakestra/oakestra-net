@@ -8,6 +8,7 @@ from interfaces.mongodb_requests import (
 )
 from interfaces.root_service_manager_requests import (
     root_service_manager_get_subnet,
+    system_manager_notify_gateway_update,
 )
 from network.deployment import deployment_status_report
 from network.tablequery import resolution, interests
