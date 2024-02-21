@@ -12,17 +12,22 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-type FakeEnv struct {
-}
+type FakeEnv struct{}
 
 // used as example packets for testing
-var ipv6Packet string = "600219310028063ffc000000000000000000000000000203fdff1000000000000000000000000001b98400502a8697ed00000000a002ff322a8900000204056e0402080a7fb1168c0000000001030307"
-var ipv4Packet string = "4500003471ab40003f06b54e0a1e00130a120088a8fc0050866d4e41ec673059801001f6a3fd00000101080aac259946269fb537"
-var ipv4SYNPacket string = "4500003cf20440003f0635810a1e00010a120006b5a2005071f2e51a00000000a002fd5c8ee50000020405820402080a3b625f570000000001030307"
+var (
+	ipv6Packet    string = "600219310028063ffc000000000000000000000000000203fdff1000000000000000000000000001b98400502a8697ed00000000a002ff322a8900000204056e0402080a7fb1168c0000000001030307"
+	ipv4Packet    string = "4500003471ab40003f06b54e0a1e00130a120088a8fc0050866d4e41ec673059801001f6a3fd00000101080aac259946269fb537"
+	ipv4SYNPacket string = "4500003cf20440003f0635810a1e00010a120006b5a2005071f2e51a00000000a002fd5c8ee50000020405820402080a3b625f570000000001030307"
+)
+
+func (fakeenv *FakeEnv) AddTableQueryEntry(entry TableEntryCache.TableEntry) {
+	// interface satisfaction
+}
 
 func (fakeenv *FakeEnv) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry {
 	entrytable := make([]TableEntryCache.TableEntry, 0)
-	//If entry already available
+	// If entry already available
 	entry := TableEntryCache.TableEntry{
 		Appname:          "a",
 		Appns:            "a",
@@ -33,16 +38,18 @@ func (fakeenv *FakeEnv) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 		Nodeip:           net.ParseIP("10.0.0.1"),
 		Nsip:             net.ParseIP("10.19.2.12"),
 		Nsipv6:           net.ParseIP("fd00::12"),
-		ServiceIP: []TableEntryCache.ServiceIP{{
-			IpType:     TableEntryCache.Closest,
-			Address:    net.ParseIP("10.30.255.255"),
-			Address_v6: net.ParseIP("fdff:1000::ff"),
-		},
+		ServiceIP: []TableEntryCache.ServiceIP{
+			{
+				IpType:     TableEntryCache.Closest,
+				Address:    net.ParseIP("10.30.255.255"),
+				Address_v6: net.ParseIP("fdff:1000::ff"),
+			},
 			{
 				IpType:     TableEntryCache.InstanceNumber,
 				Address:    net.ParseIP("10.30.255.254"),
 				Address_v6: net.ParseIP("fdff::fe"),
-			}},
+			},
+		},
 	}
 	entrytable = append(entrytable, entry)
 	return entrytable
@@ -59,16 +66,18 @@ func (fakeenv *FakeEnv) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEnt
 		Nodeip:           net.ParseIP("10.0.0.1"),
 		Nsip:             net.ParseIP("10.19.1.1"),
 		Nsipv6:           net.ParseIP("fc00::1"),
-		ServiceIP: []TableEntryCache.ServiceIP{{
-			IpType:     TableEntryCache.Closest,
-			Address:    net.ParseIP("10.30.255.252"),
-			Address_v6: net.ParseIP("fdff:2000::fc"),
-		},
+		ServiceIP: []TableEntryCache.ServiceIP{
+			{
+				IpType:     TableEntryCache.Closest,
+				Address:    net.ParseIP("10.30.255.252"),
+				Address_v6: net.ParseIP("fdff:2000::fc"),
+			},
 			{
 				IpType:     TableEntryCache.InstanceNumber,
 				Address:    net.ParseIP("10.30.255.253"),
 				Address_v6: net.ParseIP("fdff::fd"),
-			}},
+			},
+		},
 	}
 	return entry, true
 }
@@ -181,7 +190,7 @@ func TestIngoingProxy(t *testing.T) {
 	_, ip, tcp := getFakePacket("10.30.0.5", "10.19.1.15", 666, 777)
 	_, noip, notcp := getFakePacket("10.19.2.1", "10.19.1.12", 666, 80)
 
-	//update proxy proxycache
+	// update proxy proxycache
 	entry := ConversionEntry{
 		srcip:         net.ParseIP("10.19.1.15"),
 		dstip:         net.ParseIP("10.19.2.1"),
@@ -245,7 +254,7 @@ func TestIngoingV6Proxy(t *testing.T) {
 	_, ip, tcp := getFakeV6Packet("fdff::12", "fc00::15", 666, 777)
 	_, noip, notcp := getFakeV6Packet("fc00::1", "fd00::12", 666, 80)
 
-	//update proxy proxycache
+	// update proxy proxycache
 	entry := ConversionEntry{
 		srcip:         net.ParseIP("fc00::15"),
 		dstip:         net.ParseIP("fd00::12"),

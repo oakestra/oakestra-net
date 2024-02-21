@@ -20,9 +20,11 @@ const (
 	ClosePorts PortOperation = "-D"
 )
 
-var chain = "OAKESTRA"
-var iptable = NewOakestraIPTable(iptables.ProtocolIPv4)
-var ip6table = NewOakestraIPTable(iptables.ProtocolIPv6)
+var (
+	chain    = "OAKESTRA"
+	iptable  = NewOakestraIPTable(iptables.ProtocolIPv4)
+	ip6table = NewOakestraIPTable(iptables.ProtocolIPv6)
+)
 
 func IptableFlushAll() {
 	_ = iptable.DeleteChain("nat", chain)
@@ -118,7 +120,6 @@ func EnableForwarding(bridgeName string, proxyName string) {
 }
 
 func EnableMasquerading(address string, mask string, addressipv6 string, ipv6prefix string, bridgeName string, internetIfce string) {
-
 	log.Printf("add NAT ip MASQUERADING towards %s\n", internetIfce)
 	err := iptable.AppendUnique("nat", "POSTROUTING", "-s", address+mask, "-o", internetIfce, "-j", "MASQUERADE")
 	if err != nil {
@@ -130,7 +131,7 @@ func EnableMasquerading(address string, mask string, addressipv6 string, ipv6pre
 		log.Fatal(err.Error())
 	}
 
-	//masquerating towards additional interfaces
+	// masquerating towards additional interfaces
 	ifaces := []string{"en", "eth", "wl"}
 	localifces, _ := net.Interfaces()
 	for _, ifc := range localifces {
@@ -149,7 +150,6 @@ func EnableMasquerading(address string, mask string, addressipv6 string, ipv6pre
 			}
 		}
 	}
-
 }
 
 // ManageContainerPorts open or close container port with the nat rules
@@ -220,4 +220,32 @@ func isValidPort(port string) bool {
 		return false
 	}
 	return true
+}
+
+func GetInterfaceIPByName(interfaceName string) (addresses []net.IP, err error) {
+	var (
+		ief      *net.Interface
+		addrs    []net.Addr
+		ipv4Addr net.IP
+		ipv6Addr net.IP
+	)
+	if ief, err = net.InterfaceByName(interfaceName); err != nil { // get interface
+		return nil, err
+	}
+	if addrs, err = ief.Addrs(); err != nil { // get addresses
+		return nil, err
+	}
+	for _, addr := range addrs { // get ipv4 address
+		if ipv4Addr = addr.(*net.IPNet).IP.To4(); ipv4Addr != nil {
+			addresses = append(addresses, ipv4Addr)
+			continue
+		}
+		if ipv6Addr = addr.(*net.IPNet).IP.To16(); ipv6Addr != nil && !ipv6Addr.IsLinkLocalMulticast() && !ipv6Addr.IsLinkLocalUnicast() {
+			addresses = append(addresses, ipv6Addr)
+		}
+	}
+	if addresses == nil {
+		return nil, fmt.Errorf("interface %s don't have any addresses", interfaceName)
+	}
+	return addresses, nil
 }

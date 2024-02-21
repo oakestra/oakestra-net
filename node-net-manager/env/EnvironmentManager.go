@@ -26,6 +26,7 @@ type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
 	GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool)
+	AddTableQueryEntry(entry TableEntryCache.TableEntry)
 }
 
 type Configuration struct {

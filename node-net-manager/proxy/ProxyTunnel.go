@@ -68,6 +68,14 @@ type outgoingMessage struct {
 	content *[]byte
 }
 
+func (proxy *GoProxyTunnel) GetIfce() *water.Interface {
+	return proxy.ifce
+}
+
+func (proxy *GoProxyTunnel) Env() env.EnvironmentManager {
+	return proxy.environment
+}
+
 // handler function for all outgoing messages that are received by the TUN device
 func (proxy *GoProxyTunnel) outgoingMessage() {
 	for {
