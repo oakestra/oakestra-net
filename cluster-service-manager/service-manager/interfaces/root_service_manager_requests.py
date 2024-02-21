@@ -94,3 +94,27 @@ def cloud_remove_interest(job_name):
             pass
     except requests.exceptions.RequestException as e:
         print("Calling System Manager /api/job/../instances not successful.")
+
+
+def system_manager_notify_gateway_deployment(gateway_info):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/deploy"
+    try:
+        result = requests.post(request_addr, json=gateway_info)
+        if result.status_code != 200:
+            # TODO: error handling
+            logging.error(result)
+            return result.json(), result.status_code
+        return result.json(), 200
+    except requests.exceptions.RequestException:
+        print("Calling System Manager /api/net/gateway/deploy not successful.")
+        return {"error": "Failed notifying root service-manager"}, 500
+
+
+def system_manager_notify_gateway_update(client_id, nsip, nsipv6):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}".format(client_id)
+    try:
+        requests.put(
+            request_addr, json={"namespace_ip": nsip, "namespace_ip_v6": nsipv6}
+        )
+    except requests.exceptions.RequestException:
+        print("Calling System Manager PUT /api/net/gateway/update not successful.")
