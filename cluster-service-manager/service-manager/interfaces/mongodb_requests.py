@@ -267,6 +267,7 @@ def mongo_add_gateway_job(gw_job):
     jobs = mongo_jobs.db.jobs
 
     app.logger.info("MONGODB - adding gateway job")
+    gw_job["_id"] = ObjectId(gw_job["_id"])
     ins_id = jobs.insert_one(gw_job)
     app.logger.info("MONGODB - gateway job {} added.".format(str(ins_id.inserted_id)))
 
