@@ -2,6 +2,7 @@ from interfaces.mongodb_requests import (
     mongo_add_gateway,
     mongo_add_gateway_job,
     mongo_update_gateway_namespace,
+    mongo_get_all_gateways,
 )
 from network.subnetwork_management import new_instance_ip, new_instance_ip_v6
 
@@ -26,7 +27,7 @@ def gateway_deploy(gateway_info):
     # create job to make tablequerys work
     gw_job = _prepare_gateway_job_dict(gateway_info)
     mongo_add_gateway_job(gw_job)
-    del gw_job["_id"]
+    gw_job["_id"] = str(gw_job["_id"])
 
     return gw_job, 200
 
@@ -34,6 +35,10 @@ def gateway_deploy(gateway_info):
 def update_gateway_namespace(gateway_id, nsip, nsipv6):
     mongo_update_gateway_namespace(gateway_id, nsip, nsipv6)
     return "ok", 200
+
+
+def get_gateways():
+    return mongo_get_all_gateways(), 200
 
 
 def _prepare_gateway_job_dict(gateway_info):
@@ -71,9 +76,10 @@ def _prepare_gateway_job_dict(gateway_info):
             # TODO: make IPv6?
             "host_ip": gateway_info["gateway_ipv4"],
             "host_ip_v6": gateway_info["gateway_ipv6"],
-            "host_port": gateway_info["port"],
+            "host_port": gateway_info["host_port"],
         }
     ]
+    # gateways do not have service IPs for now
     data["service_ip_list"] = []
     data["interested_nodes"] = []
     return data

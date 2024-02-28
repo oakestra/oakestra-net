@@ -713,3 +713,10 @@ def mongo_update_gateway_namespace(gateway_id, nsip, nsipv6):
         },
     )
     app.logger.info("MONGODB - gateway job updated")
+
+
+def mongo_get_all_gateways():
+    global mongo_gateways
+    mongo_gw = mongo_gateways.db.gateways
+    app.logger.info("MONGODB - fetching all gateways")
+    return mongo_gw.find()

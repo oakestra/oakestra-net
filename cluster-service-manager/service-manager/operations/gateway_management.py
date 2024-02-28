@@ -16,19 +16,18 @@ def deploy_gateway(gateway_info):
     """
     Register new gateway and notify root service manager
     """
-    mongo_add_gateway(gateway_info)
-    gateway_info["_id"] = str(gateway_info["_id"])
 
     # notifies root service-manager, which directly hands out instance IPs for gateway service
-    # returns gateway_job to add to jobs for tablequery functionality
-    gw_job, ok = system_manager_notify_gateway_deployment(gateway_info=gateway_info)
-    if ok != 200:
-        return "", ok
+    # returns gateway_job to add to jobs table for tablequery functionality
+    gw_job, status = system_manager_notify_gateway_deployment(gateway_info=gateway_info)
+    if status != 200:
+        return "", status
+
+    mongo_add_gateway(gateway_info)
     mongo_add_gateway_job(gw_job)
 
     mqtt_msg = _prepare_mqtt_deploy_message(gw_job)
     mqtt_publish_gateway_deploy(gw_job["gateway_id"], mqtt_msg)
-    print(gw_job)
     del gw_job["_id"]
     return gw_job, 200
 

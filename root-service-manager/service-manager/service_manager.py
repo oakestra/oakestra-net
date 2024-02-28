@@ -225,6 +225,15 @@ def subnet_request():
 # ......................................................#
 
 
+@app.route("/api/net/gateway", methods=["GET"])
+def get_gateways():
+    """
+    Get all registered gateways
+    """
+    app.logger.info("Incoming Request GET /api/net/gateway")
+    return operations_gateway_management.get_gateways()
+
+
 @app.route("/api/net/gateway/deploy", methods=["POST"])
 def register_gateway():
     """
