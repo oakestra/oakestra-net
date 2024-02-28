@@ -8,7 +8,7 @@ from interfaces.mongodb_requests import (
 )
 from interfaces.root_service_manager_requests import (
     root_service_manager_get_subnet,
-    system_manager_notify_gateway_update,
+    system_manager_notify_gateway_update_namespace,
 )
 from network.deployment import deployment_status_report
 from network.tablequery import resolution, interests
@@ -165,7 +165,7 @@ def _gateway_deployment_handler(client_id, payload):
     nsip = payload.get("namespace_ip")
     nsipv6 = payload.get("namespace_ip_v6")
     mongo_update_gateway_job_namespace(client_id, nsip, nsipv6)
-    system_manager_notify_gateway_update(client_id, nsip, nsipv6)
+    system_manager_notify_gateway_update_namespace(client_id, nsip, nsipv6)
 
 
 def mqtt_publish_tablequery_result(client_id, result):

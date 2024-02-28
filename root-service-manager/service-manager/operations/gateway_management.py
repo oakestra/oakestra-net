@@ -31,7 +31,7 @@ def gateway_deploy(gateway_info):
     return gw_job, 200
 
 
-def update_gateway(gateway_id, nsip, nsipv6):
+def update_gateway_namespace(gateway_id, nsip, nsipv6):
     mongo_update_gateway_namespace(gateway_id, nsip, nsipv6)
     return "ok", 200
 

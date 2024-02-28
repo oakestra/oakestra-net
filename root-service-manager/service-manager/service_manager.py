@@ -236,19 +236,23 @@ def register_gateway():
     return operations_gateway_management.gateway_deploy(req_json)
 
 
-@app.route("/api/net/gateway/<gateway_id>", methods=["PUT"])
+@app.route("/api/net/gateway/<gateway_id>/namespace", methods=["PUT"])
 def update_gateway(gateway_id):
     """
     Updates the gateway namespace IPs
     """
-    app.logger.info("Incoming request PUT /api/net/gateway/{}".format(gateway_id))
+    app.logger.info(
+        "Incoming request PUT /api/net/gateway/{}/namespace".format(gateway_id)
+    )
     req_json = request.json
     app.logger.debug(req_json)
 
     nsip = req_json.get("namespace_ip")
     nsipv6 = req_json.get("namespace_ip_v6")
 
-    return operations_gateway_management.update_gateway(gateway_id, nsip, nsipv6)
+    return operations_gateway_management.update_gateway_namespace(
+        gateway_id, nsip, nsipv6
+    )
 
 
 if __name__ == "__main__":

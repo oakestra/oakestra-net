@@ -103,18 +103,19 @@ def system_manager_notify_gateway_deployment(gateway_info):
         if result.status_code != 200:
             # TODO: error handling
             logging.error(result)
-            return result.json(), result.status_code
-        return result.json(), 200
+        return result.json(), result.status_code
     except requests.exceptions.RequestException:
         print("Calling System Manager /api/net/gateway/deploy not successful.")
         return {"error": "Failed notifying root service-manager"}, 500
 
 
-def system_manager_notify_gateway_update(client_id, nsip, nsipv6):
-    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}".format(client_id)
+def system_manager_notify_gateway_update_namespace(client_id, nsip, nsipv6):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}/namespace".format(
+        client_id
+    )
     try:
         requests.put(
             request_addr, json={"namespace_ip": nsip, "namespace_ip_v6": nsipv6}
         )
     except requests.exceptions.RequestException:
-        print("Calling System Manager PUT /api/net/gateway/update not successful.")
+        print("Calling System Manager PUT /api/net/gateway/namespace not successful.")
