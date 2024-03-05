@@ -2,6 +2,7 @@ import logging
 import requests
 import os
 import json
+from interfaces.mongodb_requests import mongo_get_gateway
 
 ROOT_SERVICE_MANAGER_ADDR = (
     "http://"
@@ -101,12 +102,25 @@ def system_manager_notify_gateway_deployment(gateway_info):
     try:
         result = requests.post(request_addr, json=gateway_info)
         if result.status_code != 200:
-            # TODO: error handling
             logging.error(result)
         return result.json(), result.status_code
     except requests.exceptions.RequestException:
         print("Calling System Manager /api/net/gateway/deploy not successful.")
         return {"error": "Failed notifying root service-manager"}, 500
+
+
+def system_manager_notify_gateway_update(gateway_id):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}".format(gateway_id)
+    try:
+        data = mongo_get_gateway(gateway_id)
+        del data["_id"]
+        requests.put(request_addr, json=data)
+    except requests.exceptions.RequestException:
+        print(
+            "Calling System Manager PUT /api/net/gateway/{} not successful.".format(
+                gateway_id
+            )
+        )
 
 
 def system_manager_notify_gateway_update_namespace(client_id, nsip, nsipv6):

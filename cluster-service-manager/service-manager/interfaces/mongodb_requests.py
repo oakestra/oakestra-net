@@ -251,6 +251,11 @@ def mongo_remove_interest(job_name, clientid):
 #########################################
 
 
+def mongo_get_gateway(gateway_id):
+    global mongo_gateway_nodes
+    return mongo_gateway_nodes.find_one({"gateway_id": gateway_id})
+
+
 def mongo_add_gateway(gateway):
     global mongo_gateway_nodes
 
@@ -260,6 +265,14 @@ def mongo_add_gateway(gateway):
         {"gateway_id": gateway["gateway_id"]}, {"$set": gateway}, upsert=True
     )
     app.logger.info("MONGODB - gateway added.")
+
+
+def mongo_add_service_to_gateway(gateway_id, service):
+    global mongo_gateway_nodes
+    mongo_gateway_nodes.find_one_and_update(
+        {"gateway_id": gateway_id},
+        {"$addToSet": {"services": service, "used_ports": service["exposed_port"]}},
+    )
 
 
 def mongo_add_gateway_job(gw_job):

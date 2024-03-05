@@ -10,7 +10,7 @@ from network.subnetwork_management import new_instance_ip, new_instance_ip_v6
 def gateway_deploy(gateway_info):
     """
     Get instance IPs for the gateway and register gateway
-    Returns new Gateway Instance IPs
+    Returns new gateway job
     """
     ipv4 = None
     ipv6 = None
@@ -34,6 +34,11 @@ def gateway_deploy(gateway_info):
 
 def update_gateway_namespace(gateway_id, nsip, nsipv6):
     mongo_update_gateway_namespace(gateway_id, nsip, nsipv6)
+    return "ok", 200
+
+
+def update_gateway(gateway_id, data):
+    mongo_update_gateway(gateway_id, data)
     return "ok", 200
 
 

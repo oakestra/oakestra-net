@@ -246,7 +246,7 @@ def register_gateway():
 
 
 @app.route("/api/net/gateway/<gateway_id>/namespace", methods=["PUT"])
-def update_gateway(gateway_id):
+def update_gateway_namespace(gateway_id):
     """
     Updates the gateway namespace IPs
     """
@@ -262,6 +262,18 @@ def update_gateway(gateway_id):
     return operations_gateway_management.update_gateway_namespace(
         gateway_id, nsip, nsipv6
     )
+
+
+@app.route("/api/net/gateway/<gateway_id>", methods=["PUT"])
+def update_gateway(gateway_id):
+    """
+    Update gateway with gateway_id
+    """
+    app.logger.info("Incoming request PUT /api/net/gateway/{}".format(gateway_id))
+    req_json = request.json
+    app.logger.debug(req_json)
+
+    return operations_gateway_management.update_gateway(gateway_id, req_json)
 
 
 if __name__ == "__main__":

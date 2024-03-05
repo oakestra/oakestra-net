@@ -2,9 +2,11 @@ from interfaces.mongodb_requests import (
     mongo_add_gateway,
     mongo_add_gateway_job,
     mongo_get_service_ips_by_jobname,
+    mongo_add_service_to_gateway,
 )
 from interfaces.root_service_manager_requests import (
     system_manager_notify_gateway_deployment,
+    system_manager_notify_gateway_update,
 )
 from interfaces.mqtt_client import (
     mqtt_publish_gateway_deploy,
@@ -23,7 +25,11 @@ def deploy_gateway(gateway_info):
     if status != 200:
         return "", status
 
+    gateway_info["instance_ip"] = gw_job["instance_ip"]
+    gateway_info["instance_ip_v6"] = gw_job["instance_ip_v6"]
     mongo_add_gateway(gateway_info)
+
+    # add job to service job table
     mongo_add_gateway_job(gw_job)
 
     mqtt_msg = _prepare_mqtt_deploy_message(gw_job)
@@ -32,27 +38,31 @@ def deploy_gateway(gateway_info):
     return gw_job, 200
 
 
+# TODO: RENAME
 def update_gateway(gateway_id, service_info):
     """
     Update gateway db, notify root service manager and notify gateway node over MQTT
     """
+
+    mongo_add_service_to_gateway(gateway_id, service_info)
+
     mqtt_msg = _prepare_mqtt_expose_message(gateway_id, service_info)
 
     service_ips = mongo_get_service_ips_by_jobname(service_info["job_name"])[
         "service_ip_list"
     ]
-    print(service_ips)
+    # TODO: make respect IP Type here
     for service_ip in service_ips:
-        print(service_ip)
+        # currently only holds RR IPs
         if service_ip.get("Address") is not None:
             mqtt_msg["service_ip"] = service_ip["Address"]
-            print("publishing firewall expose: ", mqtt_msg)
             mqtt_publish_gateway_firewall_expose(gateway_id, mqtt_msg)
         if service_ip.get("Address_v6") is not None:
             mqtt_msg["service_ip"] = service_ip["Address_v6"]
-            print("publishing firewall expose: ", mqtt_msg)
             mqtt_publish_gateway_firewall_expose(gateway_id, mqtt_msg)
 
+    # TODO: NOTIFY ROOT
+    system_manager_notify_gateway_update()
     return "ok", 200
 
 

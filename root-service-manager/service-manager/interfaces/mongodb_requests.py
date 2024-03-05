@@ -688,16 +688,6 @@ def mongo_add_gateway_job(gw_job):
     app.logger.info("MONGODB - gateway job {} added.".format(str(ins_id.inserted_id)))
 
 
-def mongo_update_gateway_instance_ips(gateway_id, ipv4, ipv6):
-    global mongo_gateways
-    mongo_gw = mongo_gateways.db.gateways
-
-    mongo_gw.find_one_and_update(
-        {"_id": ObjectId(gateway_id)},
-        {"$set": {"instance_ip": ipv4, "instance_ipv6": ipv6}},
-    )
-
-
 def mongo_update_gateway_namespace(gateway_id, nsip, nsipv6):
     global mongo_jobs
     jobs = mongo_jobs.db.jobs
@@ -713,6 +703,14 @@ def mongo_update_gateway_namespace(gateway_id, nsip, nsipv6):
         },
     )
     app.logger.info("MONGODB - gateway job updated")
+
+
+def mongo_update_gateway(gateway_id, gateway_job):
+    global mongo_jobs
+    jobs = mongo_jobs.db.jobs
+    app.logger.info("MONGODB - updating gateway job")
+
+    jobs.find_one_and_update({"gateway_id": gateway_id}, {"$set": {gateway_job}})
 
 
 def mongo_get_all_gateways():
