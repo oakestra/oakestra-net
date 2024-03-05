@@ -260,7 +260,6 @@ def mongo_add_gateway(gateway):
     global mongo_gateway_nodes
 
     app.logger.info("MONGODB - adding gateway {} ...".format(gateway["gateway_id"]))
-    gateway["_id"] = ObjectId(gateway["_id"])
     mongo_gateway_nodes.find_one_and_update(
         {"gateway_id": gateway["gateway_id"]}, {"$set": gateway}, upsert=True
     )
@@ -280,7 +279,6 @@ def mongo_add_gateway_job(gw_job):
     jobs = mongo_jobs.db.jobs
 
     app.logger.info("MONGODB - adding gateway job")
-    gw_job["_id"] = ObjectId(gw_job["_id"])
     ins_id = jobs.insert_one(gw_job)
     app.logger.info("MONGODB - gateway job {} added.".format(str(ins_id.inserted_id)))
 

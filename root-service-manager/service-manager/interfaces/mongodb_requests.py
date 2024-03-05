@@ -672,7 +672,6 @@ def mongo_add_gateway(gateway):
     mongo_gw = mongo_gateways.db.gateways
 
     app.logger.info("MONGODB - adding gateway {} ...".format(gateway["gateway_id"]))
-    gateway["_id"] = ObjectId(gateway["_id"])
     mongo_gw.find_one_and_update(
         {"gateway_id": gateway["gateway_id"]}, {"$set": gateway}, upsert=True
     )
