@@ -25,8 +25,10 @@ def deploy_gateway(gateway_info):
     if status != 200:
         return "", status
 
-    gateway_info["instance_ip"] = gw_job["instance_ip"]
-    gateway_info["instance_ip_v6"] = gw_job["instance_ip_v6"]
+    gateway_info["instance_ip"] = gw_job.get("instance_list")[0].get("instance_ip")
+    gateway_info["instance_ip_v6"] = gw_job.get("instance_list")[0].get(
+        "instance_ip_v6"
+    )
     mongo_add_gateway(gateway_info)
 
     # add job to service job table
