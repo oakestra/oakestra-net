@@ -92,19 +92,18 @@ def deploy_gateway():
     return operations_gateway_management.deploy_gateway(req_json)
 
 
-@app.route("/api/net/gateway/update", methods=["POST"])
-def update_gateway():
+@app.route("/api/net/gateway/<gateway_id>/service", methods=["POST"])
+def update_gateway_service_exposure(gateway_id):
     """
     Update gateway about new service exposure
     """
-    app.logger.info("Incoming request /api/net/gateway/update")
-    req_json = request.json
-    app.logger.debug(req_json)
+    app.logger.info("Incoming request /api/net/gateway/{}/service".format(gateway_id))
+    service_info = request.json
+    app.logger.debug(service_info)
 
-    gateway_id = req_json.get("gateway_id")
-    service_info = req_json.get("service")
-
-    return operations_gateway_management.update_gateway(gateway_id, service_info)
+    return operations_gateway_management.update_gateway_service_exposure(
+        gateway_id, service_info
+    )
 
 
 # TODO: job migration

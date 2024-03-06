@@ -2,6 +2,7 @@ from interfaces.mongodb_requests import (
     mongo_add_gateway,
     mongo_add_gateway_job,
     mongo_update_gateway_namespace,
+    mongo_update_gateway_service,
     mongo_get_all_gateways,
 )
 from network.subnetwork_management import new_instance_ip, new_instance_ip_v6
@@ -27,7 +28,7 @@ def gateway_deploy(gateway_info):
     # create job to make tablequerys work
     gw_job = _prepare_gateway_job_dict(gateway_info)
     mongo_add_gateway_job(gw_job)
-    gw_job["_id"] = str(gw_job["_id"])
+    del gw_job["_id"]
 
     return gw_job, 200
 
@@ -37,8 +38,8 @@ def update_gateway_namespace(gateway_id, nsip, nsipv6):
     return "ok", 200
 
 
-def update_gateway(gateway_id, data):
-    mongo_update_gateway(gateway_id, data)
+def update_gateway_service(gateway_id, data):
+    mongo_update_gateway_service(gateway_id, data)
     return "ok", 200
 
 

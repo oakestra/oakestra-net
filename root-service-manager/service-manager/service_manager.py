@@ -264,16 +264,18 @@ def update_gateway_namespace(gateway_id):
     )
 
 
-@app.route("/api/net/gateway/<gateway_id>", methods=["PUT"])
+@app.route("/api/net/gateway/<gateway_id>/service", methods=["PUT"])
 def update_gateway(gateway_id):
     """
     Update gateway with gateway_id
     """
-    app.logger.info("Incoming request PUT /api/net/gateway/{}".format(gateway_id))
-    req_json = request.json
-    app.logger.debug(req_json)
+    app.logger.info(
+        "Incoming request PUT /api/net/gateway/{}/service".format(gateway_id)
+    )
+    gateway = request.json
+    app.logger.debug(gateway)
 
-    return operations_gateway_management.update_gateway(gateway_id, req_json)
+    return operations_gateway_management.update_gateway_service(gateway_id, gateway)
 
 
 if __name__ == "__main__":

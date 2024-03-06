@@ -109,15 +109,17 @@ def system_manager_notify_gateway_deployment(gateway_info):
         return {"error": "Failed notifying root service-manager"}, 500
 
 
-def system_manager_notify_gateway_update(gateway_id):
-    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}".format(gateway_id)
+def system_manager_notify_gateway_update_service(gateway_id):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}/service".format(
+        gateway_id
+    )
     try:
         data = mongo_get_gateway(gateway_id)
         del data["_id"]
         requests.put(request_addr, json=data)
     except requests.exceptions.RequestException:
         print(
-            "Calling System Manager PUT /api/net/gateway/{} not successful.".format(
+            "Calling System Manager PUT /api/net/gateway/{}/service not successful.".format(
                 gateway_id
             )
         )

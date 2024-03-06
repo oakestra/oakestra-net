@@ -6,7 +6,7 @@ from interfaces.mongodb_requests import (
 )
 from interfaces.root_service_manager_requests import (
     system_manager_notify_gateway_deployment,
-    system_manager_notify_gateway_update,
+    system_manager_notify_gateway_update_service,
 )
 from interfaces.mqtt_client import (
     mqtt_publish_gateway_deploy,
@@ -31,15 +31,14 @@ def deploy_gateway(gateway_info):
 
     # add job to service job table
     mongo_add_gateway_job(gw_job)
+    del gw_job["_id"]
 
     mqtt_msg = _prepare_mqtt_deploy_message(gw_job)
     mqtt_publish_gateway_deploy(gw_job["gateway_id"], mqtt_msg)
-    del gw_job["_id"]
     return gw_job, 200
 
 
-# TODO: RENAME
-def update_gateway(gateway_id, service_info):
+def update_gateway_service_exposure(gateway_id, service_info):
     """
     Update gateway db, notify root service manager and notify gateway node over MQTT
     """
@@ -52,6 +51,7 @@ def update_gateway(gateway_id, service_info):
         "service_ip_list"
     ]
     # TODO: make respect IP Type here
+    # when we start supporting more service IP types
     for service_ip in service_ips:
         # currently only holds RR IPs
         if service_ip.get("Address") is not None:
@@ -61,8 +61,7 @@ def update_gateway(gateway_id, service_info):
             mqtt_msg["service_ip"] = service_ip["Address_v6"]
             mqtt_publish_gateway_firewall_expose(gateway_id, mqtt_msg)
 
-    # TODO: NOTIFY ROOT
-    system_manager_notify_gateway_update()
+    system_manager_notify_gateway_update_service(gateway_id)
     return "ok", 200
 
 

@@ -704,12 +704,12 @@ def mongo_update_gateway_namespace(gateway_id, nsip, nsipv6):
     app.logger.info("MONGODB - gateway job updated")
 
 
-def mongo_update_gateway(gateway_id, gateway_job):
+def mongo_update_gateway_service(gateway_id, gateway):
     global mongo_jobs
-    jobs = mongo_jobs.db.jobs
-    app.logger.info("MONGODB - updating gateway job")
+    jobs = mongo_jobs.db.gateways
+    app.logger.info("MONGODB - updating gateway service")
 
-    jobs.find_one_and_update({"gateway_id": gateway_id}, {"$set": {gateway_job}})
+    jobs.find_one_and_update({"gateway_id": gateway_id}, {"$set": {gateway}})
 
 
 def mongo_get_all_gateways():
