@@ -242,7 +242,9 @@ def register_gateway():
     app.logger.info("Incoming Request POST /api/net/gateway/deploy")
     req_json = request.json
     app.logger.debug(req_json)
-    return operations_gateway_management.gateway_deploy(req_json)
+    job = operations_gateway_management.gateway_deploy(req_json)
+    app.logger.debug(job)
+    return job
 
 
 @app.route("/api/net/gateway/<gateway_id>/namespace", methods=["PUT"])
