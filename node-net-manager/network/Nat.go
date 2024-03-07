@@ -184,7 +184,13 @@ func ManageContainerPorts(localContainerAddress net.IP, portmapping string, oper
 		if !isValidPort(hostPort) || !isValidPort(containerPort) {
 			return errors.New("invalid Port Mapping")
 		}
-		destination := fmt.Sprintf("%s:%s", localContainerAddress, containerPort)
+		var destination string
+
+		if ok4 := localContainerAddress.To4(); ok4 != nil {
+			destination = fmt.Sprintf("%s:%s", localContainerAddress, containerPort)
+		} else if ok6 := localContainerAddress.To16(); ok6 != nil {
+			destination = fmt.Sprintf("[%s]:%s", localContainerAddress, containerPort)
+		}
 		args := []string{"-p", portType, "--dport", hostPort, "-j", "DNAT", "--to-destination", destination}
 
 		err := errors.New("invalid Operation")
