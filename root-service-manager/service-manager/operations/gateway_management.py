@@ -28,7 +28,7 @@ def gateway_deploy(gateway_info):
     # create job to make tablequerys work
     gw_job = _prepare_gateway_job_dict(gateway_info)
     mongo_add_gateway_job(gw_job)
-    del gw_job["_id"]
+    gw_job.pop("_id", None)
 
     return gw_job, 200
 

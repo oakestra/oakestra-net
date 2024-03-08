@@ -106,6 +106,7 @@ def system_manager_notify_gateway_deployment(gateway_info):
         return result.json(), result.status_code
     except requests.exceptions.RequestException:
         print("Calling System Manager /api/net/gateway/deploy not successful.")
+        return {}, 500
 
 
 def system_manager_notify_gateway_update_service(gateway_id):
@@ -114,7 +115,7 @@ def system_manager_notify_gateway_update_service(gateway_id):
     )
     try:
         data = mongo_get_gateway(gateway_id)
-        del data["_id"]
+        data.pop("_id", None)
         requests.put(request_addr, json=data)
     except requests.exceptions.RequestException:
         print(

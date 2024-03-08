@@ -25,16 +25,18 @@ def deploy_gateway(gateway_info):
     if status != 200:
         return "", status
 
-    gateway_info["instance_ip"] = gw_job.get("instance_list")[0].get("instance_ip")
-    gateway_info["instance_ip_v6"] = gw_job.get("instance_list")[0].get(
-        "instance_ip_v6"
-    )
+    if "instance_list" in gw_job:
+        gateway_info["instance_ip"] = gw_job.get("instance_list")[0].get("instance_ip")
+        gateway_info["instance_ip_v6"] = gw_job.get("instance_list")[0].get(
+            "instance_ip_v6"
+        )
+
     mongo_add_gateway(gateway_info)
-    del gateway_info["_id"]
+    gateway_info.pop("_id", None)
 
     # add job to service job table
     mongo_add_gateway_job(gw_job)
-    del gw_job["_id"]
+    gw_job.pop("_id", None)
 
     mqtt_msg = _prepare_mqtt_deploy_message(gw_job)
     mqtt_publish_gateway_deploy(gw_job["gateway_id"], mqtt_msg)
