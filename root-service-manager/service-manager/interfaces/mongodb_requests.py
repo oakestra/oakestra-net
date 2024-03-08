@@ -705,11 +705,11 @@ def mongo_update_gateway_namespace(gateway_id, nsip, nsipv6):
 
 
 def mongo_update_gateway_service(gateway_id, gateway):
-    global mongo_jobs
-    jobs = mongo_jobs.db.gateways
+    global mongo_gateways
+    mongo_gw = mongo_gateways.db.gateways
     app.logger.info("MONGODB - updating gateway service")
 
-    jobs.find_one_and_update(
+    mongo_gw.find_one_and_update(
         {"gateway_id": gateway_id}, {"$set": {gateway}}, upsert=True
     )
 
