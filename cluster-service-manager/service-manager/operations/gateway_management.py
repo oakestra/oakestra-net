@@ -30,6 +30,7 @@ def deploy_gateway(gateway_info):
         "instance_ip_v6"
     )
     mongo_add_gateway(gateway_info)
+    del gateway_info["_id"]
 
     # add job to service job table
     mongo_add_gateway_job(gw_job)
@@ -37,7 +38,7 @@ def deploy_gateway(gateway_info):
 
     mqtt_msg = _prepare_mqtt_deploy_message(gw_job)
     mqtt_publish_gateway_deploy(gw_job["gateway_id"], mqtt_msg)
-    return gw_job, 200
+    return gateway_info, 200
 
 
 def update_gateway_service_exposure(gateway_id, service_info):

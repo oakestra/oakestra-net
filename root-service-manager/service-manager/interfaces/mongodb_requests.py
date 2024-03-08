@@ -709,7 +709,9 @@ def mongo_update_gateway_service(gateway_id, gateway):
     jobs = mongo_jobs.db.gateways
     app.logger.info("MONGODB - updating gateway service")
 
-    jobs.find_one_and_update({"gateway_id": gateway_id}, {"$set": {gateway}})
+    jobs.find_one_and_update(
+        {"gateway_id": gateway_id}, {"$set": {gateway}}, upsert=True
+    )
 
 
 def mongo_get_all_gateways():

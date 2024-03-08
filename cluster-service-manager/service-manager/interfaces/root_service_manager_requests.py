@@ -106,7 +106,6 @@ def system_manager_notify_gateway_deployment(gateway_info):
         return result.json(), result.status_code
     except requests.exceptions.RequestException:
         print("Calling System Manager /api/net/gateway/deploy not successful.")
-        return {"error": "Failed notifying root service-manager"}, 500
 
 
 def system_manager_notify_gateway_update_service(gateway_id):
