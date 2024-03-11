@@ -21,6 +21,7 @@ mongo_jobs = None
 mongo_clusters = None
 mongo_net = None
 mongo_gateways = None
+mongo_gateway_nodes = None
 mongo_gw_net = None
 
 app = None
@@ -30,7 +31,7 @@ CLUSTERS_FRESHNESS_INTERVAL = 45
 
 def mongo_init(flask_app):
     global app
-    global mongo_jobs, mongo_net, mongo_clusters, mongo_gateways, mongo_gw_net
+    global mongo_jobs, mongo_net, mongo_clusters, mongo_gateways, mongo_gateway_nodes, mongo_gw_net
 
     app = flask_app
 
@@ -42,6 +43,7 @@ def mongo_init(flask_app):
         mongo_net = PyMongo(app, uri=MONGO_ADDR_NET)
         mongo_clusters = PyMongo(app, uri=MONGO_ADDR_CLUSTER)
         mongo_gateways = PyMongo(app, uri=MONGO_ADDR_GATEWAYS)
+        mongo_gateway_nodes = mongo_gateways.db["nodes"]
         mongo_gw_net = PyMongo(app, uri=MONGO_ADDR_GATEWAY_NET)
     except Exception as e:
         app.logger.fatal(e)
@@ -667,12 +669,10 @@ def mongo_remove_cluster_job_interest(cluster_id, job_name):
 
 
 def mongo_add_gateway(gateway):
-    global mongo_gateways
-
-    mongo_gw = mongo_gateways.db.gateways
+    global mongo_gateway_nodes
 
     app.logger.info("MONGODB - adding gateway {} ...".format(gateway["gateway_id"]))
-    mongo_gw.find_one_and_update(
+    mongo_gateway_nodes.find_one_and_update(
         {"gateway_id": gateway["gateway_id"]}, {"$set": gateway}, upsert=True
     )
     app.logger.info("MONGODB - gateway {} added.".format(gateway["gateway_id"]))
@@ -705,17 +705,22 @@ def mongo_update_gateway_namespace(gateway_id, nsip, nsipv6):
 
 
 def mongo_update_gateway_service(gateway_id, gateway):
-    global mongo_gateways
-    mongo_gw = mongo_gateways.db.gateways
+    global mongo_gateway_nodes
     app.logger.info("MONGODB - updating gateway service")
 
-    mongo_gw.find_one_and_update(
-        {"gateway_id": gateway_id}, {"$set": gateway}, upsert=True
+    mongo_gateway_nodes.find_one_and_update(
+        {"gateway_id": gateway_id},
+        {
+            "$set": {
+                "services": gateway.get("services"),
+                "used_ports": gateway.get("used_ports"),
+            }
+        },
+        upsert=True,
     )
 
 
 def mongo_get_all_gateways():
-    global mongo_gateways
-    mongo_gw = mongo_gateways.db.gateways
+    global mongo_gateway_nodes
     app.logger.info("MONGODB - fetching all gateways")
-    return mongo_gw.find()
+    return mongo_gateway_nodes.find()
