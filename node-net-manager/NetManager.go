@@ -100,12 +100,6 @@ Response: 200 or Failure code
 func register(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /register ")
 
-	if gateway.Exposer != nil {
-		log.Println("Cannot register worker when netmanager is running as gateway.")
-		writer.WriteHeader(http.StatusConflict)
-		return
-	}
-
 	reqBody, _ := io.ReadAll(request.Body)
 	var requestStruct registerRequest
 	err := json.Unmarshal(reqBody, &requestStruct)
