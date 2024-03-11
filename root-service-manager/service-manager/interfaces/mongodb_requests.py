@@ -710,7 +710,7 @@ def mongo_update_gateway_service(gateway_id, gateway):
     app.logger.info("MONGODB - updating gateway service")
 
     mongo_gw.find_one_and_update(
-        {"gateway_id": gateway_id}, {"$set": {gateway}}, upsert=True
+        {"gateway_id": gateway_id}, {"$set": gateway}, upsert=True
     )
 
 
