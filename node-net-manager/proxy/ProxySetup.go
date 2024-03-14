@@ -17,6 +17,12 @@ import (
 	"github.com/songgao/water"
 )
 
+var proxyTunnel GoProxyTunnel
+
+func Proxy() *GoProxyTunnel {
+	return &proxyTunnel
+}
+
 // create a  new GoProxyTunnel with the configuration from the custom local file
 func New() GoProxyTunnel {
 	// load netcfg.json
@@ -44,7 +50,8 @@ func New() GoProxyTunnel {
 	}
 
 	logger.InfoLogger().Printf("Utilizing config: %v", defaultconfig)
-	return NewCustom(defaultconfig)
+	proxyTunnel = NewCustom(defaultconfig)
+	return proxyTunnel
 }
 
 // create a  new GoProxyTunnel with a custom configuration
