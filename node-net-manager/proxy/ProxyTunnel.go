@@ -6,12 +6,14 @@ import (
 	"NetManager/logger"
 	"NetManager/proxy/iputils"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/songgao/water"
 	"math/rand"
 	"net"
 	"sync"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/songgao/water"
+)
 
 // const
 var BUFFER_SIZE = 64 * 1024
