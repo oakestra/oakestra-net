@@ -231,3 +231,31 @@ func isValidPort(port string) bool {
 	}
 	return true
 }
+
+func GetInterfaceIPByName(interfaceName string) (addresses []net.IP, err error) {
+	var (
+		ief      *net.Interface
+		addrs    []net.Addr
+		ipv4Addr net.IP
+		ipv6Addr net.IP
+	)
+	if ief, err = net.InterfaceByName(interfaceName); err != nil { // get interface
+		return nil, err
+	}
+	if addrs, err = ief.Addrs(); err != nil { // get addresses
+		return nil, err
+	}
+	for _, addr := range addrs { // get ipv4 address
+		if ipv4Addr = addr.(*net.IPNet).IP.To4(); ipv4Addr != nil {
+			addresses = append(addresses, ipv4Addr)
+			continue
+		}
+		if ipv6Addr = addr.(*net.IPNet).IP.To16(); ipv6Addr != nil && !ipv6Addr.IsLinkLocalMulticast() && !ipv6Addr.IsLinkLocalUnicast() {
+			addresses = append(addresses, ipv6Addr)
+		}
+	}
+	if addresses == nil {
+		return nil, fmt.Errorf("interface %s don't have any addresses", interfaceName)
+	}
+	return addresses, nil
+}

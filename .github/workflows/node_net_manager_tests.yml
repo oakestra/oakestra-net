@@ -14,7 +14,7 @@ jobs:
       - name: Setup Golang
         uses: actions/setup-go@v3
         with:
-          go-version: '^1.20'
+          go-version: "^1.22.1"
 
       - name: Install dependencies
         working-directory: node-net-manager
@@ -24,4 +24,5 @@ jobs:
       - name: Run test suite
         working-directory: node-net-manager
         run: |
-           go test ./...
+          go test ./...
+

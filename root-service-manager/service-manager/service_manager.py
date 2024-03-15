@@ -4,15 +4,11 @@ from interfaces.mongodb_requests import mongo_init
 from network.tablequery import *
 from network import subnetwork_management, routes_interests
 from network.utils import sanitize
-from operations import instances_management, cluster_management
-from operations import service_management
 from net_logging import configure_logging
-from network import routes_interests, subnetwork_management
-from network.tablequery import *
-from network import subnetwork_management, routes_interests
-from operations import instances_management, cluster_management
+from operations import instances_management
+from operations import cluster_management
+from operations import gateway_management as operations_gateway_management
 from operations import service_management
-from net_logging import configure_logging
 import os
 import socket
 
@@ -222,7 +218,66 @@ def subnet_request():
     """
     addr = subnetwork_management.new_subnetwork_addr()
     addrv6 = subnetwork_management.new_subnetwork_addr_v6()
-    return {'subnet_addr': addr, 'subnet_addr_v6': addrv6}
+    return {"subnet_addr": addr, "subnet_addr_v6": addrv6}
+
+
+# ......... Gateway management endpoints ...............#
+# ......................................................#
+
+
+@app.route("/api/net/gateway", methods=["GET"])
+def get_gateways():
+    """
+    Get all registered gateways
+    """
+    app.logger.info("Incoming Request GET /api/net/gateway")
+    return operations_gateway_management.get_gateways()
+
+
+@app.route("/api/net/gateway/deploy", methods=["POST"])
+def register_gateway():
+    """
+    Registers a new gateway to be deployed and sets up IPs
+    """
+    app.logger.info("Incoming Request POST /api/net/gateway/deploy")
+    req_json = request.json
+    app.logger.debug(req_json)
+    job = operations_gateway_management.gateway_deploy(req_json)
+    app.logger.debug(job)
+    return job
+
+
+@app.route("/api/net/gateway/<gateway_id>/namespace", methods=["PUT"])
+def update_gateway_namespace(gateway_id):
+    """
+    Updates the gateway namespace IPs
+    """
+    app.logger.info(
+        "Incoming request PUT /api/net/gateway/{}/namespace".format(gateway_id)
+    )
+    req_json = request.json
+    app.logger.debug(req_json)
+
+    nsip = req_json.get("namespace_ip")
+    nsipv6 = req_json.get("namespace_ip_v6")
+
+    return operations_gateway_management.update_gateway_namespace(
+        gateway_id, nsip, nsipv6
+    )
+
+
+@app.route("/api/net/gateway/<gateway_id>/service", methods=["PUT"])
+def update_gateway(gateway_id):
+    """
+    Update gateway with gateway_id
+    """
+    app.logger.info(
+        "Incoming request PUT /api/net/gateway/{}/service".format(gateway_id)
+    )
+    gateway = request.json
+    app.logger.debug(gateway)
+
+    return operations_gateway_management.update_gateway_service(gateway_id, gateway)
 
 
 if __name__ == "__main__":

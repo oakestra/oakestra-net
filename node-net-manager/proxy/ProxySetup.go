@@ -17,6 +17,12 @@ import (
 	"github.com/songgao/water"
 )
 
+var proxyTunnel GoProxyTunnel
+
+func Proxy() *GoProxyTunnel {
+	return &proxyTunnel
+}
+
 // create a  new GoProxyTunnel with the configuration from the custom local file
 func New() GoProxyTunnel {
 	// load netcfg.json
@@ -44,7 +50,8 @@ func New() GoProxyTunnel {
 	}
 
 	logger.InfoLogger().Printf("Utilizing config: %v", defaultconfig)
-	return NewCustom(defaultconfig)
+	proxyTunnel = NewCustom(defaultconfig)
+	return proxyTunnel
 }
 
 // create a  new GoProxyTunnel with a custom configuration
@@ -111,7 +118,7 @@ func (proxy *GoProxyTunnel) Listen() {
 
 // create an instance of the proxy TUN device and setup the environment
 func (proxy *GoProxyTunnel) createTun() {
-	//create tun device
+	// create tun device
 	config := water.Config{
 		DeviceType: water.TUN,
 	}
@@ -140,7 +147,7 @@ func (proxy *GoProxyTunnel) createTun() {
 		log.Fatal(err)
 	}
 
-	//disabling reverse path filtering
+	// disabling reverse path filtering
 	logger.InfoLogger().Println("Disabling tun dev reverse path filtering")
 	cmd = exec.Command("echo", "0", ">", "/proc/sys/net/ipv4/conf/"+ifce.Name()+"/rp_filter")
 	err = cmd.Run()
@@ -148,7 +155,7 @@ func (proxy *GoProxyTunnel) createTun() {
 		log.Printf("Error disabling tun dev reverse path filtering: %s ", err.Error())
 	}
 
-	//Increasing the MTU on the TUN dev
+	// Increasing the MTU on the TUN dev
 	logger.InfoLogger().Println("Changing TUN's MTU")
 	cmd = exec.Command("ip", "link", "set", "dev", ifce.Name(), "mtu", proxy.mtusize)
 	err = cmd.Run()
@@ -156,17 +163,17 @@ func (proxy *GoProxyTunnel) createTun() {
 		log.Fatal(err.Error())
 	}
 
-	//Add network routing rule, Done by default by the system
+	// Add network routing rule, Done by default by the system
 	logger.InfoLogger().Printf("adding routing rule for %s to %s\n", proxy.ProxyIpSubnetwork.String(), ifce.Name())
 	cmd = exec.Command("ip", "route", "add", "10.30.0.0/12", "dev", ifce.Name())
 	_, _ = cmd.Output()
 
-	//Add network routing rule, Done by default by the system
+	// Add network routing rule, Done by default by the system
 	logger.InfoLogger().Printf("adding routing rule for %s to %s\n", proxy.ProxyIPv6Subnetwork.IP.String(), ifce.Name())
 	cmd = exec.Command("ip", "route", "add", proxy.ProxyIPv6Subnetwork.IP.String()+proxy.ProxyIPv6Subnetwork.Mask.String(), "dev", ifce.Name())
 	_, _ = cmd.Output()
 
-	//add firewalls rules
+	// add firewalls rules
 	logger.InfoLogger().Println("adding firewall rule " + ifce.Name())
 	cmd = exec.Command("iptables", "-A", "INPUT", "-i", "tun0", "-m", "state",
 		"--state", "RELATED,ESTABLISHED", "-j", "ACCEPT")
