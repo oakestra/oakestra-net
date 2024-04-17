@@ -1,8 +1,8 @@
 package env
 
 import (
-	"NetManager/TableEntryCache"
 	mqttifce "NetManager/mqtt"
+	TableEntryCache "NetManager/table_entry_cache"
 	"errors"
 	"log"
 	"net"
@@ -28,7 +28,6 @@ func tableQueryByIP(ip net.IP, force_optional ...bool) ([]TableEntryCache.TableE
 Asks the MQTT client for a table query and parses the result
 */
 func tableQueryByJobName(jobname string, force_optional ...bool) ([]TableEntryCache.TableEntry, error) {
-
 	log.Println("[MQTT TABLE QUERY] sname:", jobname)
 	var mqttTablequery mqttifce.TablequeryMqttInterface = mqttifce.GetTableQueryRequestCacheInstance()
 

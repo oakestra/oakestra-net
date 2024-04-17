@@ -1,16 +1,15 @@
 package playground
 
 import (
-	"NetManager/TableEntryCache"
 	"NetManager/env"
+	TableEntryCache "NetManager/table_entry_cache"
 	"fmt"
 	"net"
 	"strconv"
 )
 
 func attachNetwork(appname string, pid int, instance int, mappings string, iip string, sip string) (string, error) {
-
-	//attach network to the container
+	// attach network to the container
 	// TODO IPv6 playground implementation: _ = addrv6
 	addr, _, err := env.GetContainerNetDeployment().DeployNetwork(pid, appname, 0, mappings)
 	if err != nil {
@@ -18,7 +17,7 @@ func attachNetwork(appname string, pid int, instance int, mappings string, iip s
 		return "", err
 	}
 
-	//update internal table entry
+	// update internal table entry
 	AddRoute(TableEntryCache.TableEntry{
 		JobName:          appname,
 		Appname:          appname,
@@ -31,11 +30,11 @@ func attachNetwork(appname string, pid int, instance int, mappings string, iip s
 		Nodeport:         PUBLIC_PORT,
 		Nsip:             addr,
 		ServiceIP: []TableEntryCache.ServiceIP{
-			TableEntryCache.ServiceIP{
+			{
 				IpType:  TableEntryCache.InstanceNumber,
 				Address: net.ParseIP(iip),
 			},
-			TableEntryCache.ServiceIP{
+			{
 				IpType:  TableEntryCache.RoundRobin,
 				Address: net.ParseIP(sip),
 			},

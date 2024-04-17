@@ -1,14 +1,15 @@
 package playground
 
 import (
-	"NetManager/TableEntryCache"
+	TableEntryCache "NetManager/table_entry_cache"
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 type SyncPacket struct {
@@ -73,7 +74,6 @@ func handleSync(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(500)
 		return
 	}
-
 }
 
 func entriesToList(entries [][]string) []TableEntryCache.TableEntry {

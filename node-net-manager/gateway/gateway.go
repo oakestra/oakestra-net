@@ -1,10 +1,10 @@
 package gateway
 
 import (
-	"NetManager/TableEntryCache"
 	"NetManager/logger"
 	"NetManager/network"
 	"NetManager/proxy"
+	TableEntryCache "NetManager/table_entry_cache"
 	"fmt"
 	"net"
 	"strconv"

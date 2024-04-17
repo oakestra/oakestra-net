@@ -1,10 +1,10 @@
 package proxy
 
 import (
-	"NetManager/TableEntryCache"
 	"NetManager/env"
 	"NetManager/logger"
 	"NetManager/proxy/iputils"
+	TableEntryCache "NetManager/table_entry_cache"
 	"fmt"
 	"math/rand"
 	"net"

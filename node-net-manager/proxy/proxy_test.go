@@ -1,8 +1,8 @@
 package proxy
 
 import (
-	"NetManager/TableEntryCache"
 	"NetManager/proxy/iputils"
+	TableEntryCache "NetManager/table_entry_cache"
 	"encoding/hex"
 	"math/rand"
 	"net"
