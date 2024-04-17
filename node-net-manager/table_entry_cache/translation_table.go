@@ -1,4 +1,4 @@
-package TableEntryCache
+package table_entry_cache
 
 import (
 	"NetManager/logger"

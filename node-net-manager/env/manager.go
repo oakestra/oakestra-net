@@ -1,11 +1,11 @@
 package env
 
 import (
-	"NetManager/TableEntryCache"
 	"NetManager/events"
 	"NetManager/logger"
 	"NetManager/mqtt"
 	"NetManager/network"
+	TableEntryCache "NetManager/table_entry_cache"
 	"errors"
 	"fmt"
 	"log"
@@ -26,6 +26,7 @@ type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
 	GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool)
+	AddTableQueryEntry(entry TableEntryCache.TableEntry)
 }
 
 type Configuration struct {

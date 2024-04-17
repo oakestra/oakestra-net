@@ -2,6 +2,7 @@ package main
 
 import (
 	"NetManager/env"
+	"NetManager/gateway"
 	"NetManager/handlers"
 	"NetManager/logger"
 	"NetManager/mqtt"
@@ -49,10 +50,13 @@ func handleRequests(port int) {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 }
 
-var Env env.Environment
-var Proxy proxy.GoProxyTunnel
-var WorkerID string
-var Configuration netConfiguration
+var (
+	Env env.Environment
+	// Proxy         proxy.GoProxyTunnel
+	WorkerID      string
+	NetManagerID  string
+	Configuration netConfiguration
+)
 
 /*
 	DEPRECATED
@@ -104,7 +108,7 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	}
 	log.Println(requestStruct)
 
-	//drop the request if the node is already initialized
+	// drop the request if the node is already initialized
 	if WorkerID != "" {
 		if WorkerID == requestStruct.ClientID {
 			log.Printf("Node already initialized")
@@ -118,23 +122,13 @@ func register(writer http.ResponseWriter, request *http.Request) {
 
 	WorkerID = requestStruct.ClientID
 
-	//initialize mqtt connection to the broker
-	mqtt.InitNetMqttClient(requestStruct.ClientID, Configuration.ClusterUrl, Configuration.ClusterMqttPort)
-
-	//initialize the proxy tunnel
-	Proxy = proxy.New()
-	Proxy.Listen()
-
-	//initialize the Env Manager
-	Env = *env.NewEnvironmentClusterConfigured(Proxy.HostTUNDeviceName)
-
-	Proxy.SetEnvironment(&Env)
+	// change mqtt subscriptions to worker topics
+	mqtt.GetNetMqttClient().RegisterWorker(WorkerID)
 
 	writer.WriteHeader(http.StatusOK)
 }
 
 func main() {
-
 	cfgFile := flag.String("cfg", "/etc/netmanager/netcfg.json", "Set a cluster IP")
 	localPort := flag.Int("p", 6000, "Default local port of the NetManager")
 	debugMode := flag.Bool("D", false, "Debug mode, it enables debug-level logs")
@@ -149,6 +143,28 @@ func main() {
 	if *debugMode {
 		logger.SetDebugMode()
 	}
+
+	log.Println("Registering to Cluster...")
+	log.Println("Contacting Cluster: ", Configuration.ClusterUrl)
+	// get initial ID and init MQTT client
+	NetManagerID = gateway.RegisterNetmanager(
+		Configuration.ClusterUrl,
+		Configuration.NodePublicPort,
+	)
+	log.Println("Registered: ", NetManagerID)
+
+	mqtt.InitNetMqttClient(NetManagerID, Configuration.ClusterUrl, Configuration.ClusterMqttPort)
+	mqtt.GetNetMqttClient().
+		RegisterTopic(fmt.Sprintf("nodes/%s/net/gateway/deploy", mqtt.GetNetMqttClient().ClientID()), gateway.GatewayDeploymentHandler)
+
+	// initialize the proxy tunnel
+	proxy.New()
+	proxy.Proxy().Listen()
+
+	// initialize the Env Manager
+	Env = *env.NewEnvironmentClusterConfigured(proxy.Proxy().HostTUNDeviceName)
+
+	proxy.Proxy().SetEnvironment(&Env)
 
 	log.Print(Configuration)
 

@@ -2,6 +2,7 @@ import logging
 import requests
 import os
 import json
+from interfaces.mongodb_requests import mongo_get_gateway
 
 ROOT_SERVICE_MANAGER_ADDR = (
     "http://"
@@ -94,3 +95,43 @@ def cloud_remove_interest(job_name):
             pass
     except requests.exceptions.RequestException as e:
         print("Calling System Manager /api/job/../instances not successful.")
+
+
+def system_manager_notify_gateway_deployment(gateway_info):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/deploy"
+    try:
+        result = requests.post(request_addr, json=gateway_info)
+        if result.status_code != 200:
+            logging.error(result)
+        return result.json(), result.status_code
+    except requests.exceptions.RequestException:
+        print("Calling System Manager /api/net/gateway/deploy not successful.")
+        return {}, 500
+
+
+def system_manager_notify_gateway_update_service(gateway_id):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}/service".format(
+        gateway_id
+    )
+    try:
+        data = mongo_get_gateway(gateway_id)
+        data.pop("_id", None)
+        requests.put(request_addr, json=data)
+    except requests.exceptions.RequestException:
+        print(
+            "Calling System Manager PUT /api/net/gateway/{}/service not successful.".format(
+                gateway_id
+            )
+        )
+
+
+def system_manager_notify_gateway_update_namespace(client_id, nsip, nsipv6):
+    request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/gateway/{}/namespace".format(
+        client_id
+    )
+    try:
+        requests.put(
+            request_addr, json={"namespace_ip": nsip, "namespace_ip_v6": nsipv6}
+        )
+    except requests.exceptions.RequestException:
+        print("Calling System Manager PUT /api/net/gateway/namespace not successful.")

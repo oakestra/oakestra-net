@@ -1,17 +1,18 @@
 package proxy
 
 import (
-	"NetManager/TableEntryCache"
 	"NetManager/env"
 	"NetManager/logger"
 	"NetManager/proxy/iputils"
+	TableEntryCache "NetManager/table_entry_cache"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/songgao/water"
 	"math/rand"
 	"net"
 	"sync"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/songgao/water"
 )
 
 // const
@@ -65,6 +66,14 @@ type incomingMessage struct {
 // outgoing message from bridge
 type outgoingMessage struct {
 	content *[]byte
+}
+
+func (proxy *GoProxyTunnel) GetIfce() *water.Interface {
+	return proxy.ifce
+}
+
+func (proxy *GoProxyTunnel) Env() env.EnvironmentManager {
+	return proxy.environment
 }
 
 // handler function for all outgoing messages that are received by the TUN device

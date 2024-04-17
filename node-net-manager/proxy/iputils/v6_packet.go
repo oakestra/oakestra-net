@@ -7,16 +7,12 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/sipcapture/heplify/ip6defrag"
 )
 
 type IPv6Packet struct {
 	*layers.IPv6
 	*layers.IPv6Fragment
 }
-
-// IPv6 defragger
-var v6defragger = ip6defrag.NewIPv6Defragmenter()
 
 func newIPv6Packet(nl gopacket.NetworkLayer) NetworkLayerPacket {
 	return &IPv6Packet{
@@ -57,19 +53,7 @@ func (packet *IPv6Packet) DecodeNetworkLayer(gop gopacket.Packet) {
 }
 
 func (packet *IPv6Packet) Defragment() error {
-	/*
-		ipv6Defrag, err := v6defragger.DefragIPv6(packet.IPv6, packet.IPv6Fragment)
-		if err != nil {
-			fmt.Println(err)
-			return err
-		} else if ipv6Defrag == nil {
-			return fmt.Errorf("packet was a fragment. Saved state and waiting for rest")
-		}
-		packet.IPv6 = ipv6Defrag
-		return nil
-	*/
-	// TODO fix broken
-	// overwrites NextHeader Value for whatever reason
+	// interface satisfaction
 	return nil
 }
 
