@@ -1,9 +1,10 @@
 from network.subnetwork_management import *
 from interfaces.mongodb_requests import *
+from utils.sla_validation import check_valid_sla
 
-
+@check_valid_sla
 def deploy_request(deployment_descriptor=None, system_job_id=None):
-    if deployment_descriptor is None or system_job_id is None:
+    if deployment_descriptor is None or system_job_id is None or not sla_validation.valid_sla(deployment_descriptor):
         return "Invalid input parameters", 400
 
     s_ip = [{
