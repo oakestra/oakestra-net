@@ -12,13 +12,13 @@ def check_valid_sla(func):
 def valid_sla(sla):
     if sla is None:
         return False
-    if not valid_name(sla.get("application_name","")):
+    if not valid_name(sla.get("app_name","")):
         return False
-    if not valid_name(sla.get("application_namespace","")):
+    if not valid_name(sla.get("app_ns","")):
         return False
-    if not valid_name(sla.get("service_name","")):
+    if not valid_name(sla.get("microservice_name","")):
         return False
-    if not valid_name(sla.get("service_namespace","")):
+    if not valid_name(sla.get("microservice_namespace","")):
         return False
     return True
 

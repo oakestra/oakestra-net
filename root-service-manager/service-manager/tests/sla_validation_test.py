@@ -2,62 +2,62 @@ import utils.sla_validation as sla_validation
 
 def test_full_sla():
     sla = {
-        "application_name": "app",
-        "application_namespace": "app",
-        "service_name": "service",
-        "service_namespace": "service"
+        "app_name": "app",
+        "app_ns": "app",
+        "microservice_name": "service",
+        "microservice_namespace": "service"
     }
 
     assert sla_validation.valid_sla(sla) == True
 
-    sla["application_name"] = "app-"
+    sla["app_name"] = "app-"
     assert sla_validation.valid_sla(sla) == False
 
-    sla["application_name"] = "app"
-    sla["application_namespace"] = "app_"
+    sla["app_name"] = "app"
+    sla["app_ns"] = "app_"
     assert sla_validation.valid_sla(sla) == False
 
-    sla["application_namespace"] = "app"
-    sla["service_name"] = "service!"
+    sla["app_ns"] = "app"
+    sla["microservice_name"] = "service!"
     assert sla_validation.valid_sla(sla) == False
 
-    sla["service_name"] = "service"
-    sla["service_namespace"] = "service."
+    sla["microservice_name"] = "service"
+    sla["microservice_namespace"] = "service."
     assert sla_validation.valid_sla(sla) == False
 
-    sla["service_name"] = "service1234safasdf"
-    sla["service_namespace"] = "servicfdfwefd"
+    sla["microservice_name"] = "service1234safasdf"
+    sla["microservice_namespace"] = "servicfdfwefd"
     assert sla_validation.valid_sla(sla) == True
 
 def test_sla_missing_field():
     sla = {
-        "application_name": "app",
-        "application_namespace": "app",
-        "service_name": "service"
+        "app_name": "app",
+        "app_ns": "app",
+        "microservice_name": "service"
     }
 
     assert sla_validation.valid_sla(sla) == False
 
     sla = {
-        "application_name": "app",
-        "application_namespace": "app",
-        "service_namespace": "service"
+        "app_name": "app",
+        "app_ns": "app",
+        "microservice_namespace": "service"
     }
 
     assert sla_validation.valid_sla(sla) == False
 
     sla = {
-        "application_name": "app",
-        "service_name": "service",
-        "service_namespace": "service"
+        "app_name": "app",
+        "microservice_name": "service",
+        "microservice_namespace": "service"
     }
 
     assert sla_validation.valid_sla(sla) == False
 
     sla = {
-        "application_namespace": "app",
-        "service_name": "service",
-        "service_namespace": "service"
+        "app_ns": "app",
+        "microservice_name": "service",
+        "microservice_namespace": "service"
     }
 
     assert sla_validation.valid_sla(sla) == False
