@@ -76,6 +76,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		}
 	}
 
+	// Move peer veth to namespace
 	if err := netlink.LinkSetNsFd(peerVeth, int(ns)); err != nil {
 		logger.DebugLogger().Printf("Error %s: %v", peerVeth.Attrs().Name, err)
 		cleanup(vethIfce)
@@ -89,6 +90,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
+	// Set IP for veth interface
 	if err := env.addPeerLinkNetworkByNsName(sname, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
 		logger.DebugLogger().Println("Unable to configure Peer")
 		cleanup(vethIfce)
@@ -96,81 +98,38 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
-	// Create Bridge and tap within Ns
-	logger.DebugLogger().Println("Creating Bridge and Tap inside of Ns")
-	labr := netlink.NewLinkAttrs()
-	labr.Name = "virbr0"
-	bridge := &netlink.Bridge{LinkAttrs: labr}
-	lat := netlink.NewLinkAttrs()
-	lat.Name = "tap0"
-	tap := &netlink.Tuntap{LinkAttrs: lat, Mode: netlink.TUNTAP_MODE_TAP}
+	// Create Macvtap device inside the namespace
+	logger.DebugLogger().Println("Creating Macvtap device")
 	err = env.execInsideNsByName(sname, func() error {
-		// Create Bridge
-		err := netlink.LinkAdd(bridge)
-		if err != nil {
-			logger.DebugLogger().Printf("Unable to create Bridge: %v\n", err)
+
+		mvtAttr := netlink.NewLinkAttrs()
+		mvtAttr.Name = "tap0"
+		mvtAttr.ParentIndex = peerVeth.Attrs().Index
+		macvtap := &netlink.Macvtap{
+			Macvlan: netlink.Macvlan{
+				LinkAttrs: mvtAttr,
+				Mode:      netlink.MACVLAN_MODE_BRIDGE,
+			},
+		}
+
+		if err := netlink.LinkAdd(macvtap); err != nil {
+			logger.DebugLogger().Printf("Unable to create macvtap netlink %v", err)
 			return err
 		}
-		// Set IP on Bridge
-		addrbr, _ := netlink.ParseAddr("192.168.1.1/30")
-		err = netlink.AddrAdd(bridge, addrbr)
-		if err != nil {
-			logger.DebugLogger().Printf("Unable to add ip address to bridge: %v\n", err)
-			return err
-		}
-		// Create tap for Qemu
-		err = netlink.LinkAdd(tap)
-		if err != nil {
-			logger.DebugLogger().Printf("Unable to create Tap: %v\n", err)
-			return err
-		}
-		// Attach tap to Bridge
-		if netlink.LinkSetMaster(tap, bridge) != nil {
-			logger.DebugLogger().Printf("Unable to set master to tap: %v\n", err)
+		if err := netlink.LinkSetUp(macvtap); err != nil {
+			logger.DebugLogger().Printf("Unable to set macvtap netlink up %v", err)
 			return err
 		}
 
-		// ip link set up virbr0/tap0
-		cmd := exec.Command("ip", "link", "set", "up", "dev", "virbr0")
-		err = cmd.Run()
+		_, err := netlink.LinkByName(macvtap.Name)
 		if err != nil {
-			return err
-		}
-		cmd = exec.Command("ip", "link", "set", "up", "dev", "tap0")
-		err = cmd.Run()
-		if err != nil {
+			logger.DebugLogger().Printf("Unable to retrieve the new macvtap netlink %v", err)
 			return err
 		}
 
-		// Set route for Ns
-		dst, err := netlink.ParseIPNet("0.0.0.0/0")
-		if err != nil {
-			return err
-		}
-
-		err = netlink.RouteAdd(&netlink.Route{
-			LinkIndex: peerVeth.Attrs().Index,
-			Dst:       dst,
-			Gw:        net.ParseIP(env.config.HostBridgeIP),
-		})
-		if err != nil {
-			logger.DebugLogger().Printf("Failed to set route in Ns: %v", err)
-			return err
-		}
-
-		// Set NAT for Unikernel
-		cmd = exec.Command("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vethIfce.PeerName, "-j", "SNAT", "--to", ip.String())
-		err = cmd.Run()
-		if err != nil {
-			return err
-		}
-		cmd = exec.Command("iptables", "-t", "nat", "-A", "PREROUTING", "-i", vethIfce.PeerName, "-j", "DNAT", "--to", "192.168.1.2")
-		err = cmd.Run()
-		if err != nil {
-			return err
-		}
 		return nil
 	})
+
 	if err != nil {
 		logger.DebugLogger().Printf("Failed to configure Ns for Unikernel\n")
 		cleanup(vethIfce)
