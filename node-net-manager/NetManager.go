@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NetManager/ebpfManager"
 	"NetManager/env"
 	"NetManager/handlers"
 	"NetManager/logger"
@@ -129,6 +130,9 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	Env = *env.NewEnvironmentClusterConfigured(Proxy.HostTUNDeviceName)
 
 	Proxy.SetEnvironment(&Env)
+
+	Ebpf := ebpfManager.New(&Env)
+	fmt.Println("", Ebpf)
 
 	writer.WriteHeader(http.StatusOK)
 }

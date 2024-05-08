@@ -26,6 +26,7 @@ type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
 	GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool)
+	GetDeployedServicesVeths() []*netlink.Veth // TODO ben remove
 }
 
 type Configuration struct {
@@ -508,6 +509,15 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 		}
 	}
 	return TableEntryCache.TableEntry{}, false
+}
+
+// TODO ben remove
+func (env *Environment) GetDeployedServicesVeths() []*netlink.Veth {
+	vethSlice := make([]*netlink.Veth, 0)
+	for _, value := range env.deployedServices {
+		vethSlice = append(vethSlice, value.veth)
+	}
+	return vethSlice
 }
 
 // GetTableEntryByNsIP Given a NamespaceIP finds the table entry. This search is local because the networking component MUST have all
