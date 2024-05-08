@@ -102,6 +102,23 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	logger.DebugLogger().Println("Creating Macvtap device")
 	err = env.execInsideNsByName(sname, func() error {
 
+		// Set default route for the namespace
+		dst, err := netlink.ParseIPNet("0.0.0.0/0")
+		if err != nil {
+			return err
+		}
+
+		err = netlink.RouteAdd(&netlink.Route{
+			LinkIndex: peerVeth.Attrs().Index,
+			Dst:       dst,
+			Gw:        net.ParseIP(env.config.HostBridgeIP),
+		})
+		if err != nil {
+			logger.DebugLogger().Printf("Failed to set route in Ns: %v", err)
+			return err
+		}
+
+		// create and configure macvtap device
 		mvtAttr := netlink.NewLinkAttrs()
 		mvtAttr.Name = "tap0"
 		mvtAttr.ParentIndex = peerVeth.Attrs().Index
@@ -121,7 +138,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 			return err
 		}
 
-		_, err := netlink.LinkByName(macvtap.Name)
+		_, err = netlink.LinkByName(macvtap.Name)
 		if err != nil {
 			logger.DebugLogger().Printf("Unable to retrieve the new macvtap netlink %v", err)
 			return err
