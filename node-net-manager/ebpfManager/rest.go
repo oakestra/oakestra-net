@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func (e EbpfManager) createRestInterface(manager *env.EnvironmentManager) {
+func (e *EbpfManager) createRestInterface(manager *env.EnvironmentManager) {
 	router := gin.Default()
 	router.GET("/ebpf/environment", func(c *gin.Context) {
 		vethList := (*manager).GetDeployedServicesVeths()
@@ -20,6 +20,11 @@ func (e EbpfManager) createRestInterface(manager *env.EnvironmentManager) {
 
 	router.GET("/ebpf/activate", func(c *gin.Context) {
 		e.ActivateFirewall()
+		c.Status(200)
+	})
+
+	router.DELETE("/ebpf/firewall", func(c *gin.Context) {
+		e.firewallManager.RemoveAllFirewalls()
 		c.Status(200)
 	})
 

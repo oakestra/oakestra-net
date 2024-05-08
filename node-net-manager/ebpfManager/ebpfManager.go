@@ -37,12 +37,13 @@ func New(env env.EnvironmentManager) EbpfManager {
 	return ebpfManager
 }
 
-func (e EbpfManager) ActivateFirewall() {
+func (e *EbpfManager) ActivateFirewall() {
 	e.firewallManager = firewall.NewFirewallManager()
 
+	// TODO ben need to register a call back such that every time a new service is deployed the firwall ist also added
 	vethList := (e.environment).GetDeployedServicesVeths()
 	for _, vethName := range vethList {
-		e.firewallManager.AddFirewall(vethName.Name)
+		e.firewallManager.AttachFirewall(vethName.Name)
 	}
 }
 

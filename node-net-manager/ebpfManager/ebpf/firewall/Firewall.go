@@ -3,7 +3,6 @@ package firewall
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/cilium/ebpf/link"
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
 	"golang.org/x/sys/unix"
@@ -18,10 +17,9 @@ var nextId = 0
 
 type Firewall struct {
 	Id        int
-	Link      link.Link
 	FwObjects firewallObjects
-	Loaded    bool
 	Tcnl      *tc.Tc
+	Qdisc     tc.Object
 }
 
 func NewFirewall() Firewall {
@@ -39,12 +37,7 @@ func (e *Firewall) Close() error {
 		return err
 	}
 
-	err = e.Link.Close()
-	if err != nil {
-		return err
-	}
-
-	//TODO ben e.Tcnl.Qdisc().Delete(&qdisc)
+	e.Tcnl.Qdisc().Delete(&e.Qdisc)
 
 	err = e.Tcnl.Close()
 	if err != nil {
@@ -105,9 +98,6 @@ func (e *Firewall) DeleteRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPor
 }
 
 func (e *Firewall) Load() {
-	if e.Loaded {
-		return
-	}
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs firewallObjects
 	if err := loadFirewallObjects(&objs, nil); err != nil {
@@ -134,7 +124,6 @@ func (e *Firewall) Load() {
 //}
 
 func (e *Firewall) AttachTC(ifname string) {
-	fmt.Println("Attaching Firewall to %s", ifname)
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		log.Fatalf("Getting interface %s: %s", ifname, err)
@@ -159,6 +148,7 @@ func (e *Firewall) AttachTC(ifname string) {
 			Kind: "clsact",
 		},
 	}
+	e.Qdisc = qdisc
 
 	if err := tcnl.Qdisc().Add(&qdisc); err != nil {
 		fmt.Fprintf(os.Stderr, "could not assign clsact to %s: %v\n", ifname, err)
@@ -212,5 +202,4 @@ func (e *Firewall) AttachTC(ifname string) {
 		fmt.Fprintf(os.Stderr, "could not attach egress filter for eBPF program: %v\n", err)
 		return
 	}
-
 }
