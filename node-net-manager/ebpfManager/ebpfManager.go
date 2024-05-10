@@ -3,6 +3,7 @@ package ebpfManager
 import (
 	"NetManager/ebpfManager/ebpf/firewall"
 	"NetManager/env"
+	"NetManager/events"
 	"log"
 
 	"github.com/cilium/ebpf/rlimit"
@@ -40,11 +41,23 @@ func New(env env.EnvironmentManager) EbpfManager {
 func (e *EbpfManager) ActivateFirewall() {
 	e.firewallManager = firewall.NewFirewallManager()
 
-	// TODO ben need to register a call back such that every time a new service is deployed the firwall ist also added
+	// Attach firewall to all currently active deployments
 	vethList := (e.environment).GetDeployedServicesVeths()
 	for _, vethName := range vethList {
 		e.firewallManager.AttachFirewall(vethName.Name)
 	}
+
+	// Attach firewall to added deployments in the future
+	go func() {
+		// listen to VethCreationEvents such that a firewall can be attached to new veths
+		for true {
+			eventChan, _ := events.GetInstance().Register(events.VethCreation, "firewall") // TODO ben "firewall" target name??
+			vethCreationEvent := <-eventChan
+			if payload, ok := vethCreationEvent.Payload.(events.VethCreationPayload); ok {
+				e.firewallManager.AttachFirewall(payload.Name)
+			}
+		}
+	}()
 }
 
 // TODO ben store for later

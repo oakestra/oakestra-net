@@ -1,5 +1,9 @@
 package firewall
 
+import (
+	"net"
+)
+
 type FirewallManager struct {
 	// maps interface name to firewall
 	firewalls map[string]Firewall
@@ -12,8 +16,10 @@ func NewFirewallManager() FirewallManager {
 	}
 }
 
-func (e *FirewallManager) AddFirewallRule() {
-
+func (e *FirewallManager) AddFirewallRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPort uint16, dstPort uint16) {
+	for _, fw := range e.firewalls {
+		fw.AddRule(srcIp, dstIp, proto, srcPort, dstPort)
+	}
 }
 
 func (e *FirewallManager) AttachFirewall(ifname string) {
@@ -32,6 +38,6 @@ func (e *FirewallManager) RemoveFirewall(ifname string) {
 
 func (e *FirewallManager) RemoveAllFirewalls() {
 	for ifname := range e.firewalls {
-		e.RemoveFirewall((ifname))
+		e.RemoveFirewall(ifname)
 	}
 }

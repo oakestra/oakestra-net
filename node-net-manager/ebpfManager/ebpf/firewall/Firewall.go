@@ -37,6 +37,7 @@ func (e *Firewall) Close() error {
 		return err
 	}
 
+	// TODO ben handle error
 	e.Tcnl.Qdisc().Delete(&e.Qdisc)
 
 	err = e.Tcnl.Close()

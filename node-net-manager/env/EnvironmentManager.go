@@ -229,6 +229,15 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 		return nil, err
 	}
 
+	// TODO ben also emit event for UniKernels
+	events.GetInstance().Emit(events.Event{
+		EventType:   events.VethCreation,
+		EventTarget: "TODO",
+		Payload: events.VethCreationPayload{
+			Name:     veth.Name,
+			PeerName: veth.PeerName,
+		},
+	})
 	return veth, nil
 }
 
@@ -511,7 +520,6 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 	return TableEntryCache.TableEntry{}, false
 }
 
-// TODO ben remove
 func (env *Environment) GetDeployedServicesVeths() []*netlink.Veth {
 	vethSlice := make([]*netlink.Veth, 0)
 	for _, value := range env.deployedServices {
