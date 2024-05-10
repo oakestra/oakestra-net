@@ -195,10 +195,11 @@ func (t *TableManager) isValid(entry TableEntry) bool {
 		log.Println("TranslationTable: Invalid Entry, wrong nsip")
 		return false
 	}
-	if entry.Nsipv6 == nil {
-		log.Println("TranslationTable: Invalid Entry, wrong nsipv6")
-		return false
-	}
+	// Unikernel does not have IPv6
+	//if entry.Nsipv6 == nil {
+	//	log.Println("TranslationTable: Invalid Entry, wrong nsipv6")
+	//	return false
+	//}
 	if len(entry.ServiceIP) < 1 {
 		log.Println("TranslationTable: Invalid Entry, wrong serviceip")
 		return false
