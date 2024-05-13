@@ -100,8 +100,8 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, net.IP, erro
 		requestStruct.Instancenumber,
 		addr.String(),
 		addrv6.String(),
-		requestStruct.PublicAddr,
-		requestStruct.PublicPort,
+		env.GetConfiguration().NodePublicAddress,
+		env.GetConfiguration().NodePublicPort,
 	)
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)

@@ -16,7 +16,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/tkanos/gonfig"
 )
 
 type undeployRequest struct {
@@ -33,26 +32,18 @@ type DeployResponse struct {
 	NsAddress   string `json:"nsAddress"`
 }
 
-type netConfiguration struct {
-	NodePublicAddress string
-	NodePublicPort    string
-	ClusterUrl        string
-	ClusterMqttPort   string
-}
-
 func handleRequests(port int) {
 	netRouter := mux.NewRouter().StrictSlash(true)
 	netRouter.HandleFunc("/register", register).Methods("POST")
 	netRouter.HandleFunc("/docker/deploy", dockerDeploy).Methods("POST")
 
-	handlers.RegisterAllManagers(&Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
+	handlers.RegisterAllManagers(&Env, &WorkerID, env.GetConfiguration().NodePublicAddress, env.GetConfiguration().NodePublicPort, netRouter)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 }
 
 var Env env.Environment
 var Proxy proxy.GoProxyTunnel
 var WorkerID string
-var Configuration netConfiguration
 
 /*
 	DEPRECATED
@@ -119,7 +110,7 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	WorkerID = requestStruct.ClientID
 
 	//initialize mqtt connection to the broker
-	mqtt.InitNetMqttClient(requestStruct.ClientID, Configuration.ClusterUrl, Configuration.ClusterMqttPort)
+	mqtt.InitNetMqttClient(requestStruct.ClientID, env.GetConfiguration().ClusterUrl, env.GetConfiguration().ClusterMqttPort)
 
 	//initialize the proxy tunnel
 	Proxy = proxy.New()
@@ -141,22 +132,19 @@ func main() {
 	p2pMode := flag.Bool("p2p", false, "Start the engine in p2p mode (playground2playground), requires the address of a peer node. Useful for debugging.")
 	flag.Parse()
 
-	err := gonfig.GetConf(*cfgFile, &Configuration)
-	if err != nil {
-		log.Fatal(err)
-	}
+	env.InitConfigurationFile(*cfgFile)
 
 	if *debugMode {
 		logger.SetDebugMode()
 	}
 
-	log.Print(Configuration)
+	log.Print(env.GetConfiguration())
 
 	network.IptableFlushAll()
 
 	if *p2pMode {
 		defer playground.APP.Stop()
-		playground.CliLoop(Configuration.NodePublicAddress, Configuration.NodePublicPort)
+		playground.CliLoop(env.GetConfiguration().NodePublicAddress, env.GetConfiguration().NodePublicPort)
 	}
 
 	log.Println("NetManager started. Waiting for registration.")
