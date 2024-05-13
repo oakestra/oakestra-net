@@ -14,7 +14,7 @@ type NetConfiguration struct {
 }
 
 var configuration *NetConfiguration
-var cfgFile = "/etc/netmanager/netcfg.json"
+var cfgFile = "/etc/netmanager/netcfg.json" // default configuration file
 
 func GetConfiguration() NetConfiguration {
 	if configuration == nil {
@@ -22,7 +22,6 @@ func GetConfiguration() NetConfiguration {
 		if err != nil {
 			log.Fatal(err)
 		}
-		configuration = &NetConfiguration{}
 	}
 	return *configuration
 }
