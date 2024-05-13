@@ -18,7 +18,7 @@ var cfgFile = "/etc/netmanager/netcfg.json"
 
 func GetConfiguration() *NetConfiguration {
 	if configuration == nil {
-		err := gonfig.GetConf(cfgFile, &configuration)
+		err := gonfig.GetConf(cfgFile, configuration)
 		if err != nil {
 			log.Fatal(err)
 		}
