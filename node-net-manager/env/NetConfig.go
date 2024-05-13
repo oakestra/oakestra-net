@@ -16,7 +16,7 @@ type NetConfiguration struct {
 var configuration *NetConfiguration
 var cfgFile = "/etc/netmanager/netcfg.json"
 
-func GetConfiguration() *NetConfiguration {
+func GetConfiguration() NetConfiguration {
 	if configuration == nil {
 		err := gonfig.GetConf(cfgFile, configuration)
 		if err != nil {
@@ -24,7 +24,7 @@ func GetConfiguration() *NetConfiguration {
 		}
 		configuration = &NetConfiguration{}
 	}
-	return configuration
+	return *configuration
 }
 
 func InitConfigurationFile(file string) {
