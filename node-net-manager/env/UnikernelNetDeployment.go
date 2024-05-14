@@ -122,10 +122,13 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		mvtAttr := netlink.NewLinkAttrs()
 		mvtAttr.Name = "tap0"
 		mvtAttr.ParentIndex = peerVeth.Attrs().Index
+		mvtAttr.NetNsID = int(ns)
+		// Important! The index must be set manually, otw this device won't get a unique fd!
+		mvtAttr.Index = peerVeth.Attrs().Index + 1
 		macvtap := &netlink.Macvtap{
 			Macvlan: netlink.Macvlan{
 				LinkAttrs: mvtAttr,
-				Mode:      netlink.MACVLAN_MODE_BRIDGE,
+				Mode:      netlink.MACVLAN_MODE_VEPA,
 			},
 		}
 
