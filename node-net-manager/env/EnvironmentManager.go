@@ -20,8 +20,6 @@ import (
 	"github.com/vishvananda/netns"
 )
 
-const NamespaceAlreadyDeclared string = "namespace already declared"
-
 type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
@@ -555,15 +553,21 @@ func (env *Environment) RemoveNsIPEntries(nsip string) {
 
 func (env *Environment) generateAddress() (net.IP, error) {
 	var result net.IP
+	//Check address check for available reusable addresses
 	if len(env.addrCache) > 0 {
 		result, env.addrCache = env.addrCache[0], env.addrCache[1:]
 	} else {
+		//Generate new address from the node subnetwork
 		result = env.nextContainerIP
 		if env.totNextAddr < 62 {
 			env.totNextAddr++
 		} else {
-			logger.ErrorLogger().Printf("exhausted IPv4 address space")
-			return result, errors.New("IPv4 address space exhausted")
+			logger.ErrorLogger().Printf("Exhausted address space, requesting additional SubNetwork")
+			err := env.extendIPv4Subnetwork()
+			if err != nil {
+				logger.ErrorLogger().Printf("exhausted IPv4 address space")
+				return result, errors.New("IPv4 address space exhausted")
+			}
 		}
 		env.nextContainerIP = network.NextIPv4(env.nextContainerIP, 1)
 	}
@@ -597,4 +601,15 @@ func (env *Environment) freeContainerAddress(ip net.IP) {
 	if err = ip.To16(); err != nil {
 		env.addrCachev6 = append(env.addrCachev6, ip)
 	}
+}
+
+func (env *Environment) extendIPv4Subnetwork() error {
+	subnetwork, err := mqtt.RequestSubnetworkMqttBlocking()
+	if err != nil {
+		return err
+	}
+	logger.DebugLogger().Printf("Received new IPv4 subnetwork: %s\n", subnetwork)
+	env.nextContainerIP = network.NextIPv4(net.ParseIP(subnetwork.Address), 1)
+	env.totNextAddr = 0
+	return nil
 }
