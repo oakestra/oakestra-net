@@ -47,17 +47,12 @@ func (e *EbpfManager) ActivateFirewall() {
 		e.firewallManager.AttachFirewall(vethName.Name)
 	}
 
-	// Attach firewall to added deployments in the future
-	go func() {
-		// listen to VethCreationEvents such that a firewall can be attached to new veths
-		for true {
-			eventChan, _ := events.GetInstance().Register(events.VethCreation, "firewall") // TODO ben "firewall" target name??
-			vethCreationEvent := <-eventChan
-			if payload, ok := vethCreationEvent.Payload.(events.VethCreationPayload); ok {
-				e.firewallManager.AttachFirewall(payload.Name)
-			}
+	// TODO ben deregister callback when firewall is deactivated or object is deconstructed!
+	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
+		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
+			e.firewallManager.AttachFirewall(payload.Name)
 		}
-	}()
+	})
 }
 
 // TODO ben store for later

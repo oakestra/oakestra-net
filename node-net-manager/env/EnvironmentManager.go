@@ -230,9 +230,8 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 	}
 
 	// TODO ben also emit event for UniKernels
-	events.GetInstance().Emit(events.Event{
-		EventType:   events.VethCreation,
-		EventTarget: "TODO",
+	events.GetInstance().EmitCallback(events.CallbackEvent{
+		EventType: events.VethCreation,
 		Payload: events.VethCreationPayload{
 			Name:     veth.Name,
 			PeerName: veth.PeerName,

@@ -2,28 +2,39 @@ package events
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 )
+
+type Callback func(event CallbackEvent)
 
 type EventManager interface {
 	Emit(event Event)
 	Register(eventType EventType, eventTarget string) (chan Event, error)
 	DeRegister(eventType EventType, eventTarget string)
+
+	EmitCallback(event CallbackEvent)
+	RegisterCallback(eventType EventType, callback Callback) string
+	DeRegisterCallback(eventType EventType, id string)
 }
 
 type EventType int
 
 type Events struct {
 	//map of event target to event kind
-	eventTableQueryChannelQueue map[string]chan Event
-	vethCreationChannel         chan Event
+	pubSubChannels map[string]chan Event
+	listeners      map[EventType]map[string]Callback
 }
 
 type Event struct {
 	EventType    EventType
 	EventTarget  string
 	EventMessage string
-	Payload      interface{}
+}
+
+type CallbackEvent struct {
+	EventType EventType
+	Payload   interface{}
 }
 
 type VethCreationPayload struct {
@@ -31,20 +42,12 @@ type VethCreationPayload struct {
 	PeerName string
 }
 
-// TODO ben ensure type safty at compile time for Payload!
-//type EventPayload interface {
-//	Type() EventType
-//}
-//
-//
-//func (v VethCreationPayload) Type() EventType {
-//	return VethCreation
-//}
-
+// TODO ben add short doc of why we need ChannelEvents and CallbackEvents and what they are
 const (
+	// ChannelEvents
 	TableQuery EventType = iota
 
-	// VethCreation This event is triggered by the environment when a new veth pair was created.
+	// CallbackEvents
 	VethCreation
 )
 
@@ -57,10 +60,44 @@ var (
 
 /* ------------------------------------------*/
 
+func (e *Events) EmitCallback(event CallbackEvent) {
+	rwlock.RLock()
+	defer rwlock.RUnlock()
+	callbacks, ok := e.listeners[event.EventType]
+	if ok {
+		for _, callback := range callbacks {
+			callback(event)
+		}
+	}
+}
+
+func (e *Events) RegisterCallback(eventType EventType, callback Callback) string {
+	rwlock.RLock()
+	defer rwlock.RUnlock()
+	id := fmt.Sprintf("%p", &callback) // Generate a unique ID based on the pointer address
+	if _, ok := e.listeners[eventType]; !ok {
+		e.listeners[eventType] = make(map[string]Callback)
+	}
+	e.listeners[eventType][id] = callback
+	return id
+}
+
+func (e *Events) DeRegisterCallback(eventType EventType, id string) {
+	rwlock.RLock()
+	defer rwlock.RUnlock()
+	if callbacks, ok := e.listeners[eventType]; ok {
+		delete(callbacks, id)
+		if len(callbacks) == 0 {
+			delete(e.listeners, eventType)
+		}
+	}
+}
+
 func GetInstance() EventManager {
 	once.Do(func() {
 		eventInstance = &Events{
-			eventTableQueryChannelQueue: make(map[string]chan Event, 0),
+			pubSubChannels: make(map[string]chan Event, 0),
+			listeners:      make(map[EventType]map[string]Callback),
 		}
 	})
 	return eventInstance
@@ -71,23 +108,13 @@ func (e *Events) Emit(event Event) {
 	defer rwlock.RUnlock()
 	switch event.EventType {
 	case TableQuery:
-		channel := e.eventTableQueryChannelQueue[event.EventTarget]
+		channel := e.pubSubChannels[event.EventTarget]
 		if channel != nil {
 			//check channel buffer capacity to prevent blocking. If this is false, probably no receiver is active.
 			if len(channel) < cap(channel) {
 				channel <- event
 			}
 		}
-		break
-	case VethCreation:
-		channel := e.vethCreationChannel
-		if channel != nil {
-			//check channel buffer capacity to prevent blocking. If this is false, probably no receiver is active.
-			if len(channel) < cap(channel) {
-				channel <- event
-			}
-		}
-		break
 	}
 }
 
@@ -96,18 +123,11 @@ func (e *Events) Register(eventType EventType, eventTarget string) (chan Event, 
 	defer rwlock.Unlock()
 	switch eventType {
 	case TableQuery:
-		channel := e.eventTableQueryChannelQueue[eventTarget]
+		channel := e.pubSubChannels[eventTarget]
 		if channel == nil {
 			channel = make(chan Event, 10)
 		}
-		e.eventTableQueryChannelQueue[eventTarget] = channel
-		return channel, nil
-	case VethCreation:
-		channel := e.vethCreationChannel
-		if channel == nil {
-			channel = make(chan Event, 10)
-		}
-		e.vethCreationChannel = channel
+		e.pubSubChannels[eventTarget] = channel
 		return channel, nil
 	}
 	return nil, errors.New("Invalid EventType")
@@ -118,15 +138,10 @@ func (e *Events) DeRegister(eventType EventType, eventTarget string) {
 	defer rwlock.Unlock()
 	switch eventType {
 	case TableQuery:
-		channel := e.eventTableQueryChannelQueue[eventTarget]
+		channel := e.pubSubChannels[eventTarget]
 		if channel != nil {
-			e.eventTableQueryChannelQueue[eventTarget] = nil
+			e.pubSubChannels[eventTarget] = nil
 			close(channel)
 		}
-		break
-	case VethCreation:
-		channel := e.vethCreationChannel
-		close(channel)
-		break
 	}
 }
