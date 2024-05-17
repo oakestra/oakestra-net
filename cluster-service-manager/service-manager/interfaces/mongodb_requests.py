@@ -177,17 +177,23 @@ def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instanc
     if job is None:
         return None
     instance_list = job.get('instance_list',[])
-    for instance in instance_list:
-        if int(instance["instance_number"]) == int(instance_number):
-            instance['worker_id'] = node_id
-            instance['namespace_ip'] = ns_ip
-            instance['namespace_ip_v6'] = ns_ipv6
-            instance['host_ip'] = host_ip
-            instance['host_port'] = int(host_port)
-            break
-    return mongo_jobs.db.jobs.find_one_and_update({'job_name': job_name},
-                                         {'$set': {'status': status, 'instance_list': instance_list}},
-                                         return_document=True)
+    document = mongo_jobs.db.jobs.update_one(
+        {
+            'job_name': job_name,
+            "instance_list": {'$elemMatch': {'instance_number': int(instance_number)}}},
+        {
+            '$set': {
+                "instance_list.$.namespace_ip": ns_ip,
+                "instance_list.$.namespace_ip_v6": ns_ipv6,
+                "instance_list.$.host_ip": host_ip,
+                "instance_list.$.host_port": int(host_port),
+                "instance_list.$.worker_id": node_id
+            }
+        },return_document=True
+    )
+    #return only the updated instance
+    document['instance_list'] = [{'instance_number': instance_number, 'namespace_ip': ns_ip, 'namespace_ip_v6': ns_ipv6, 'host_ip': host_ip, 'host_port': host_port, 'worker_id': node_id}]
+    return document
 
 
 def mongo_find_job_by_id(id):
