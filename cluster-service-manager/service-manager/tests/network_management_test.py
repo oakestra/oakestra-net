@@ -73,6 +73,8 @@ def test_deployment_status_report(requests_mock):
         }
     ]
     data = {"job_id": job["system_job_id"], "instances": instances}
+    # wait for the thread to finish
+    time.sleep(1)
     assert adapter.call_count == 1
     assert adapter.called
     assert adapter.last_request.json() == data
