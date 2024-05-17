@@ -192,7 +192,7 @@ def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instanc
         },return_document=True
     )
     #return only the updated instance
-    document['instance_list'] = [{'instance_number': instance_number, 'namespace_ip': ns_ip, 'namespace_ip_v6': ns_ipv6, 'host_ip': host_ip, 'host_port': host_port, 'worker_id': node_id}]
+    document['instance_list'] = [{'instance_number': instance_number, 'namespace_ip': ns_ip, 'namespace_ip_v6': ns_ipv6, 'host_ip': host_ip, 'host_port': int(host_port), 'worker_id': node_id}]
     return document
 
 
