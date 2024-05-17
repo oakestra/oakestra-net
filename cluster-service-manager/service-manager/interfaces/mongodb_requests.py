@@ -177,7 +177,7 @@ def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instanc
     if job is None:
         return None
     instance_list = job.get('instance_list',[])
-    document = mongo_jobs.db.jobs.update_one(
+    document = mongo_jobs.db.jobs.find_one_and_update(
         {
             'job_name': job_name,
             "instance_list": {'$elemMatch': {'instance_number': int(instance_number)}}},
