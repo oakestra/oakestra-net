@@ -1,5 +1,6 @@
 from interfaces import mongodb_requests
 from interfaces.root_service_manager_requests import *
+import threading
 
 
 def deployment_status_report(
@@ -12,4 +13,4 @@ def deployment_status_report(
     if job is None:
         raise FileNotFoundError
     # Notify System manager
-    system_manager_notify_deployment_status(job, node_id)
+    threading.Thread(target=system_manager_notify_deployment_status, args=(job, node_id)).start()
