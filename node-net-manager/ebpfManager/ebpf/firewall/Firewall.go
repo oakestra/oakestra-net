@@ -1,4 +1,4 @@
-package firewall
+package main
 
 import (
 	"encoding/binary"
@@ -10,8 +10,6 @@ import (
 	"net"
 	"os"
 )
-
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go firewall firewall.c
 
 var nextId = 0
 

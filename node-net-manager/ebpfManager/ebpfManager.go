@@ -1,19 +1,24 @@
 package ebpfManager
 
 import (
-	"NetManager/ebpfManager/ebpf/firewall"
+	"NetManager/ebpfManager/ebpf"
 	"NetManager/env"
-	"NetManager/events"
-	"log"
-
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/gorilla/mux"
+	"log"
+	"plugin"
 )
 
 //go:generate ./generate_ebpf.sh
 
 type EbpfManager struct {
-	environment     env.EnvironmentManager
-	firewallManager firewall.FirewallManager
+	router *mux.Router
+}
+
+var ebpfManager EbpfManager
+
+func init() {
+	ebpfManager = EbpfManager{}
 }
 
 type FirewallRequest struct {
@@ -24,36 +29,62 @@ type FirewallRequest struct {
 	DstPort uint16 `json:"dstPort"`
 }
 
-func New(env env.EnvironmentManager) EbpfManager {
+func New(env *env.Environment, router *mux.Router) EbpfManager {
 	if err := rlimit.RemoveMemlock(); err != nil { // TODO ben what if multiple created?
 		log.Fatal("Removing memlock:", err)
 	}
 
 	ebpfManager := EbpfManager{
-		environment: env,
+		router: router,
 	}
 
-	ebpfManager.createRestInterface(&ebpfManager.environment) //TODO ben just for dev. Remove later!
+	//ebpfManager.createRestInterface(&ebpfManager.environment) //TODO ben just for dev. Remove later!
 
 	return ebpfManager
 }
 
-func (e *EbpfManager) ActivateFirewall() {
-	e.firewallManager = firewall.NewFirewallManager()
-
-	// Attach firewall to all currently active deployments
-	vethList := (e.environment).GetDeployedServicesVeths()
-	for _, vethName := range vethList {
-		e.firewallManager.AttachFirewall(vethName.Name)
+func (e *EbpfManager) createNewEbpf() {
+	// Load the plugin
+	plug, err := plugin.Open("ebpfManager/ebpf/firewall/firewall.so")
+	if err != nil {
+		panic(err)
 	}
 
-	// TODO ben deregister callback when firewall is deactivated or object is deconstructed!
-	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
-		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
-			e.firewallManager.AttachFirewall(payload.Name)
-		}
-	})
+	// Lookup the symbol for NewGreeter
+	sym, err := plug.Lookup("New")
+	if err != nil {
+		panic(err)
+	}
+
+	newModule, ok := sym.(func() ebpf.EbpfModule)
+	if !ok {
+		panic("Invalid function signature")
+	}
+
+	subRouter := e.router.PathPrefix("/firewall").Subrouter()
+
+	// Use the interface
+	firewall := newModule()
+	firewall.Configure("test", subRouter)
+	firewall.NewInterfaceCreated("test")
 }
+
+//func (e *EbpfManager) ActivateFirewall() {
+//	e.firewallManager = firewall.NewFirewallManager()
+//
+//	// Attach firewall to all currently active deployments
+//	vethList := (e.environment).GetDeployedServicesVeths()
+//	for _, vethName := range vethList {
+//		e.firewallManager.AttachFirewall(vethName.Name)
+//	}
+//
+//	// TODO ben deregister callback when firewall is deactivated or object is deconstructed!
+//	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
+//		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
+//			e.firewallManager.AttachFirewall(payload.Name)
+//		}
+//	})
+//}
 
 // TODO ben store for later
 //func attachFirewall(c *gin.Context) {
@@ -90,5 +121,5 @@ func (e *EbpfManager) ActivateFirewall() {
 //defer netns.Set(originalNS) // Revert to the original namespace before exit.
 //
 //	fw := firewall.New()
-//	fw.LoadAndAttach("br0")
+//	fw.NewInterfaceCreated("br0")
 //}
