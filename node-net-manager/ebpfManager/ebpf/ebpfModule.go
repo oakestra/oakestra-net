@@ -2,9 +2,19 @@ package ebpf
 
 import "github.com/gorilla/mux"
 
-type EbpfModule interface {
+type Config struct {
+	Name   string      `json:"name"`
+	Config interface{} `json:"config"`
+}
+
+type Module struct {
+	Id     string `json:"id"`
+	Config Config `json:"config"`
+}
+
+type ModuleInterface interface {
 	// Configure Pass its configuration to the module. This is usually the first method to be called.
-	Configure(config string, router *mux.Router) // TODO ben later not a string anymore
+	Configure(config Config, router *mux.Router) // TODO ben later not a string anymore
 
 	// NewInterfaceCreated notifies the ebpf module that a new interface (+ service) was created
 	NewInterfaceCreated(ifname string) error

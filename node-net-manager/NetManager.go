@@ -47,7 +47,9 @@ func handleRequests(port int) {
 	netRouter.HandleFunc("/docker/deploy", dockerDeploy).Methods("POST")
 
 	// TODO ben put to a more suitable place. Where is the best place to initialise the ebpf manager?
-	var _ = ebpfManager.New(&Env, netRouter)
+
+	ebpfRouter := netRouter.PathPrefix("/ebpf").Subrouter()
+	var _ = ebpfManager.New(ebpfRouter)
 
 	handlers.RegisterAllManagers(&Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))

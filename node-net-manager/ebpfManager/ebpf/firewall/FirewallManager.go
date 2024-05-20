@@ -12,6 +12,7 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go firewall firewall.c
 
 type FirewallManager struct {
+	ebpf.Module
 	// maps interface name to firewall
 	firewalls map[string]Firewall
 }
@@ -29,7 +30,7 @@ func (e *FirewallManager) removeFirewall(ifname string) {
 	}
 }
 
-func (e *FirewallManager) Configure(config string, router *mux.Router) {
+func (e *FirewallManager) Configure(config ebpf.Config, router *mux.Router) {
 	router.HandleFunc("/rule", func(writer http.ResponseWriter, request *http.Request) {
 		type FirewallRequest struct {
 			Proto   string `json:"proto"`
@@ -78,8 +79,9 @@ func (e *FirewallManager) DestroyModule() error {
 	return nil
 }
 
-func New() ebpf.EbpfModule {
+func New() ebpf.ModuleInterface {
 	return &FirewallManager{
+		Module:    ebpf.Module{},
 		firewalls: make(map[string]Firewall),
 	}
 }

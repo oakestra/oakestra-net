@@ -2,23 +2,20 @@ package ebpfManager
 
 import (
 	"NetManager/ebpfManager/ebpf"
-	"NetManager/env"
-	"github.com/cilium/ebpf/rlimit"
-	"github.com/gorilla/mux"
+	"errors"
+	"fmt"
 	"log"
 	"plugin"
+
+	"github.com/cilium/ebpf/rlimit"
+	"github.com/gorilla/mux"
 )
 
 //go:generate ./generate_ebpf.sh
 
 type EbpfManager struct {
-	router *mux.Router
-}
-
-var ebpfManager EbpfManager
-
-func init() {
-	ebpfManager = EbpfManager{}
+	router      *mux.Router
+	ebpfModules []ebpf.ModuleInterface
 }
 
 type FirewallRequest struct {
@@ -29,44 +26,55 @@ type FirewallRequest struct {
 	DstPort uint16 `json:"dstPort"`
 }
 
-func New(env *env.Environment, router *mux.Router) EbpfManager {
+func New(router *mux.Router) EbpfManager {
 	if err := rlimit.RemoveMemlock(); err != nil { // TODO ben what if multiple created?
 		log.Fatal("Removing memlock:", err)
 	}
 
 	ebpfManager := EbpfManager{
-		router: router,
+		router:      router,
+		ebpfModules: make([]ebpf.ModuleInterface, 0),
 	}
 
-	//ebpfManager.createRestInterface(&ebpfManager.environment) //TODO ben just for dev. Remove later!
+	ebpfManager.RegisterHandles()
 
 	return ebpfManager
 }
 
-func (e *EbpfManager) createNewEbpf() {
-	// Load the plugin
-	plug, err := plugin.Open("ebpfManager/ebpf/firewall/firewall.so")
-	if err != nil {
-		panic(err)
+func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
+	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
+
+	if !fileExists(objectPath) {
+		// todo return err
+		return errors.New("no ebpf mpodule installed with this name")
 	}
 
-	// Lookup the symbol for NewGreeter
+	// Load the plugin
+	plug, err := plugin.Open(objectPath)
+	if err != nil {
+		return errors.New("there was an error loading the ebpf module")
+	}
+
+	// every ebpfModule should support a New() method to create an instance of the module
 	sym, err := plug.Lookup("New")
 	if err != nil {
-		panic(err)
+		// todo return err
+		return errors.New("the ebpf module does not adhear to the expected interface")
 	}
 
-	newModule, ok := sym.(func() ebpf.EbpfModule)
+	newModule, ok := sym.(func() ebpf.ModuleInterface)
 	if !ok {
-		panic("Invalid function signature")
+		return errors.New("the ebpf module does not adhear to the expected interface")
 	}
 
-	subRouter := e.router.PathPrefix("/firewall").Subrouter()
+	subRouter := e.router.PathPrefix(fmt.Sprintf("/%s", config.Name)).Subrouter()
 
 	// Use the interface
 	firewall := newModule()
-	firewall.Configure("test", subRouter)
-	firewall.NewInterfaceCreated("test")
+	firewall.Configure(config, subRouter)
+	e.ebpfModules = append(e.ebpfModules, firewall)
+	// firewall.NewInterfaceCreated("test")
+	return nil
 }
 
 //func (e *EbpfManager) ActivateFirewall() {
