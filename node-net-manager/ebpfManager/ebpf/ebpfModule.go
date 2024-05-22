@@ -7,12 +7,13 @@ type Config struct {
 	Config interface{} `json:"config"`
 }
 
-type Module struct {
-	Id     string `json:"id"`
-	Config Config `json:"config"`
-}
-
+// ModuleInterface defines the interface of a ebpf Module that can be plugged into the NetManager at runtime
+// additionally the NetManager expects a 'New() ebpf.ModuleInterface' function to be implemented.
 type ModuleInterface interface {
+
+	// GetConfig returns the modul's configuration
+	GetConfig() Config
+
 	// Configure Pass its configuration to the module. This is usually the first method to be called.
 	Configure(config Config, router *mux.Router) // TODO ben later not a string anymore
 

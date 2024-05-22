@@ -46,7 +46,7 @@ func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
 
 	if !fileExists(objectPath) {
 		// todo return err
-		return errors.New("no ebpf mpodule installed with this name")
+		return errors.New("no ebpf module installed with this name")
 	}
 
 	// Load the plugin
@@ -59,12 +59,12 @@ func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
 	sym, err := plug.Lookup("New")
 	if err != nil {
 		// todo return err
-		return errors.New("the ebpf module does not adhear to the expected interface")
+		return errors.New("the ebpf module does not adhere to the expected interface")
 	}
 
 	newModule, ok := sym.(func() ebpf.ModuleInterface)
 	if !ok {
-		return errors.New("the ebpf module does not adhear to the expected interface")
+		return errors.New("the ebpf module does not adhere to the expected interface")
 	}
 
 	subRouter := e.router.PathPrefix(fmt.Sprintf("/%s", config.Name)).Subrouter()

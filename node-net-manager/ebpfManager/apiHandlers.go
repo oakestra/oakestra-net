@@ -8,6 +8,11 @@ import (
 	"net/http"
 )
 
+type ModuleModel struct {
+	ID     int         `json:"id"`
+	Config ebpf.Config `json:"config"`
+}
+
 func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP POST request - /ebpf ")
 
@@ -27,10 +32,10 @@ func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Reque
 
 func (e *EbpfManager) getEbpfModules(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP GET request - /ebpf ")
-
+	modules := mapInterfaceToModule(e.ebpfModules) // This function should be implemented to retrieve moduleInterface data
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
-	jsonResponse, err := json.Marshal(e.ebpfModules)
+	jsonResponse, err := json.Marshal(modules)
 	if err != nil {
 		return
 	}
