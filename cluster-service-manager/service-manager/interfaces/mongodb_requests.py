@@ -192,7 +192,8 @@ def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instanc
         },return_document=True
     )
     #return only the updated instance
-    document['instance_list'] = [{'instance_number': instance_number, 'namespace_ip': ns_ip, 'namespace_ip_v6': ns_ipv6, 'host_ip': host_ip, 'host_port': int(host_port), 'worker_id': node_id}]
+    if document is not None:
+        document['instance_list'] = [{'instance_number': instance_number, 'namespace_ip': ns_ip, 'namespace_ip_v6': ns_ipv6, 'host_ip': host_ip, 'host_port': int(host_port), 'worker_id': node_id}]
     return document
 
 
@@ -231,10 +232,11 @@ def mongo_remove_interest(job_name, clientid):
     interested_nodes = mongo_get_interest_workers(job_name)
     if interested_nodes is not None:
         if len(interested_nodes) > 0:
-            interested_nodes.remove(clientid)
-            mongo_jobs.db.jobs.update_one(
-                {'job_name': job_name},
-                {'$set': {
-                    "interested_nodes": interested_nodes
-                }}
-            )
+            if clientid in interested_nodes:
+                interested_nodes.remove(clientid)
+                mongo_jobs.db.jobs.update_one(
+                    {'job_name': job_name},
+                    {'$set': {
+                        "interested_nodes": interested_nodes
+                    }}
+                )
