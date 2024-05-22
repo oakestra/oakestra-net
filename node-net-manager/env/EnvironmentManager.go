@@ -153,7 +153,7 @@ func NewEnvironmentClusterConfigured(proxyname string) *Environment {
 	config := Configuration{
 		HostBridgeName:             "goProxyBridge",
 		HostBridgeIP:               network.NextIPv4(net.ParseIP(ipv4_subnet), 1).String(),
-		HostBridgeMask:             "/26",
+		HostBridgeMask:             "/24",
 		HostBridgeIPv6:             network.NextIPv6(net.ParseIP(ipv6_subnet), 1).String(),
 		HostBridgeIPv6Prefix:       "/120",
 		HostTunName:                "goProxyTun",
