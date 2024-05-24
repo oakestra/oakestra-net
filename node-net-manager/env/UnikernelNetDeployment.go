@@ -90,11 +90,21 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
+	// generate a new ipv6 address for compatibility reasons. But Unikernels do not support IPv6
+	ipv6, err := env.generateIPv6Address()
+	if err != nil {
+		cleanup(vethIfce)
+		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
+		return nil, nil, err
+	}
+
 	// Set IP for veth interface
 	if err := env.addPeerLinkNetworkByNsName(sname, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
 		logger.DebugLogger().Println("Unable to configure Peer")
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
 
@@ -154,6 +164,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		logger.DebugLogger().Printf("Failed to configure Ns for Unikernel\n")
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
 
@@ -162,6 +173,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
 
@@ -169,19 +181,21 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		debug.PrintStack()
 		cleanup(vethIfce)
 		env.freeContainerAddress(ip)
+		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
 
 	env.deployedServicesLock.Lock()
 	env.deployedServices[sname] = service{
 		ip:          ip,
+		ipv6:        ipv6,
 		sname:       name,
 		portmapping: portmapping,
 		veth:        vethIfce,
 	}
 	env.deployedServicesLock.Unlock()
 	logger.DebugLogger().Println("Successful Network creation for Unikernel")
-	return ip, nil, nil
+	return ip, ipv6, nil
 }
 
 func (env *Environment) DeleteUnikernelNamespace(sname string, instance int) {
@@ -193,6 +207,7 @@ func (env *Environment) DeleteUnikernelNamespace(sname string, instance int) {
 		delete(env.deployedServices, name)
 		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
+		env.freeContainerAddress(s.ipv6)
 		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.veth)
 		_ = netns.DeleteNamed(name)
