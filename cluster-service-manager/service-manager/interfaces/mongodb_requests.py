@@ -80,6 +80,22 @@ def mongo_remove_job(job_name):
     mongo_jobs.db.jobs.delete_one({"job_name": job_name})
 
 
+def mongo_remove_job_by_sip(service_ip_list):
+    global mongo_jobs
+    addrlist = []
+    addrv6list = []
+
+    for sip in service_ip_list:
+        addrlist.append(sip.get('Address'))
+        addrv6list.append(sip.get('Address_v6'))
+
+    mongo_jobs.db.jobs.delete_many(
+        {"$or": [
+            {"service_ip_list.Address": addrlist},
+            {"service_ip_list.Address_v6": addrv6list}
+        ]})
+
+
 def mongo_update_job(job):
     if job is None:
         return

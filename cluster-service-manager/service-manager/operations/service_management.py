@@ -14,6 +14,10 @@ def create_service(job_name):
     # table query the root to get the instances
     try:
         job = root_service_manager_requests.cloud_table_query_service_name(job_name)
+        
+        # cleanup pre-existing service with same addresses, root service manager is the source of truth
+        mongo_remove_job_by_sip(job.get('service_ip_list'))
+
         mongodb_requests.mongo_insert_job(copy.deepcopy(job))
         for instance in job.get('instance_list'):
             mongo_update_job_instance(job_name, instance)

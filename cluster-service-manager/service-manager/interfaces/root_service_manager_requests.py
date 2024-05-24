@@ -78,6 +78,7 @@ def cloud_table_query_service_name(name):
     except requests.exceptions.RequestException as e:
         logging.error(e)
         logging.error("Calling System Manager /api/job/../instances not successful.")
+        return None
 
 
 def cloud_remove_interest(job_name):
