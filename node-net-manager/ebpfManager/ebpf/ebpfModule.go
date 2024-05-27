@@ -1,21 +1,36 @@
 package ebpf
 
-import "github.com/gorilla/mux"
+import (
+	"NetManager/ebpfManager"
+	"github.com/gorilla/mux"
+)
 
 type Config struct {
 	Name   string      `json:"name"`
 	Config interface{} `json:"config"`
 }
 
-// ModuleInterface defines the interface of a ebpf Module that can be plugged into the NetManager at runtime
+// ModuleBase represents the attributes that every ebpf ModuleBase has. Every Implementation of an ebpf ModuleBase should
+// embed the ModuleBase struct
+type ModuleBase struct {
+	Id       uint   `json:"id"`
+	Config   Config `json:"config"`
+	Priority uint   `json:"priority"`
+	Active   bool   `json:"active"`
+	FDin     uint32
+	FDout    uint32
+}
+
+// ModuleInterface defines the interface of an ebpf ModuleBase that can be plugged into the NetManager at runtime
 // additionally the NetManager expects a 'New() ebpf.ModuleInterface' function to be implemented.
 type ModuleInterface interface {
 
-	// GetConfig returns the modul's configuration
-	GetConfig() Config
+	// GetModule returns ModuleBase struct
+	GetModule() ModuleBase
 
 	// Configure Pass its configuration to the module. This is usually the first method to be called.
-	Configure(config Config, router *mux.Router) // TODO ben later not a string anymore
+	// TODO Ben give manager functions like "register API" such that a ebpfModule gets independent of the underlaying HTTP implementation
+	Configure(config Config, router *mux.Router, manager *ebpfManager.EbpfManager)
 
 	// NewInterfaceCreated notifies the ebpf module that a new interface (+ service) was created
 	NewInterfaceCreated(ifname string) error

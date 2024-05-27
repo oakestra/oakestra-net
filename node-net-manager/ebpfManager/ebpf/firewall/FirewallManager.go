@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NetManager/ebpfManager"
 	"NetManager/ebpfManager/ebpf"
 	"encoding/json"
 	"github.com/gorilla/mux"
@@ -12,9 +13,10 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go firewall firewall.c
 
 type FirewallManager struct {
+	ebpf.ModuleBase
 	// maps interface name to firewall
-	config    ebpf.Config
 	firewalls map[string]Firewall
+	manager   *ebpfManager.EbpfManager
 }
 
 func New() ebpf.ModuleInterface {
@@ -23,12 +25,13 @@ func New() ebpf.ModuleInterface {
 	}
 }
 
-func (e *FirewallManager) GetConfig() ebpf.Config {
-	return e.config
+func (f *FirewallManager) GetModule() ebpf.ModuleBase {
+	return f.ModuleBase
 }
 
-func (e *FirewallManager) Configure(config ebpf.Config, router *mux.Router) {
-	e.config = config
+func (f *FirewallManager) Configure(config ebpf.Config, router *mux.Router, manager *ebpfManager.EbpfManager) {
+	f.ModuleBase.Config = config
+	f.manager = manager
 	router.HandleFunc("/rule", func(writer http.ResponseWriter, request *http.Request) {
 		type FirewallRequest struct {
 			Proto   string `json:"proto"`
@@ -56,37 +59,38 @@ func (e *FirewallManager) Configure(config ebpf.Config, router *mux.Router) {
 			proto = ICMP
 		}
 
-		e.AddFirewallRule(src, dst, proto, firewallRequest.SrcPort, firewallRequest.DstPort)
+		f.AddFirewallRule(src, dst, proto, firewallRequest.SrcPort, firewallRequest.DstPort)
 
 		writer.WriteHeader(http.StatusOK)
 	})
 }
 
-func (e *FirewallManager) NewInterfaceCreated(ifname string) error {
+// TODO ben instead of creating one function per Event, pass a Event channel to the module that emits all events
+func (f *FirewallManager) NewInterfaceCreated(ifname string) error {
 	firewall := NewFirewall()
 	firewall.Load()
-	firewall.AttachTC(ifname)
-	e.firewalls[ifname] = firewall
+	f.manager.RequestAttach(ifname, f)
+	f.firewalls[ifname] = firewall
 	return nil
 }
 
-func (e *FirewallManager) DestroyModule() error {
-	for ifname := range e.firewalls {
-		e.removeFirewall(ifname)
+func (f *FirewallManager) DestroyModule() error {
+	for ifname := range f.firewalls {
+		f.removeFirewall(ifname)
 	}
 	return nil
 }
 
-func (e *FirewallManager) AddFirewallRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPort uint16, dstPort uint16) {
-	for _, fw := range e.firewalls {
+func (f *FirewallManager) AddFirewallRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPort uint16, dstPort uint16) {
+	for _, fw := range f.firewalls {
 		fw.AddRule(srcIp, dstIp, proto, srcPort, dstPort)
 	}
 }
 
-func (e *FirewallManager) removeFirewall(ifname string) {
-	if fw, exists := e.firewalls[ifname]; exists {
+func (f *FirewallManager) removeFirewall(ifname string) {
+	if fw, exists := f.firewalls[ifname]; exists {
 		fw.Close()
-		delete(e.firewalls, ifname)
+		delete(f.firewalls, ifname)
 	}
 }
 

@@ -4,7 +4,12 @@ import (
 	"NetManager/ebpfManager/ebpf"
 	"errors"
 	"fmt"
+	"github.com/florianl/go-tc"
+	"github.com/florianl/go-tc/core"
+	"golang.org/x/sys/unix"
 	"log"
+	"net"
+	"os"
 	"plugin"
 
 	"github.com/cilium/ebpf/rlimit"
@@ -14,8 +19,12 @@ import (
 //go:generate ./generate_ebpf.sh
 
 type EbpfManager struct {
-	router      *mux.Router
-	ebpfModules []ebpf.ModuleInterface
+	router          *mux.Router
+	ebpfModules     map[uint]ebpf.ModuleInterface // TODO ben maybe its better to use a list that is sorted by priorities?
+	Tcnl            *tc.Tc
+	Qdisc           tc.Object
+	currentPriority int
+	nextId          uint
 }
 
 type FirewallRequest struct {
@@ -33,12 +42,22 @@ func New(router *mux.Router) EbpfManager {
 
 	ebpfManager := EbpfManager{
 		router:      router,
-		ebpfModules: make([]ebpf.ModuleInterface, 0),
+		ebpfModules: make(map[uint]ebpf.ModuleInterface, 0),
 	}
 
+	ebpfManager.init()
 	ebpfManager.RegisterHandles()
 
 	return ebpfManager
+}
+
+func (e *EbpfManager) init() {
+	tcnl, err := tc.Open(&tc.Config{})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not open rtnetlink socket: %v\n", err)
+		return // TODO ben return error
+	}
+	e.Tcnl = tcnl
 }
 
 func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
@@ -70,10 +89,92 @@ func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
 	subRouter := e.router.PathPrefix(fmt.Sprintf("/%s", config.Name)).Subrouter()
 
 	// Use the interface
-	firewall := newModule()
-	firewall.Configure(config, subRouter)
-	e.ebpfModules = append(e.ebpfModules, firewall)
-	// firewall.NewInterfaceCreated("test")
+	module := newModule()
+	module.Configure(config, subRouter, e)
+
+	base := module.GetModule()
+	base.Id = e.nextId
+	e.ebpfModules[e.nextId] = module
+	e.nextId += 1
+
+	return nil
+}
+
+// RequestAttach can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
+func (e *EbpfManager) RequestAttach(ifname string, ebpfModule ebpf.ModuleInterface) error {
+	module := ebpfModule.GetModule()
+	// TODO ben check if tcln != null ??
+	iface, err := net.InterfaceByName(ifname)
+	if err != nil {
+		log.Fatalf("Getting interface %s: %s", ifname, err)
+	}
+
+	qdisc := tc.Object{
+		Msg: tc.Msg{
+			Family:  unix.AF_UNSPEC,
+			Ifindex: uint32(iface.Index),
+			Handle:  core.BuildHandle(tc.HandleRoot, 0x0000),
+			Parent:  tc.HandleIngress,
+			Info:    0,
+		},
+		Attribute: tc.Attribute{
+			Kind: "clsact",
+		},
+	}
+	e.Qdisc = qdisc
+
+	if err := e.Tcnl.Qdisc().Add(&qdisc); err != nil {
+		fmt.Fprintf(os.Stderr, "could not assign clsact to %s: %v\n", ifname, err)
+		return nil
+	}
+
+	flagsIn := uint32(0x1)
+	ingressFilter := tc.Object{
+		tc.Msg{
+			Family:  unix.AF_UNSPEC,
+			Ifindex: uint32(iface.Index),
+			Handle:  0,
+			Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinIngress),
+			Info:    uint32(e.currentPriority << 16),
+		},
+		tc.Attribute{
+			Kind: "bpf",
+			BPF: &tc.Bpf{
+				FD:    &module.FDin,
+				Flags: &flagsIn,
+			},
+		},
+	}
+	e.currentPriority += 1
+
+	flagsEg := uint32(0x1)
+	egressFilter := tc.Object{
+		tc.Msg{
+			Family:  unix.AF_UNSPEC,
+			Ifindex: uint32(iface.Index),
+			Handle:  0,
+			Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinEgress),
+			Info:    uint32(e.currentPriority << 16),
+		},
+		tc.Attribute{
+			Kind: "bpf",
+			BPF: &tc.Bpf{
+				FD:    &module.FDout,
+				Flags: &flagsEg,
+			},
+		},
+	}
+
+	if err := e.Tcnl.Filter().Replace(&ingressFilter); err != nil {
+		fmt.Fprintf(os.Stderr, "could not attach ingress filter for eBPF program: %v\n", err)
+		return nil
+	}
+
+	if err := e.Tcnl.Filter().Replace(&egressFilter); err != nil {
+		fmt.Fprintf(os.Stderr, "could not attach egress filter for eBPF program: %v\n", err)
+		return nil
+	}
+
 	return nil
 }
 
