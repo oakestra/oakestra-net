@@ -18,17 +18,10 @@ func fileExists(filename string) bool {
 	return !info.IsDir() // Ensure the path is not a directory
 }
 
-func mapInterfaceToModule(index int, module ebpf.ModuleInterface) ModuleModel {
-	model := ModuleModel{}
-	model.ID = index // id is just the index in the list
-	model.Config = module.GetConfig()
-	return model
-}
-
-func mapInterfacesToModules(modules []ebpf.ModuleInterface) []ModuleModel {
-	mapped := make([]ModuleModel, len(modules))
+func mapInterfacesToModules(modules []ebpf.ModuleInterface) []ebpf.ModuleBase {
+	mapped := make([]ebpf.ModuleBase, len(modules))
 	for i, module := range modules {
-		mapped[i] = mapInterfaceToModule(i, module)
+		mapped[i] = module.GetModule()
 	}
 	return mapped
 }

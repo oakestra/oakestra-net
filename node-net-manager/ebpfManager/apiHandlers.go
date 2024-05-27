@@ -58,7 +58,7 @@ func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Re
 		fmt.Fprintf(writer, "no firewall with id %s exists", moduleId)
 		return
 	}
-	module := mapInterfaceToModule(id, e.ebpfModules[id])
+	module := e.ebpfModules[id]
 	jsonResponse, err := json.Marshal(module)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)

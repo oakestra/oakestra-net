@@ -20,7 +20,7 @@ import (
 
 type EbpfManager struct {
 	router          *mux.Router
-	ebpfModules     map[uint]ebpf.ModuleInterface // TODO ben maybe its better to use a list that is sorted by priorities?
+	ebpfModules     []ebpf.ModuleInterface // TODO ben maybe its better to use a list that is sorted by priorities?
 	Tcnl            *tc.Tc
 	Qdisc           tc.Object
 	currentPriority int
@@ -42,7 +42,7 @@ func New(router *mux.Router) EbpfManager {
 
 	ebpfManager := EbpfManager{
 		router:      router,
-		ebpfModules: make(map[uint]ebpf.ModuleInterface, 0),
+		ebpfModules: make([]ebpf.ModuleInterface, 0),
 	}
 
 	ebpfManager.init()
