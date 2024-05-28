@@ -1,7 +1,6 @@
 package ebpfManager
 
 import (
-	"NetManager/ebpfManager/ebpf"
 	"os"
 )
 
@@ -18,15 +17,15 @@ func fileExists(filename string) bool {
 	return !info.IsDir() // Ensure the path is not a directory
 }
 
-func mapInterfacesToModules(modules []ebpf.ModuleInterface) []ebpf.ModuleBase {
-	mapped := make([]ebpf.ModuleBase, len(modules))
+func mapInterfacesToModules(modules []ModuleInterface) []ModuleBase {
+	mapped := make([]ModuleBase, len(modules))
 	for i, module := range modules {
 		mapped[i] = *module.GetModule()
 	}
 	return mapped
 }
 
-func getModuleBaseById(modules []ebpf.ModuleInterface, id uint) *ebpf.ModuleBase {
+func getModuleBaseById(modules []ModuleInterface, id uint) *ModuleBase {
 	for _, module := range modules {
 		if module.GetModule().Id == id {
 			return module.GetModule()

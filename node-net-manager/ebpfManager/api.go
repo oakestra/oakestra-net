@@ -1,7 +1,6 @@
 package ebpfManager
 
 import (
-	"NetManager/ebpfManager/ebpf"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
@@ -12,15 +11,15 @@ import (
 )
 
 type ModuleModel struct {
-	ID     int         `json:"id"`
-	Config ebpf.Config `json:"config"`
+	ID     int    `json:"id"`
+	Config Config `json:"config"`
 }
 
 func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP POST request - /ebpf ")
 
 	reqBody, _ := io.ReadAll(request.Body)
-	var config ebpf.Config
+	var config Config
 	err := json.Unmarshal(reqBody, &config)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -52,16 +51,12 @@ func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Re
 	vars := mux.Vars(request)
 	moduleId := vars["id"]
 	id, err := strconv.Atoi(moduleId)
-	if err != nil || id > len(e.ebpfModules)-1 {
-		writer.WriteHeader(http.StatusBadRequest)
-		writer.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(writer, "no firewall with id %s exists", moduleId)
-		return
-	}
 
 	module := getModuleBaseById(e.ebpfModules, uint(id))
 	if module == nil {
 		writer.WriteHeader(http.StatusNotFound)
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "no ebpf modle with id %s exists", moduleId)
 		return
 	}
 

@@ -1,0 +1,45 @@
+//go:build ignore
+
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/icmp.h>
+#include <linux/udp.h>
+#include <linux/tcp.h>
+#include <netinet/in.h>
+#include <bpf/bpf_endian.h>
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+#include <linux/pkt_cls.h>
+
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __type(key, __u32);
+    __type(value, __u64);
+    __uint(max_entries, 2);
+} pkt_count SEC(".maps");
+
+SEC("classifier")
+int handle_ingress(struct __sk_buff *skb)
+{
+    __u32 key    = 0;
+    __u64 *count = bpf_map_lookup_elem(&pkt_count, &key);
+    if (count) {
+        __sync_fetch_and_add(count, 1);
+    }
+    return TC_ACT_OK;
+}
+
+SEC("classifier")
+int handle_egress(struct __sk_buff *skb)
+{
+    __u32 key    = 1;
+    __u64 *count = bpf_map_lookup_elem(&pkt_count, &key);
+    if (count) {
+        __sync_fetch_and_add(count, 1);
+    }
+    return TC_ACT_OK;
+}
+
+char _license[] SEC("license") = "GPL";

@@ -1,7 +1,7 @@
 package ebpfManager
 
 import (
-	"NetManager/ebpfManager/ebpf"
+	"NetManager/events"
 	"errors"
 	"fmt"
 	"github.com/florianl/go-tc"
@@ -20,7 +20,7 @@ import (
 
 type EbpfManager struct {
 	router          *mux.Router
-	ebpfModules     []ebpf.ModuleInterface // TODO ben maybe its better to use a list that is sorted by priorities?
+	ebpfModules     []ModuleInterface // TODO ben maybe its better to use a list that is sorted by priorities?
 	Tcnl            *tc.Tc
 	Qdisc           tc.Object
 	currentPriority int
@@ -42,7 +42,7 @@ func New(router *mux.Router) EbpfManager {
 
 	ebpfManager := EbpfManager{
 		router:      router,
-		ebpfModules: make([]ebpf.ModuleInterface, 0),
+		ebpfModules: make([]ModuleInterface, 0),
 	}
 
 	ebpfManager.init()
@@ -58,9 +58,18 @@ func (e *EbpfManager) init() {
 		return // TODO ben return error
 	}
 	e.Tcnl = tcnl
+
+	// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
+	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
+		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
+			for _, module := range e.ebpfModules {
+				module.NewInterfaceCreated(payload.Name)
+			}
+		}
+	})
 }
 
-func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
+func (e *EbpfManager) createNewEbpf(config Config) error {
 	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
 
 	if !fileExists(objectPath) {
@@ -81,7 +90,7 @@ func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
 		return errors.New("the ebpf module does not adhere to the expected interface")
 	}
 
-	newModule, ok := sym.(func() ebpf.ModuleInterface)
+	newModule, ok := sym.(func() ModuleInterface)
 	if !ok {
 		return errors.New("the ebpf module does not adhere to the expected interface")
 	}
@@ -94,15 +103,14 @@ func (e *EbpfManager) createNewEbpf(config ebpf.Config) error {
 
 	base := module.GetModule()
 	base.Id = e.nextId
-	e.ebpfModules[e.nextId] = module
+	e.ebpfModules = append(e.ebpfModules, module)
 	e.nextId += 1
 
 	return nil
 }
 
 // RequestAttach can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
-func (e *EbpfManager) RequestAttach(ifname string, ebpfModule ebpf.ModuleInterface) error {
-	module := ebpfModule.GetModule()
+func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress uint32) error {
 	// TODO ben check if tcln != null ??
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
@@ -140,7 +148,7 @@ func (e *EbpfManager) RequestAttach(ifname string, ebpfModule ebpf.ModuleInterfa
 		tc.Attribute{
 			Kind: "bpf",
 			BPF: &tc.Bpf{
-				FD:    &module.FDin,
+				FD:    &fdIngress,
 				Flags: &flagsIn,
 			},
 		},
@@ -159,7 +167,7 @@ func (e *EbpfManager) RequestAttach(ifname string, ebpfModule ebpf.ModuleInterfa
 		tc.Attribute{
 			Kind: "bpf",
 			BPF: &tc.Bpf{
-				FD:    &module.FDout,
+				FD:    &fdEgress,
 				Flags: &flagsEg,
 			},
 		},
