@@ -3,8 +3,9 @@ package main
 import (
 	"NetManager/ebpfManager"
 	"fmt"
-	"github.com/gorilla/mux"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go packetCounter packetCounter.c
@@ -35,10 +36,15 @@ func (p *PacketCounterManager) Configure(config ebpfManager.Config, router *mux.
 
 // TODO ben instead of creating one function per Event, pass a Event channel to the module that emits all events
 func (p *PacketCounterManager) NewInterfaceCreated(ifname string) error {
+	fmt.Printf("TODO ben 1\n")
 	pc := NewPacketCounter(ifname)
+	fmt.Printf("TODO ben 2\n")
 	pc.Load()
+	fmt.Printf("TODO ben 3\n")
+
 	fdIn := uint32(pc.packetCounterObjects.HandleIngress.FD())
 	fdEg := uint32(pc.packetCounterObjects.HandleEgress.FD())
+	fmt.Printf("TODO ben %d\n", pc.packetCounterObjects.packetCounterPrograms.HandleIngress.FD())
 	p.manager.RequestAttach(ifname, fdIn, fdEg)
 	p.counters[ifname] = pc
 	return nil

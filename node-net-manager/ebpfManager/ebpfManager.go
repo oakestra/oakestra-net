@@ -4,16 +4,15 @@ import (
 	"NetManager/events"
 	"errors"
 	"fmt"
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
+	"github.com/gorilla/mux"
 	"golang.org/x/sys/unix"
 	"log"
 	"net"
 	"os"
 	"plugin"
-
-	"github.com/cilium/ebpf/rlimit"
-	"github.com/gorilla/mux"
 )
 
 //go:generate ./generate_ebpf.sh
@@ -21,7 +20,7 @@ import (
 type EbpfManager struct {
 	router          *mux.Router
 	ebpfModules     []ModuleInterface // TODO ben maybe its better to use a list that is sorted by priorities?
-	Tcnl            *tc.Tc
+	Tcnl            tc.Tc
 	Qdisc           tc.Object
 	currentPriority int
 	nextId          uint
@@ -57,7 +56,7 @@ func (e *EbpfManager) init() {
 		fmt.Fprintf(os.Stderr, "could not open rtnetlink socket: %v\n", err)
 		return // TODO ben return error
 	}
-	e.Tcnl = tcnl
+	e.Tcnl = *tcnl
 
 	// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
 	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
@@ -112,11 +111,12 @@ func (e *EbpfManager) createNewEbpf(config Config) error {
 // RequestAttach can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
 func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress uint32) error {
 	// TODO ben check if tcln != null ??
+	fmt.Printf("TODO ben 4\n")
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		log.Fatalf("Getting interface %s: %s", ifname, err)
 	}
-
+	fmt.Printf("TODO ben 5\n")
 	qdisc := tc.Object{
 		Msg: tc.Msg{
 			Family:  unix.AF_UNSPEC,
@@ -130,7 +130,7 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 		},
 	}
 	e.Qdisc = qdisc
-
+	fmt.Printf("TODO ben 6\n")
 	if err := e.Tcnl.Qdisc().Add(&qdisc); err != nil {
 		fmt.Fprintf(os.Stderr, "could not assign clsact to %s: %v\n", ifname, err)
 		return nil
@@ -153,7 +153,6 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 			},
 		},
 	}
-	e.currentPriority += 1
 
 	flagsEg := uint32(0x1)
 	egressFilter := tc.Object{
@@ -172,7 +171,8 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 			},
 		},
 	}
-
+	e.currentPriority += 1
+	fmt.Printf("TODO ben 7\n")
 	if err := e.Tcnl.Filter().Replace(&ingressFilter); err != nil {
 		fmt.Fprintf(os.Stderr, "could not attach ingress filter for eBPF program: %v\n", err)
 		return nil
@@ -182,7 +182,7 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 		fmt.Fprintf(os.Stderr, "could not attach egress filter for eBPF program: %v\n", err)
 		return nil
 	}
-
+	fmt.Printf("TODO ben 8\n")
 	return nil
 }
 
