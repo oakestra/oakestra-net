@@ -25,8 +25,8 @@ func New() ebpf.ModuleInterface {
 	}
 }
 
-func (f *FirewallManager) GetModule() ebpf.ModuleBase {
-	return f.ModuleBase
+func (f *FirewallManager) GetModule() *ebpf.ModuleBase {
+	return &f.ModuleBase
 }
 
 func (f *FirewallManager) Configure(config ebpf.Config, router *mux.Router, manager *ebpfManager.EbpfManager) {

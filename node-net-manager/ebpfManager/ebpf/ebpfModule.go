@@ -26,7 +26,7 @@ type ModuleBase struct {
 type ModuleInterface interface {
 
 	// GetModule returns ModuleBase struct
-	GetModule() ModuleBase
+	GetModule() *ModuleBase
 
 	// Configure Pass its configuration to the module. This is usually the first method to be called.
 	// TODO Ben give manager functions like "register API" such that a ebpfModule gets independent of the underlaying HTTP implementation

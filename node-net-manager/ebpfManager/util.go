@@ -21,7 +21,16 @@ func fileExists(filename string) bool {
 func mapInterfacesToModules(modules []ebpf.ModuleInterface) []ebpf.ModuleBase {
 	mapped := make([]ebpf.ModuleBase, len(modules))
 	for i, module := range modules {
-		mapped[i] = module.GetModule()
+		mapped[i] = *module.GetModule()
 	}
 	return mapped
+}
+
+func getModuleBaseById(modules []ebpf.ModuleInterface, id uint) *ebpf.ModuleBase {
+	for _, module := range modules {
+		if module.GetModule().Id == id {
+			return module.GetModule()
+		}
+	}
+	return nil
 }

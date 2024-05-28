@@ -35,7 +35,7 @@ func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Reque
 
 func (e *EbpfManager) getEbpfModules(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP GET request - /ebpf")
-	modules := mapInterfacesToModules(e.ebpfModules) // This function should be implemented to retrieve moduleInterface data
+	modules := mapInterfacesToModules(e.ebpfModules)
 	jsonResponse, err := json.Marshal(modules)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -58,14 +58,21 @@ func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Re
 		fmt.Fprintf(writer, "no firewall with id %s exists", moduleId)
 		return
 	}
-	module := e.ebpfModules[id]
+
+	module := getModuleBaseById(e.ebpfModules, uint(id))
+	if module == nil {
+		writer.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	jsonResponse, err := json.Marshal(module)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	writer.Header().Set("Content-Type", "application/json")
+
 	writer.WriteHeader(http.StatusOK)
+	writer.Header().Set("Content-Type", "application/json")
 	writer.Write(jsonResponse)
 }
 
