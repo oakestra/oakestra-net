@@ -26,7 +26,7 @@ type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
 	GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool)
-	GetDeployedServicesVeths() []*netlink.Veth // TODO ben remove
+	GetDeployedServices() map[string]service
 }
 
 type Configuration struct {
@@ -51,7 +51,7 @@ type Environment struct {
 	config            Configuration
 	translationTable  TableEntryCache.TableManager
 	//### Deployment management variables
-	deployedServices     map[string]service // all the deployed services with the ip and ports
+	deployedServices     map[string]service // all the deployed services with the ip and ports //TODO ben all deployed services here!!!
 	deployedServicesLock sync.RWMutex
 	nextContainerIP      net.IP // next address for the next container to be deployed
 	nextContainerIPv6    net.IP
@@ -519,12 +519,8 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 	return TableEntryCache.TableEntry{}, false
 }
 
-func (env *Environment) GetDeployedServicesVeths() []*netlink.Veth {
-	vethSlice := make([]*netlink.Veth, 0)
-	for _, value := range env.deployedServices {
-		vethSlice = append(vethSlice, value.veth)
-	}
-	return vethSlice
+func (env *Environment) GetDeployedServices() map[string]service {
+	return env.deployedServices
 }
 
 // GetTableEntryByNsIP Given a NamespaceIP finds the table entry. This search is local because the networking component MUST have all

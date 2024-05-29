@@ -49,7 +49,7 @@ func handleRequests(port int) {
 	// TODO ben put to a more suitable place. Where is the best place to initialise the ebpf manager?
 
 	ebpfRouter := netRouter.PathPrefix("/ebpf").Subrouter()
-	var _ = ebpfManager.New(ebpfRouter)
+	var _ = ebpfManager.New(ebpfRouter, &Env)
 
 	handlers.RegisterAllManagers(&Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))

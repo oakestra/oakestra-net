@@ -1,6 +1,7 @@
 package ebpfManager
 
 import (
+	"NetManager/env"
 	"NetManager/events"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ type EbpfManager struct {
 	Qdisc           tc.Object
 	currentPriority int
 	nextId          uint
+	env             env.EnvironmentManager
 }
 
 type FirewallRequest struct {
@@ -34,7 +36,7 @@ type FirewallRequest struct {
 	DstPort uint16 `json:"dstPort"`
 }
 
-func New(router *mux.Router) EbpfManager {
+func New(router *mux.Router, env env.EnvironmentManager) EbpfManager {
 	if err := rlimit.RemoveMemlock(); err != nil { // TODO ben what if multiple created?
 		log.Fatal("Removing memlock:", err)
 	}
@@ -42,6 +44,7 @@ func New(router *mux.Router) EbpfManager {
 	ebpfManager := EbpfManager{
 		router:      router,
 		ebpfModules: make([]ModuleInterface, 0),
+		env:         env,
 	}
 
 	ebpfManager.init()
@@ -111,12 +114,10 @@ func (e *EbpfManager) createNewEbpf(config Config) error {
 // RequestAttach can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
 func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress uint32) error {
 	// TODO ben check if tcln != null ??
-	fmt.Printf("TODO ben 4\n")
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		log.Fatalf("Getting interface %s: %s", ifname, err)
 	}
-	fmt.Printf("TODO ben 5\n")
 	qdisc := tc.Object{
 		Msg: tc.Msg{
 			Family:  unix.AF_UNSPEC,
@@ -130,7 +131,6 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 		},
 	}
 	e.Qdisc = qdisc
-	fmt.Printf("TODO ben 6\n")
 	if err := e.Tcnl.Qdisc().Add(&qdisc); err != nil {
 		fmt.Fprintf(os.Stderr, "could not assign clsact to %s: %v\n", ifname, err)
 		return nil
@@ -143,7 +143,7 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 			Ifindex: uint32(iface.Index),
 			Handle:  0,
 			Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinIngress),
-			Info:    uint32(e.currentPriority << 16),
+			Info:    0x300, // uint32(e.currentPriority << 16),
 		},
 		tc.Attribute{
 			Kind: "bpf",
@@ -161,7 +161,7 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 			Ifindex: uint32(iface.Index),
 			Handle:  0,
 			Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinEgress),
-			Info:    uint32(e.currentPriority << 16),
+			Info:    0x300,
 		},
 		tc.Attribute{
 			Kind: "bpf",
@@ -172,7 +172,6 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 		},
 	}
 	e.currentPriority += 1
-	fmt.Printf("TODO ben 7\n")
 	if err := e.Tcnl.Filter().Replace(&ingressFilter); err != nil {
 		fmt.Fprintf(os.Stderr, "could not attach ingress filter for eBPF program: %v\n", err)
 		return nil
@@ -182,7 +181,6 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 		fmt.Fprintf(os.Stderr, "could not attach egress filter for eBPF program: %v\n", err)
 		return nil
 	}
-	fmt.Printf("TODO ben 8\n")
 	return nil
 }
 
