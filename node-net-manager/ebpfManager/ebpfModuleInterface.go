@@ -9,7 +9,7 @@ type Config struct {
 	Config interface{} `json:"config"`
 }
 
-// ModuleBase represents the attributes that every ebpf ModuleBase has. Every Implementation of an ebpf ModuleBase should
+// ModuleBase represents the attributes that every ebpf ModuleBase has. Every Implementation of an ebpf ModuleInterface should
 // embed the ModuleBase struct
 type ModuleBase struct {
 	Id       uint   `json:"id"`

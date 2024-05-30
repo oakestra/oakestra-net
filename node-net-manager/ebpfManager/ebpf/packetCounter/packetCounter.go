@@ -2,19 +2,29 @@ package main
 
 import (
 	"log"
-	"os"
-	"os/signal"
-	"time"
 )
 
 type PacketCounter struct {
-	packetCounterObjects packetCounterObjects
-	id                   string
+	Ingress              uint64               `json:"ingress"`
+	Egress               uint64               `json:"egress"`
+	packetCounterObjects packetCounterObjects `json:"-"`
+	id                   string               `json:"-"`
 }
 
 func NewPacketCounter(id string) PacketCounter {
 	return PacketCounter{
 		id: id,
+	}
+}
+
+func (p *PacketCounter) refreshCountsFromKernel() {
+	err := p.packetCounterObjects.PktCount.Lookup(uint32(0), &p.Ingress)
+	if err != nil {
+		log.Fatal("map lookup for ingress count failed:", err)
+	}
+	err = p.packetCounterObjects.PktCount.Lookup(uint32(1), &p.Egress)
+	if err != nil {
+		log.Fatal("map lookup for egress count failed:", err)
 	}
 }
 
@@ -26,30 +36,4 @@ func (p *PacketCounter) Load() {
 	}
 	p.packetCounterObjects = objs
 	// TODO ben implement killing thread when destroying overall ebpf module
-	go p.printPacketCount()
-}
-
-func (p *PacketCounter) printPacketCount() {
-	tick := time.Tick(time.Second)
-	stop := make(chan os.Signal, 5)
-	signal.Notify(stop, os.Interrupt)
-	for {
-		select {
-		case <-tick:
-			var countIngress uint64
-			var countEgress uint64
-			err := p.packetCounterObjects.PktCount.Lookup(uint32(0), &countIngress)
-			if err != nil {
-				log.Fatal("Map lookup:", err)
-			}
-			err = p.packetCounterObjects.PktCount.Lookup(uint32(0), &countEgress)
-			if err != nil {
-				log.Fatal("Map lookup:", err)
-			}
-			log.Printf("%s: #Ingress %d, #Egress %d", p.id, countIngress, countEgress)
-		case <-stop:
-			log.Print("Received signal, exiting..")
-			return
-		}
-	}
 }

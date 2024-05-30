@@ -75,7 +75,7 @@ func (e *EbpfManager) createNewEbpf(config Config) error {
 	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
 
 	if !fileExists(objectPath) {
-		// todo return err
+		// todo ben return err
 		return errors.New("no ebpf module installed with this name")
 	}
 
