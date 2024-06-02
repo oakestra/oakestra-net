@@ -70,7 +70,7 @@ func (f *FirewallManager) NewInterfaceCreated(ifname string) error {
 	firewall.Load()
 	fdIn := uint32(firewall.FwObjects.HandleIngress.FD())
 	fdEg := uint32(firewall.FwObjects.HandleEgress.FD())
-	f.manager.RequestAttach(ifname, fdIn, fdEg)
+	f.manager.AttachEbpf(ifname, fdIn, fdEg)
 	f.firewalls[ifname] = firewall
 	return nil
 }

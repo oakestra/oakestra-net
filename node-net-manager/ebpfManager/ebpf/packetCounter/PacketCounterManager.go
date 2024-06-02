@@ -21,23 +21,18 @@ type PacketCounterManager struct {
 	manager  *ebpfManager.EbpfManager
 }
 
-func New() ebpfManager.ModuleInterface {
-	return &PacketCounterManager{
+func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) ebpfManager.ModuleInterface {
+	module := PacketCounterManager{
 		counters: make(map[string]*PacketCounter),
 	}
-}
+	module.ModuleBase.Id = id
 
-func (p *PacketCounterManager) GetModule() *ebpfManager.ModuleBase {
-	return &p.ModuleBase
-}
-
-func (p *PacketCounterManager) Configure(config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) {
-	p.ModuleBase.Config = config
-	p.manager = manager
+	module.ModuleBase.Config = config
+	module.manager = manager
 	router.HandleFunc("/counts", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
-		p.RefreshAllCounters()
-		jsonResponse, err := json.Marshal(p.counters)
+		module.RefreshAllCounters()
+		jsonResponse, err := json.Marshal(module.counters)
 		if err != nil {
 			writer.WriteHeader(http.StatusBadRequest)
 			return
@@ -46,15 +41,19 @@ func (p *PacketCounterManager) Configure(config ebpfManager.Config, router *mux.
 		writer.WriteHeader(http.StatusOK)
 		writer.Write(jsonResponse)
 	}).Methods("GET")
+
+	return &module
+}
+
+func (p *PacketCounterManager) GetModule() *ebpfManager.ModuleBase {
+	return &p.ModuleBase
 }
 
 // TODO ben instead of creating one function per Event, pass a Event channel to the module that emits all events
 func (p *PacketCounterManager) NewInterfaceCreated(ifname string) error {
 	pc := NewPacketCounter(ifname)
 	pc.Load()
-	fdIn := uint32(pc.packetCounterObjects.HandleIngress.FD())
-	fdEg := uint32(pc.packetCounterObjects.HandleEgress.FD())
-	p.manager.RequestAttach(ifname, fdIn, fdEg)
+	p.manager.LoadAndAttach("packetCounter", ifname) // TODO ben handle error
 	p.counters[ifname] = &pc
 	return nil
 }

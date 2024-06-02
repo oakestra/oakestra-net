@@ -1,16 +1,12 @@
 package ebpfManager
 
-import (
-	"github.com/gorilla/mux"
-)
-
 type Config struct {
 	Name   string      `json:"name"`
 	Config interface{} `json:"config"`
 }
 
-// ModuleBase represents the attributes that every ebpf ModuleBase has. Every Implementation of an ebpf ModuleInterface should
-// embed the ModuleBase struct
+// ModuleBase represents the attributes that every eBPF module has.
+// Every implementation of the ModuleInterface should embed the ModuleBase struct.
 type ModuleBase struct {
 	Id       uint   `json:"id"`
 	Config   Config `json:"config"`
@@ -18,21 +14,18 @@ type ModuleBase struct {
 	Active   bool   `json:"active"`
 }
 
-// ModuleInterface defines the interface of an ebpf ModuleBase that can be plugged into the NetManager at runtime
-// additionally the NetManager expects a 'New() ebpf.ModuleInterface' function to be implemented.
+// ModuleInterface defines the interface of an eBPF module that can be plugged into the NetManager at runtime.
+// Additionally, the NetManager expects a 'New(id uint, config Config, router *mux.Router, manager *EbpfManager) ModuleInterface' function to be implemented.
+// This function return a freshly initialised instance of the ebpf module.
 type ModuleInterface interface {
 
 	// GetModule returns ModuleBase struct
 	GetModule() *ModuleBase
 
-	// Configure Pass its configuration to the module. This is usually the first method to be called.
-	// TODO Ben give manager functions like "register API" such that a ebpfModule gets independent of the underlaying HTTP implementation
-	Configure(config Config, router *mux.Router, manager *EbpfManager)
-
 	// NewInterfaceCreated notifies the ebpf module that a new interface (+ service) was created
 	NewInterfaceCreated(ifname string) error
 
-	// DestroyModule removes deconstructs the module and releases all ressources
+	// DestroyModule removes deconstructs the module and releases all resources
 	DestroyModule() error
 	// TODO ben do we need to tell the module if a service got undeployed?
 	// In general and ebpf function get removed when veth is removed. I think a module should be written in a way such that it can handle this

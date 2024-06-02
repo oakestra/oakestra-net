@@ -40,7 +40,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		_ = netlink.LinkDel(veth)
 	}
 
-	logger.DebugLogger().Println("Creating veth pair for unikernel deployment")
+	logger.DebugLogger().Println("Creating Veth pair for unikernel deployment")
 	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
 	if err != nil {
 		cleanup(vethIfce)
@@ -82,7 +82,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
-	// Get IP for veth interface
+	// Get IP for Veth interface
 	ip, err := env.generateAddress()
 	if err != nil {
 		cleanup(vethIfce)
@@ -198,7 +198,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		ip:          ip,
 		sname:       name,
 		portmapping: portmapping,
-		veth:        vethIfce,
+		Veth:        vethIfce,
 	}
 	env.deployedServicesLock.Unlock()
 	logger.DebugLogger().Println("Successful Network creation for Unikernel")
@@ -215,7 +215,7 @@ func (env *Environment) DeleteUnikernelNamespace(sname string, instance int) {
 		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
 		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
-		_ = netlink.LinkDel(s.veth)
+		_ = netlink.LinkDel(s.Veth)
 		_ = netns.DeleteNamed(name)
 	}
 }

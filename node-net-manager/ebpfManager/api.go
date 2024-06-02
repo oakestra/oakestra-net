@@ -24,7 +24,7 @@ func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Reque
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 	}
-	err = e.createNewEbpf(config)
+	err = e.createNewEbpfModule(config)
 	if err != nil {
 		// TODO ben can returning this error potentially be exploited?
 		http.Error(writer, "Error creating Ebpf: "+err.Error(), http.StatusInternalServerError)

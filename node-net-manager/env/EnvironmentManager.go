@@ -70,7 +70,7 @@ type service struct {
 	ipv6        net.IP
 	sname       string
 	portmapping string
-	veth        *netlink.Veth
+	Veth        *netlink.Veth
 }
 
 // current network interfaces in the system
@@ -190,8 +190,8 @@ func (env *Environment) ConfigureDockerNetwork(containername string) (string, er
 	return "", errors.New("not yet implemented")
 }
 
-// create veth pair and connect one to the host bridge
-// returns: bridgeVeth name, free Veth name, Vether interface to the veth pair and eventually an error
+// create Veth pair and connect one to the host bridge
+// returns: bridgeVeth name, free Veth name, Vether interface to the Veth pair and eventually an error
 func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) (*netlink.Veth, error) {
 	// Retrieve current bridge
 	logger.DebugLogger().Println("Retrieving current bridge ")
@@ -202,9 +202,9 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 	}
 	logger.DebugLogger().Println("Retrieved current bridge")
 	hashedName := network.NameUniqueHash(sname, 4)
-	veth1name := fmt.Sprintf("veth%s%s%s", "00", strconv.Itoa(env.nextVethNumber), hashedName)
-	veth2name := fmt.Sprintf("veth%s%s%s", "01", strconv.Itoa(env.nextVethNumber), hashedName)
-	logger.DebugLogger().Println("creating veth pair: " + veth1name + "@" + veth2name)
+	veth1name := fmt.Sprintf("Veth%s%s%s", "00", strconv.Itoa(env.nextVethNumber), hashedName)
+	veth2name := fmt.Sprintf("Veth%s%s%s", "01", strconv.Itoa(env.nextVethNumber), hashedName)
+	logger.DebugLogger().Println("creating Veth pair: " + veth1name + "@" + veth2name)
 
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
@@ -224,7 +224,7 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 		return nil, err
 	}
 
-	// set veth status up
+	// set Veth status up
 	if err = netlink.LinkSetUp(veth); err != nil {
 		return nil, err
 	}
@@ -240,12 +240,12 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 	return veth, nil
 }
 
-// sets the FORWARD firewall rules for the bridge veth
+// sets the FORWARD firewall rules for the bridge Veth
 func (env *Environment) setVethFirewallRules(bridgeVethName string) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	// iptables -A FORWARD -o goProxyBridge -i veth -j ACCEPT
+	// iptables -A FORWARD -o goProxyBridge -i Veth -j ACCEPT
 	cmd := exec.Command("iptables", "-A", "FORWARD", "-o", env.config.HostBridgeName, "-i", bridgeVethName, "-j", "ACCEPT")
 	err := cmd.Run()
 	if err != nil {
@@ -310,7 +310,7 @@ func (env *Environment) setIPv6ContainerRoutes(containerPid int, peerVeth string
 	return nil
 }
 
-// setup the address of the network namespace veth
+// setup the address of the network namespace Veth
 func (env *Environment) addPeerLinkNetwork(nspid int, addr string, vethname string) error {
 	netlinkAddr, err := netlink.ParseAddr(addr)
 	if err != nil {
@@ -333,7 +333,7 @@ func (env *Environment) addPeerLinkNetwork(nspid int, addr string, vethname stri
 	return err
 }
 
-// setup the address of the network namespace veth based on Ns name
+// setup the address of the network namespace Veth based on Ns name
 func (env *Environment) addPeerLinkNetworkByNsName(NsName string, addr string, vethname string) error {
 	netlinkAddr, err := netlink.ParseAddr(addr)
 	if err != nil {
@@ -413,7 +413,7 @@ func (env *Environment) execInsideNsByName(Nsname string, function func() error)
 	return err
 }
 
-// BookVethNumber Update the veth number to be used for the next veth
+// BookVethNumber Update the Veth number to be used for the next Veth
 func (env *Environment) BookVethNumber() {
 	env.nextVethNumber = env.nextVethNumber + 1
 }

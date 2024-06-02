@@ -5,6 +5,7 @@ import (
 	"NetManager/events"
 	"errors"
 	"fmt"
+	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
@@ -20,12 +21,12 @@ import (
 
 type EbpfManager struct {
 	router          *mux.Router
-	ebpfModules     []ModuleInterface // TODO ben maybe its better to use a list that is sorted by priorities?
+	ebpfModules     map[uint]ModuleInterface
 	Tcnl            tc.Tc
-	Qdisc           tc.Object
 	currentPriority int
 	nextId          uint
 	env             env.EnvironmentManager
+	vethToQdisc     map[string]*tc.Object
 }
 
 type FirewallRequest struct {
@@ -37,13 +38,9 @@ type FirewallRequest struct {
 }
 
 func New(router *mux.Router, env env.EnvironmentManager) EbpfManager {
-	if err := rlimit.RemoveMemlock(); err != nil { // TODO ben what if multiple created?
-		log.Fatal("Removing memlock:", err)
-	}
-
 	ebpfManager := EbpfManager{
 		router:      router,
-		ebpfModules: make([]ModuleInterface, 0),
+		ebpfModules: make(map[uint]ModuleInterface),
 		env:         env,
 	}
 
@@ -54,6 +51,10 @@ func New(router *mux.Router, env env.EnvironmentManager) EbpfManager {
 }
 
 func (e *EbpfManager) init() {
+	if err := rlimit.RemoveMemlock(); err != nil {
+		log.Fatal("Removing memlock:", err)
+	}
+
 	tcnl, err := tc.Open(&tc.Config{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "could not open rtnetlink socket: %v\n", err)
@@ -71,11 +72,10 @@ func (e *EbpfManager) init() {
 	})
 }
 
-func (e *EbpfManager) createNewEbpf(config Config) error {
+func (e *EbpfManager) createNewEbpfModule(config Config) error {
 	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
 
 	if !fileExists(objectPath) {
-		// todo ben return err
 		return errors.New("no ebpf module installed with this name")
 	}
 
@@ -88,54 +88,97 @@ func (e *EbpfManager) createNewEbpf(config Config) error {
 	// every ebpfModule should support a New() method to create an instance of the module
 	sym, err := plug.Lookup("New")
 	if err != nil {
-		// todo return err
 		return errors.New("the ebpf module does not adhere to the expected interface")
 	}
 
-	newModule, ok := sym.(func() ModuleInterface)
+	newModule, ok := sym.(func(id uint, config Config, router *mux.Router, manager *EbpfManager) ModuleInterface)
 	if !ok {
-		return errors.New("the ebpf module does not adhere to the expected interface")
+		return errors.New("the ebpf module does not export a function with the name New or it does not follow the required interface")
 	}
 
-	subRouter := e.router.PathPrefix(fmt.Sprintf("/%s", config.Name)).Subrouter()
-
-	// Use the interface
-	module := newModule()
-	module.Configure(config, subRouter, e)
-
-	base := module.GetModule()
-	base.Id = e.nextId
-	e.ebpfModules = append(e.ebpfModules, module)
+	id := e.nextId
 	e.nextId += 1
+	subRouter := e.router.PathPrefix(fmt.Sprintf("/%d", id)).Subrouter()
+	module := newModule(id, config, subRouter, e)
+
+	for _, service := range e.env.GetDeployedServices() {
+		for _, mod := range e.ebpfModules {
+			mod.NewInterfaceCreated(service.Veth.Name)
+		}
+	}
+	e.ebpfModules[id] = module
+	return nil
+}
+
+func (e *EbpfManager) LoadAndAttach(moduleName string, ifname string) error {
+	coll, err := e.loadEbpf(moduleName)
+	if err != nil {
+		return err
+	}
+
+	err = e.attachEbpf(ifname, coll)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-// RequestAttach can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
-func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress uint32) error {
+func (e *EbpfManager) loadEbpf(moduleName string) (*ebpf.Collection, error) {
+	path := fmt.Sprintf("ebpfManager/ebpf/%s/%s.o", moduleName)
+	spec, err := ebpf.LoadCollectionSpec(path)
+	if err != nil {
+		return nil, err
+	}
+
+	coll, err := ebpf.NewCollection(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return coll, nil
+}
+
+// AttachEbpf can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
+func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) error {
 	// TODO ben check if tcln != null ??
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		log.Fatalf("Getting interface %s: %s", ifname, err)
 	}
-	qdisc := tc.Object{
-		Msg: tc.Msg{
-			Family:  unix.AF_UNSPEC,
-			Ifindex: uint32(iface.Index),
-			Handle:  core.BuildHandle(tc.HandleRoot, 0x0000),
-			Parent:  tc.HandleIngress,
-			Info:    0,
-		},
-		Attribute: tc.Attribute{
-			Kind: "clsact",
-		},
+
+	progIngress := collection.Programs["handle_ingress"]
+	if progIngress == nil {
+		return errors.New("program 'handle_ingress' not found")
 	}
-	e.Qdisc = qdisc
-	if err := e.Tcnl.Qdisc().Add(&qdisc); err != nil {
+
+	progEgress := collection.Programs["handle_egress"]
+	if progEgress == nil {
+		return errors.New("program 'handle_egress' not found")
+	}
+
+	// create qdisc for veth if there is none so far.
+	if e.vethToQdisc[ifname] == nil {
+		e.vethToQdisc[ifname] = &tc.Object{
+			Msg: tc.Msg{
+				Family:  unix.AF_UNSPEC,
+				Ifindex: uint32(iface.Index),
+				Handle:  core.BuildHandle(tc.HandleRoot, 0x0000),
+				Parent:  tc.HandleIngress,
+				Info:    0,
+			},
+			Attribute: tc.Attribute{
+				Kind: "clsact",
+			},
+		}
+	}
+
+	if err := e.Tcnl.Qdisc().Add(e.vethToQdisc[ifname]); err != nil {
 		fmt.Fprintf(os.Stderr, "could not assign clsact to %s: %v\n", ifname, err)
 		return nil
 	}
 
+	fdIngress := uint32(progIngress.FD())
 	flagsIn := uint32(0x1)
 	ingressFilter := tc.Object{
 		tc.Msg{
@@ -154,6 +197,7 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 		},
 	}
 
+	fdEgress := uint32(progEgress.FD())
 	flagsEg := uint32(0x1)
 	egressFilter := tc.Object{
 		tc.Msg{
@@ -171,7 +215,7 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 			},
 		},
 	}
-	e.currentPriority += 1
+
 	if err := e.Tcnl.Filter().Replace(&ingressFilter); err != nil {
 		fmt.Fprintf(os.Stderr, "could not attach ingress filter for eBPF program: %v\n", err)
 		return nil
@@ -183,58 +227,3 @@ func (e *EbpfManager) RequestAttach(ifname string, fdIngress uint32, fdEgress ui
 	}
 	return nil
 }
-
-//func (e *EbpfManager) ActivateFirewall() {
-//	e.firewallManager = firewall.NewFirewallManager()
-//
-//	// Attach firewall to all currently active deployments
-//	vethList := (e.environment).GetDeployedServicesVeths()
-//	for _, vethName := range vethList {
-//		e.firewallManager.AttachFirewall(vethName.Name)
-//	}
-//
-//	// TODO ben deregister callback when firewall is deactivated or object is deconstructed!
-//	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
-//		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
-//			e.firewallManager.AttachFirewall(payload.Name)
-//		}
-//	})
-//}
-
-// TODO ben store for later
-//func attachFirewall(c *gin.Context) {
-//	var request FirewallRequest
-//	if err := c.BindJSON(&request); err != nil {
-//		return
-//	}
-//
-//	networkNamespace := "ns1"
-//	ifaceName := "veth-ns1-peer"
-//	if request.Service == 2 {
-//		networkNamespace = "ns2"
-//		ifaceName = "veth-ns2-peer"
-//	}
-//	println(ifaceName)        // TODO ben remove
-//	println(networkNamespace) // TODO ben remove
-
-//originalNS, err := netns.Get()
-//if err != nil {
-//	log.Fatalf("failed to get current namespace: %v", err)
-//}
-//defer originalNS.Close()
-//
-//nsHandle, err := netns.GetFromName(networkNamespace)
-//if err != nil {
-//	log.Fatalf("failed to get network namespace handle: %v", err)
-//}
-//defer nsHandle.Close()
-//
-//err = netns.Set(nsHandle)
-//if err != nil {
-//	log.Fatalf("failed to set network namespace: %v", err)
-//}
-//defer netns.Set(originalNS) // Revert to the original namespace before exit.
-//
-//	fw := firewall.New()
-//	fw.NewInterfaceCreated("br0")
-//}

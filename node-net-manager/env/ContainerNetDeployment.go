@@ -71,7 +71,7 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
-	// set ip to the container veth
+	// set ip to the container Veth
 	logger.DebugLogger().Println("Assigning ip ", ip.String()+env.config.HostBridgeMask, " to container ")
 	if err := env.addPeerLinkNetwork(pid, ip.String()+env.config.HostBridgeMask, vethIfce.PeerName); err != nil {
 		logger.ErrorLogger().Println("Error in addPeerLinkNetwork")
@@ -151,7 +151,7 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		ipv6:        ipv6,
 		sname:       sname,
 		portmapping: portmapping,
-		veth:        vethIfce,
+		Veth:        vethIfce,
 	}
 	env.deployedServicesLock.Unlock()
 	logger.DebugLogger().Printf("New deployedServices table: %v", env.deployedServices)
@@ -172,7 +172,7 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		env.freeContainerAddress(s.ipv6)
 		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
 		_ = network.ManageContainerPorts(s.ipv6, s.portmapping, network.ClosePorts)
-		_ = netlink.LinkDel(s.veth)
+		_ = netlink.LinkDel(s.Veth)
 		// if no interest registered delete all remaining info about the service
 		if !mqtt.MqttIsInterestRegistered(sname) {
 			env.RemoveServiceEntries(sname)
