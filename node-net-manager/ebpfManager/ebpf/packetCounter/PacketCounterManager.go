@@ -51,9 +51,8 @@ func (p *PacketCounterManager) GetModule() *ebpfManager.ModuleBase {
 
 // TODO ben instead of creating one function per Event, pass a Event channel to the module that emits all events
 func (p *PacketCounterManager) NewInterfaceCreated(ifname string) error {
-	pc := NewPacketCounter(ifname)
-	pc.Load()
-	p.manager.LoadAndAttach("packetCounter", ifname) // TODO ben handle error
+	coll, _ := p.manager.LoadAndAttach(p.Id, ifname) // TODO ben handle error
+	pc := NewPacketCounter(coll)
 	p.counters[ifname] = &pc
 	return nil
 }

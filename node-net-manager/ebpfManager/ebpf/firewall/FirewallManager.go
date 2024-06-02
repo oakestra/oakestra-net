@@ -67,10 +67,7 @@ func (f *FirewallManager) Configure(config ebpfManager.Config, router *mux.Route
 // TODO ben instead of creating one function per Event, pass a Event channel to the module that emits all events
 func (f *FirewallManager) NewInterfaceCreated(ifname string) error {
 	firewall := Firewall{}
-	firewall.Load()
-	fdIn := uint32(firewall.FwObjects.HandleIngress.FD())
-	fdEg := uint32(firewall.FwObjects.HandleEgress.FD())
-	f.manager.AttachEbpf(ifname, fdIn, fdEg)
+	f.manager.LoadAndAttach("firewall", ifname)
 	f.firewalls[ifname] = firewall
 	return nil
 }

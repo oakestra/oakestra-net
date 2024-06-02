@@ -110,18 +110,24 @@ func (e *EbpfManager) createNewEbpfModule(config Config) error {
 	return nil
 }
 
-func (e *EbpfManager) LoadAndAttach(moduleName string, ifname string) error {
-	coll, err := e.loadEbpf(moduleName)
+func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collection, error) {
+	module := e.ebpfModules[moduleId]
+	if module == nil {
+		return nil, errors.New(fmt.Sprintf("there is no module with id %d", moduleId))
+	}
+
+	coll, err := e.loadEbpf(module.GetModule().Config.Name)
+	// TODO ben. make the ebbf manager store one copy of all collections, such that we can close them ourselves in an emergency
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = e.attachEbpf(ifname, coll)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return coll, nil
 }
 
 func (e *EbpfManager) loadEbpf(moduleName string) (*ebpf.Collection, error) {
@@ -144,7 +150,7 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 	// TODO ben check if tcln != null ??
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
-		log.Fatalf("Getting interface %s: %s", ifname, err)
+		return errors.New(fmt.Sprintf("Getting interface %s: %s", ifname, err))
 	}
 
 	progIngress := collection.Programs["handle_ingress"]
@@ -174,8 +180,7 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 	}
 
 	if err := e.Tcnl.Qdisc().Add(e.vethToQdisc[ifname]); err != nil {
-		fmt.Fprintf(os.Stderr, "could not assign clsact to %s: %v\n", ifname, err)
-		return nil
+		return err
 	}
 
 	fdIngress := uint32(progIngress.FD())
@@ -217,13 +222,26 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 	}
 
 	if err := e.Tcnl.Filter().Replace(&ingressFilter); err != nil {
-		fmt.Fprintf(os.Stderr, "could not attach ingress filter for eBPF program: %v\n", err)
-		return nil
+		return err
 	}
 
 	if err := e.Tcnl.Filter().Replace(&egressFilter); err != nil {
-		fmt.Fprintf(os.Stderr, "could not attach egress filter for eBPF program: %v\n", err)
-		return nil
+		return err
+	}
+	return nil
+}
+
+func (e EbpfManager) getAllModules() []ModuleInterface {
+	values := make([]ModuleInterface, 0, len(e.ebpfModules))
+	for _, module := range e.ebpfModules {
+		values = append(values, module)
+	}
+	return values
+}
+
+func (e EbpfManager) getModuleById(id uint) ModuleInterface {
+	if module, exists := e.ebpfModules[id]; exists {
+		return module
 	}
 	return nil
 }

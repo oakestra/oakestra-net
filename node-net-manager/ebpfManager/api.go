@@ -34,7 +34,7 @@ func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Reque
 
 func (e *EbpfManager) getEbpfModules(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP GET request - /ebpf")
-	modules := mapInterfacesToModules(e.ebpfModules)
+	modules := e.getAllModules()
 	jsonResponse, err := json.Marshal(modules)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -52,7 +52,7 @@ func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Re
 	moduleId := vars["id"]
 	id, err := strconv.Atoi(moduleId)
 
-	module := getModuleBaseById(e.ebpfModules, uint(id))
+	module := e.getModuleById(uint(id))
 	if module == nil {
 		writer.WriteHeader(http.StatusNotFound)
 		writer.Header().Set("Content-Type", "text/plain")

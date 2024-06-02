@@ -17,7 +17,7 @@ func fileExists(filename string) bool {
 	return !info.IsDir() // Ensure the path is not a directory
 }
 
-func mapInterfacesToModules(modules []ModuleInterface) []ModuleBase {
+func InterfaceMapToList(modules []ModuleInterface) []ModuleBase {
 	mapped := make([]ModuleBase, len(modules))
 	for i, module := range modules {
 		mapped[i] = *module.GetModule()
