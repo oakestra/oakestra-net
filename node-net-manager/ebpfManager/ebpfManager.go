@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"plugin"
+	"runtime"
 )
 
 //go:generate ./generate_ebpf.sh
@@ -41,6 +42,7 @@ func New(router *mux.Router, env env.EnvironmentManager) EbpfManager {
 	ebpfManager := EbpfManager{
 		router:      router,
 		ebpfModules: make(map[uint]ModuleInterface),
+		vethToQdisc: make(map[string]*tc.Object),
 		env:         env,
 	}
 
@@ -66,34 +68,35 @@ func (e *EbpfManager) init() {
 	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
 		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
 			for _, module := range e.ebpfModules {
+				runtime.Breakpoint() // TODO ben remove
 				module.NewInterfaceCreated(payload.Name)
 			}
 		}
 	})
 }
 
-func (e *EbpfManager) createNewEbpfModule(config Config) error {
+func (e *EbpfManager) createNewEbpfModule(config Config) (ModuleInterface, error) {
 	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
 
 	if !fileExists(objectPath) {
-		return errors.New("no ebpf module installed with this name")
+		return nil, errors.New("no ebpf module installed with this name")
 	}
 
 	// Load the plugin
 	plug, err := plugin.Open(objectPath)
 	if err != nil {
-		return errors.New("there was an error loading the ebpf module")
+		return nil, errors.New("there was an error loading the ebpf module")
 	}
 
 	// every ebpfModule should support a New() method to create an instance of the module
 	sym, err := plug.Lookup("New")
 	if err != nil {
-		return errors.New("the ebpf module does not adhere to the expected interface")
+		return nil, errors.New("the ebpf module does not adhere to the expected interface")
 	}
 
 	newModule, ok := sym.(func(id uint, config Config, router *mux.Router, manager *EbpfManager) ModuleInterface)
 	if !ok {
-		return errors.New("the ebpf module does not export a function with the name New or it does not follow the required interface")
+		return nil, errors.New("the ebpf module does not export a function with the name New or it does not follow the required interface")
 	}
 
 	id := e.nextId
@@ -107,7 +110,7 @@ func (e *EbpfManager) createNewEbpfModule(config Config) error {
 		}
 	}
 	e.ebpfModules[id] = module
-	return nil
+	return module, nil
 }
 
 func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collection, error) {
@@ -131,7 +134,7 @@ func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collect
 }
 
 func (e *EbpfManager) loadEbpf(moduleName string) (*ebpf.Collection, error) {
-	path := fmt.Sprintf("ebpfManager/ebpf/%s/%s.o", moduleName)
+	path := fmt.Sprintf("ebpfManager/ebpf/%s/%s.o", moduleName, moduleName)
 	spec, err := ebpf.LoadCollectionSpec(path)
 	if err != nil {
 		return nil, err
@@ -164,8 +167,9 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 	}
 
 	// create qdisc for veth if there is none so far.
+	runtime.Breakpoint() //TODO ben remove
 	if e.vethToQdisc[ifname] == nil {
-		e.vethToQdisc[ifname] = &tc.Object{
+		qdisc := tc.Object{
 			Msg: tc.Msg{
 				Family:  unix.AF_UNSPEC,
 				Ifindex: uint32(iface.Index),
@@ -177,6 +181,7 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 				Kind: "clsact",
 			},
 		}
+		e.vethToQdisc[ifname] = &qdisc
 	}
 
 	if err := e.Tcnl.Qdisc().Add(e.vethToQdisc[ifname]); err != nil {

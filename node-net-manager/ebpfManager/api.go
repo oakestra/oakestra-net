@@ -15,7 +15,7 @@ type ModuleModel struct {
 	Config Config `json:"config"`
 }
 
-func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Request) {
+func (e *EbpfManager) createEbpfModule(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP POST request - /ebpf ")
 
 	reqBody, _ := io.ReadAll(request.Body)
@@ -24,12 +24,19 @@ func (e *EbpfManager) createEbpf(writer http.ResponseWriter, request *http.Reque
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 	}
-	err = e.createNewEbpfModule(config)
+	newModule, err := e.createNewEbpfModule(config)
 	if err != nil {
 		// TODO ben can returning this error potentially be exploited?
 		http.Error(writer, "Error creating Ebpf: "+err.Error(), http.StatusInternalServerError)
 	}
+	jsonResponse, err := json.Marshal(newModule)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
+	writer.Write(jsonResponse)
 }
 
 func (e *EbpfManager) getEbpfModules(writer http.ResponseWriter, request *http.Request) {
@@ -75,6 +82,6 @@ func (e *EbpfManager) RegisterHandles() {
 	if e.router != nil {
 		e.router.HandleFunc("", e.getEbpfModules).Methods("GET")
 		e.router.HandleFunc("/{id}", e.getEbpfModule).Methods("GET")
-		e.router.HandleFunc("", e.createEbpf).Methods("POST")
+		e.router.HandleFunc("", e.createEbpfModule).Methods("POST")
 	}
 }
