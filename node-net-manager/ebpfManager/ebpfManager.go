@@ -13,17 +13,26 @@ import (
 	"log"
 	"net"
 	"plugin"
-	"runtime"
 )
 
 //go:generate ./generate_ebpf.sh
 
+type ModuleContainer struct {
+	module  ModuleInterface
+	filters []FilterPair
+}
+
+type FilterPair struct {
+	ingress *netlink.BpfFilter
+	egress  *netlink.BpfFilter
+}
+
 type EbpfManager struct {
 	router          *mux.Router
-	ebpfModules     map[uint]ModuleInterface
 	currentPriority uint16
 	nextId          uint
 	env             env.EnvironmentManager
+	idToModule      map[uint]*ModuleContainer
 	vethToQdisc     map[string]*netlink.GenericQdisc
 }
 
@@ -35,10 +44,14 @@ type FirewallRequest struct {
 	DstPort uint16 `json:"dstPort"`
 }
 
+func (m ModuleBase) close() {
+
+}
+
 func New(router *mux.Router, env env.EnvironmentManager) EbpfManager {
 	ebpfManager := EbpfManager{
 		router:          router,
-		ebpfModules:     make(map[uint]ModuleInterface),
+		idToModule:      make(map[uint]*ModuleContainer),
 		vethToQdisc:     make(map[string]*netlink.GenericQdisc),
 		env:             env,
 		currentPriority: 1,
@@ -58,8 +71,8 @@ func (e *EbpfManager) init() {
 	// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
 	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
 		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
-			for _, module := range e.ebpfModules {
-				module.NewInterfaceCreated(payload.Name)
+			for _, moduleContainer := range e.idToModule {
+				moduleContainer.module.NewInterfaceCreated(payload.Name)
 			}
 		}
 	})
@@ -93,7 +106,10 @@ func (e *EbpfManager) createNewEbpfModule(config Config) (ModuleInterface, error
 	e.nextId += 1
 	subRouter := e.router.PathPrefix(fmt.Sprintf("/%d", id)).Subrouter()
 	module := newModule(id, config, subRouter, e)
-	e.ebpfModules[id] = module
+	e.idToModule[id] = &ModuleContainer{
+		module:  module,
+		filters: make([]FilterPair, 0),
+	}
 
 	for _, service := range e.env.GetDeployedServices() {
 		module.NewInterfaceCreated(service.Veth.Name)
@@ -103,21 +119,24 @@ func (e *EbpfManager) createNewEbpfModule(config Config) (ModuleInterface, error
 }
 
 func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collection, error) {
-	module := e.ebpfModules[moduleId]
-	if module == nil {
+	moduleContainer, exists := e.idToModule[moduleId]
+
+	if !exists || moduleContainer.module == nil {
 		return nil, errors.New(fmt.Sprintf("there is no module with id %d", moduleId))
 	}
 
-	coll, err := e.loadEbpf(module.GetModule().Config.Name)
+	coll, err := e.loadEbpf(moduleContainer.module.GetModuleBase().Config.Name)
 	// TODO ben. make the ebbf manager store one copy of all collections, such that we can close them ourselves in an emergency
 	if err != nil {
 		return nil, err
 	}
 
-	err = e.attachEbpf(ifname, coll)
+	fp, err := e.attachEbpf(ifname, coll)
 	if err != nil {
 		return nil, err
 	}
+
+	moduleContainer.filters = append(moduleContainer.filters, *fp)
 
 	return coll, nil
 }
@@ -138,21 +157,21 @@ func (e *EbpfManager) loadEbpf(moduleName string) (*ebpf.Collection, error) {
 }
 
 // AttachEbpf can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
-func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) error {
+func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*FilterPair, error) {
 	// TODO ben check if tcln != null ??
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Getting interface %s: %s", ifname, err))
+		return nil, errors.New(fmt.Sprintf("Getting interface %s: %s", ifname, err))
 	}
 
 	progIngress := collection.Programs["handle_ingress"]
 	if progIngress == nil {
-		return errors.New("program 'handle_ingress' not found")
+		return nil, errors.New("program 'handle_ingress' not found")
 	}
 
 	progEgress := collection.Programs["handle_egress"]
 	if progEgress == nil {
-		return errors.New("program 'handle_egress' not found")
+		return nil, errors.New("program 'handle_egress' not found")
 	}
 
 	// create qdisc for veth if there is none so far.
@@ -169,7 +188,7 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 
 	qdisc := e.vethToQdisc[ifname]
 	if err := netlink.QdiscReplace(qdisc); err != nil && err.Error() != "file exists" {
-		return err
+		return nil, err
 	}
 
 	ingressFilter := &netlink.BpfFilter{
@@ -200,29 +219,59 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 
 	e.currentPriority += 1
 
-	runtime.Breakpoint()
 	if err := netlink.FilterAdd(ingressFilter); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := netlink.FilterAdd(egressFilter); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	fp := FilterPair{
+		ingress: ingressFilter,
+		egress:  egressFilter,
+	}
+
+	return &fp, nil
 }
 
 func (e EbpfManager) getAllModules() []ModuleInterface {
-	values := make([]ModuleInterface, 0, len(e.ebpfModules))
-	for _, module := range e.ebpfModules {
-		values = append(values, module)
+	values := make([]ModuleInterface, 0, len(e.idToModule))
+	for _, moduleContainer := range e.idToModule {
+		values = append(values, moduleContainer.module)
 	}
 	return values
 }
 
 func (e EbpfManager) getModuleById(id uint) ModuleInterface {
-	if module, exists := e.ebpfModules[id]; exists {
-		return module
+	if moduleContainer, exists := e.idToModule[id]; exists {
+		return moduleContainer.module
 	}
 	return nil
+}
+
+func (e EbpfManager) deleteAllModules() {
+	for id := range e.idToModule {
+		e.deleteModuleById(id)
+	}
+}
+
+func (e EbpfManager) deleteModuleById(id uint) {
+	if moduleContainer, exists := e.idToModule[id]; exists {
+		moduleContainer.module.GetModuleBase().close()
+		moduleContainer.module.DestroyModule()
+		for _, fp := range moduleContainer.filters {
+			netlink.FilterDel(fp.ingress)
+			netlink.FilterDel(fp.egress)
+		}
+		delete(e.idToModule, id)
+	}
+}
+
+func (e EbpfManager) Close() {
+	e.deleteAllModules()
+	for veth, qdisc := range e.vethToQdisc {
+		netlink.QdiscDel(qdisc)
+		delete(e.vethToQdisc, veth)
+	}
 }

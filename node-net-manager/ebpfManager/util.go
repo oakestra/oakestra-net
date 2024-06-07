@@ -20,15 +20,15 @@ func fileExists(filename string) bool {
 func InterfaceMapToList(modules []ModuleInterface) []ModuleBase {
 	mapped := make([]ModuleBase, len(modules))
 	for i, module := range modules {
-		mapped[i] = *module.GetModule()
+		mapped[i] = *module.GetModuleBase()
 	}
 	return mapped
 }
 
 func getModuleBaseById(modules []ModuleInterface, id uint) *ModuleBase {
 	for _, module := range modules {
-		if module.GetModule().Id == id {
-			return module.GetModule()
+		if module.GetModuleBase().Id == id {
+			return module.GetModuleBase()
 		}
 	}
 	return nil

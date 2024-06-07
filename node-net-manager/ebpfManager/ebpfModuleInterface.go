@@ -20,7 +20,7 @@ type ModuleBase struct {
 type ModuleInterface interface {
 
 	// GetModule returns ModuleBase struct
-	GetModule() *ModuleBase
+	GetModuleBase() *ModuleBase
 
 	// NewInterfaceCreated notifies the ebpf module that a new interface (+ service) was created
 	NewInterfaceCreated(ifname string) error

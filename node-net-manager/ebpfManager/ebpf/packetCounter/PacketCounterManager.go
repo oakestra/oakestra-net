@@ -40,7 +40,7 @@ func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfMa
 	return &module
 }
 
-func (p *PacketCounterManager) GetModule() *ebpfManager.ModuleBase {
+func (p *PacketCounterManager) GetModuleBase() *ebpfManager.ModuleBase {
 	return &p.ModuleBase
 }
 

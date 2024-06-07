@@ -15,6 +15,7 @@ type ModuleModel struct {
 	Config Config `json:"config"`
 }
 
+// TODO ben separate the api implementation from ebpfManager struct
 func (e *EbpfManager) createEbpfModule(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP POST request - /ebpf ")
 
@@ -58,6 +59,12 @@ func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Re
 	vars := mux.Vars(request)
 	moduleId := vars["id"]
 	id, err := strconv.Atoi(moduleId)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "id '%s' is not a valid ebpf module id", moduleId)
+		return
+	}
 
 	module := e.getModuleById(uint(id))
 	if module == nil {
@@ -78,10 +85,36 @@ func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Re
 	writer.Write(jsonResponse)
 }
 
+func (e *EbpfManager) deleteEbpfModule(writer http.ResponseWriter, request *http.Request) {
+	log.Println("Received HTTP DELETE request - /ebpf/{id}")
+
+	vars := mux.Vars(request)
+	moduleId := vars["id"]
+	id, err := strconv.Atoi(moduleId)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Header().Set("Content-Type", "text/plain")
+		fmt.Fprintf(writer, "'%s' is not a valid ebpf module id", moduleId)
+		return
+	}
+
+	e.deleteModuleById(uint(id))
+
+	writer.WriteHeader(http.StatusOK)
+}
+
+func (e *EbpfManager) deleteAllEbpfModules(writer http.ResponseWriter, request *http.Request) {
+	log.Println("Received HTTP DELETE request - /ebpf")
+	e.deleteAllModules()
+	writer.WriteHeader(http.StatusOK)
+}
+
 func (e *EbpfManager) RegisterHandles() {
 	if e.router != nil {
+		e.router.HandleFunc("", e.createEbpfModule).Methods("POST")
 		e.router.HandleFunc("", e.getEbpfModules).Methods("GET")
 		e.router.HandleFunc("/{id}", e.getEbpfModule).Methods("GET")
-		e.router.HandleFunc("", e.createEbpfModule).Methods("POST")
+		e.router.HandleFunc("", e.deleteAllEbpfModules).Methods("DELETE")
+		e.router.HandleFunc("/{id}", e.deleteEbpfModule).Methods("DELETE")
 	}
 }

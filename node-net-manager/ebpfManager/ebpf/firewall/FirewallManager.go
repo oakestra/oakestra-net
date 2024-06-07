@@ -24,7 +24,7 @@ func New() ebpfManager.ModuleInterface {
 	}
 }
 
-func (f *FirewallManager) GetModule() *ebpfManager.ModuleBase {
+func (f *FirewallManager) GetModuleBase() *ebpfManager.ModuleBase {
 	return &f.ModuleBase
 }
 
