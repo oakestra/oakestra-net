@@ -10,11 +10,6 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go packetCounter packetCounter.c
 
-type Counts struct {
-	ingress int
-	egress  int
-}
-
 type PacketCounterManager struct {
 	ebpfManager.ModuleBase
 	counters map[string]*PacketCounter

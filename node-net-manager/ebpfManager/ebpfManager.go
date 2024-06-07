@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
-	"github.com/florianl/go-tc"
-	"github.com/florianl/go-tc/core"
 	"github.com/gorilla/mux"
+	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"log"
 	"net"
-	"os"
 	"plugin"
 	"runtime"
 )
@@ -23,11 +21,10 @@ import (
 type EbpfManager struct {
 	router          *mux.Router
 	ebpfModules     map[uint]ModuleInterface
-	Tcnl            tc.Tc
-	currentPriority int
+	currentPriority uint16
 	nextId          uint
 	env             env.EnvironmentManager
-	vethToQdisc     map[string]*tc.Object
+	vethToQdisc     map[string]*netlink.GenericQdisc
 }
 
 type FirewallRequest struct {
@@ -40,10 +37,11 @@ type FirewallRequest struct {
 
 func New(router *mux.Router, env env.EnvironmentManager) EbpfManager {
 	ebpfManager := EbpfManager{
-		router:      router,
-		ebpfModules: make(map[uint]ModuleInterface),
-		vethToQdisc: make(map[string]*tc.Object),
-		env:         env,
+		router:          router,
+		ebpfModules:     make(map[uint]ModuleInterface),
+		vethToQdisc:     make(map[string]*netlink.GenericQdisc),
+		env:             env,
+		currentPriority: 1,
 	}
 
 	ebpfManager.init()
@@ -57,18 +55,10 @@ func (e *EbpfManager) init() {
 		log.Fatal("Removing memlock:", err)
 	}
 
-	tcnl, err := tc.Open(&tc.Config{})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not open rtnetlink socket: %v\n", err)
-		return // TODO ben return error
-	}
-	e.Tcnl = *tcnl
-
 	// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
 	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
 		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
 			for _, module := range e.ebpfModules {
-				runtime.Breakpoint() // TODO ben remove
 				module.NewInterfaceCreated(payload.Name)
 			}
 		}
@@ -103,13 +93,12 @@ func (e *EbpfManager) createNewEbpfModule(config Config) (ModuleInterface, error
 	e.nextId += 1
 	subRouter := e.router.PathPrefix(fmt.Sprintf("/%d", id)).Subrouter()
 	module := newModule(id, config, subRouter, e)
+	e.ebpfModules[id] = module
 
 	for _, service := range e.env.GetDeployedServices() {
-		for _, mod := range e.ebpfModules {
-			mod.NewInterfaceCreated(service.Veth.Name)
-		}
+		module.NewInterfaceCreated(service.Veth.Name)
 	}
-	e.ebpfModules[id] = module
+
 	return module, nil
 }
 
@@ -167,72 +156,59 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) err
 	}
 
 	// create qdisc for veth if there is none so far.
-	runtime.Breakpoint() //TODO ben remove
 	if e.vethToQdisc[ifname] == nil {
-		qdisc := tc.Object{
-			Msg: tc.Msg{
-				Family:  unix.AF_UNSPEC,
-				Ifindex: uint32(iface.Index),
-				Handle:  core.BuildHandle(tc.HandleRoot, 0x0000),
-				Parent:  tc.HandleIngress,
-				Info:    0,
+		e.vethToQdisc[ifname] = &netlink.GenericQdisc{
+			QdiscAttrs: netlink.QdiscAttrs{
+				LinkIndex: iface.Index,
+				Handle:    netlink.MakeHandle(0xffff, 0),
+				Parent:    netlink.HANDLE_CLSACT,
 			},
-			Attribute: tc.Attribute{
-				Kind: "clsact",
-			},
+			QdiscType: "clsact",
 		}
-		e.vethToQdisc[ifname] = &qdisc
 	}
 
-	if err := e.Tcnl.Qdisc().Add(e.vethToQdisc[ifname]); err != nil {
+	qdisc := e.vethToQdisc[ifname]
+	if err := netlink.QdiscReplace(qdisc); err != nil && err.Error() != "file exists" {
 		return err
 	}
 
-	fdIngress := uint32(progIngress.FD())
-	flagsIn := uint32(0x1)
-	ingressFilter := tc.Object{
-		tc.Msg{
-			Family:  unix.AF_UNSPEC,
-			Ifindex: uint32(iface.Index),
-			Handle:  0,
-			Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinIngress),
-			Info:    0x300, // uint32(e.currentPriority << 16),
+	ingressFilter := &netlink.BpfFilter{
+		FilterAttrs: netlink.FilterAttrs{
+			LinkIndex: iface.Index,
+			Priority:  e.currentPriority,
+			Handle:    netlink.MakeHandle(0x1, 0),
+			Parent:    netlink.HANDLE_MIN_INGRESS,
+			Protocol:  unix.ETH_P_ALL,
 		},
-		tc.Attribute{
-			Kind: "bpf",
-			BPF: &tc.Bpf{
-				FD:    &fdIngress,
-				Flags: &flagsIn,
-			},
-		},
+		DirectAction: true,
+		Name:         progIngress.String(),
+		Fd:           progIngress.FD(),
 	}
 
-	fdEgress := uint32(progEgress.FD())
-	flagsEg := uint32(0x1)
-	egressFilter := tc.Object{
-		tc.Msg{
-			Family:  unix.AF_UNSPEC,
-			Ifindex: uint32(iface.Index),
-			Handle:  0,
-			Parent:  core.BuildHandle(tc.HandleRoot, tc.HandleMinEgress),
-			Info:    0x300,
+	egressFilter := &netlink.BpfFilter{
+		FilterAttrs: netlink.FilterAttrs{
+			LinkIndex: iface.Index,
+			Priority:  e.currentPriority,
+			Handle:    netlink.MakeHandle(0x1, 0),
+			Parent:    netlink.HANDLE_MIN_EGRESS,
+			Protocol:  unix.ETH_P_ALL,
 		},
-		tc.Attribute{
-			Kind: "bpf",
-			BPF: &tc.Bpf{
-				FD:    &fdEgress,
-				Flags: &flagsEg,
-			},
-		},
+		DirectAction: true,
+		Name:         progEgress.String(),
+		Fd:           progEgress.FD(),
 	}
 
-	if err := e.Tcnl.Filter().Replace(&ingressFilter); err != nil {
+	e.currentPriority += 1
+
+	runtime.Breakpoint()
+	if err := netlink.FilterAdd(ingressFilter); err != nil {
 		return err
 	}
 
-	if err := e.Tcnl.Filter().Replace(&egressFilter); err != nil {
+	if err := netlink.FilterAdd(egressFilter); err != nil {
 		return err
 	}
+
 	return nil
 }
 
