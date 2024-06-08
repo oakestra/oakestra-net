@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/binary"
+	"github.com/cilium/ebpf"
 	"log"
 	"net"
 )
 
 type Firewall struct {
-	FwObjects firewallObjects
+	collection *ebpf.Collection `json:"-"`
 }
 
 type Protocol uint32
@@ -27,6 +28,12 @@ type FirewallRule struct {
 	dstPort uint16
 }
 
+func NewFirewall(collection *ebpf.Collection) Firewall {
+	return Firewall{
+		collection: collection,
+	}
+}
+
 func (e *Firewall) AddRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPort uint16, dstPort uint16) error {
 	rule := FirewallRule{
 		srcIp:   binary.LittleEndian.Uint32(srcIp.To4()),
@@ -37,7 +44,7 @@ func (e *Firewall) AddRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPort u
 		dstPort: dstPort,
 	}
 	value := uint8(1)
-	err := e.FwObjects.FwRules.Put(rule, value)
+	err := e.collection.Maps["fw_rules"].Put(rule, value)
 	if err != nil {
 		log.Fatalf("Error %s", err)
 		return err
@@ -53,18 +60,9 @@ func (e *Firewall) DeleteRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPor
 		srcPort: srcPort,
 		dstPort: dstPort,
 	}
-	err := e.FwObjects.FwRules.Delete(rule)
+	err := e.collection.Maps["fw_rules"].Delete(rule)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func (e *Firewall) Load() {
-	// Load the compiled eBPF ELF and load it into the kernel.
-	var objs firewallObjects
-	if err := loadFirewallObjects(&objs, nil); err != nil {
-		log.Fatal("Loading eBPF objects:", err)
-	}
-	e.FwObjects = objs
 }

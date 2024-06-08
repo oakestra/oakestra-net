@@ -14,6 +14,7 @@ type ModuleBase struct {
 	Active   bool   `json:"active"`
 }
 
+// TODO ben write one build script for each module to make building a bit easier, especially for different architectures
 // ModuleInterface defines the interface of an eBPF module that can be plugged into the NetManager at runtime.
 // Additionally, the NetManager expects a 'New(id uint, config Config, router *mux.Router, manager *EbpfManager) ModuleInterface' function to be implemented.
 // This function return a freshly initialised instance of the ebpf module.
@@ -22,13 +23,12 @@ type ModuleInterface interface {
 	// GetModule returns ModuleBase struct
 	GetModuleBase() *ModuleBase
 
+	// TODO make this an event channel instead of a function? -> strong Coupling to go language!
 	// NewInterfaceCreated notifies the ebpf module that a new interface (+ service) was created
 	NewInterfaceCreated(ifname string) error
 
-	// DestroyModule removes deconstructs the module and releases all resources
+	// DestroyModule releases all ressources that were allocated by the module and are not manages by the ebpf manager
 	DestroyModule() error
-	// TODO ben do we need to tell the module if a service got undeployed?
-	// In general and ebpf function get removed when veth is removed. I think a module should be written in a way such that it can handle this
 
-	// TODO ben does it make sense to have a destroy method for each interface?
+	// TODO ben handle service undeployment or removal of veths!
 }

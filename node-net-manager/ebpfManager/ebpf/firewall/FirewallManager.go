@@ -14,14 +14,25 @@ import (
 type FirewallManager struct {
 	ebpfManager.ModuleBase
 	// maps interface name to firewall
-	firewalls map[string]Firewall
+	firewalls map[string]*Firewall
 	manager   *ebpfManager.EbpfManager
 }
 
-func New() ebpfManager.ModuleInterface {
-	return &FirewallManager{
-		firewalls: make(map[string]Firewall),
+func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) ebpfManager.ModuleInterface {
+	module := FirewallManager{
+		firewalls: make(map[string]*Firewall),
 	}
+	module.ModuleBase.Id = id
+	module.ModuleBase.Config = config
+	module.manager = manager
+
+	//TODO ben handler functions
+	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusOK)
+	}).Methods("GET")
+
+	return &module
 }
 
 func (f *FirewallManager) GetModuleBase() *ebpfManager.ModuleBase {
@@ -64,17 +75,18 @@ func (f *FirewallManager) Configure(config ebpfManager.Config, router *mux.Route
 	})
 }
 
-// TODO ben instead of creating one function per Event, pass a Event channel to the module that emits all events
 func (f *FirewallManager) NewInterfaceCreated(ifname string) error {
-	firewall := Firewall{}
-	f.manager.LoadAndAttach("firewall", ifname)
-	f.firewalls[ifname] = firewall
+	coll, _ := f.manager.LoadAndAttach(f.Id, ifname)
+	firewall := NewFirewall(coll)
+	f.firewalls[ifname] = &firewall
 	return nil
 }
 
 func (f *FirewallManager) DestroyModule() error {
 	for ifname := range f.firewalls {
-		f.removeFirewall(ifname)
+		if _, exists := f.firewalls[ifname]; exists {
+			delete(f.firewalls, ifname)
+		}
 	}
 	return nil
 }
@@ -82,13 +94,6 @@ func (f *FirewallManager) DestroyModule() error {
 func (f *FirewallManager) AddFirewallRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPort uint16, dstPort uint16) {
 	for _, fw := range f.firewalls {
 		fw.AddRule(srcIp, dstIp, proto, srcPort, dstPort)
-	}
-}
-
-func (f *FirewallManager) removeFirewall(ifname string) {
-	if _, exists := f.firewalls[ifname]; exists {
-		// TODO ben add request unattach to ebpfManager
-		delete(f.firewalls, ifname)
 	}
 }
 

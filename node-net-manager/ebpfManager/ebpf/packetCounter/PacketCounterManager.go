@@ -25,7 +25,6 @@ func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfMa
 	module.ModuleBase.Config = config
 	module.manager = manager
 	router.HandleFunc("/counts", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
 		module.RefreshAllCounters()
 		jsonResponse, err := json.Marshal(module.counters)
 		if err != nil {

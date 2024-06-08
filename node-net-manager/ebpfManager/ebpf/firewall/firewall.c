@@ -40,7 +40,7 @@ int handle_ingress(struct __sk_buff *skb)
     bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
 
     if (eth.h_proto != bpf_htons(ETH_P_IP))
-        return TC_ACT_OK; // Pass the packet if it is not IPv4 for now TODO ben!
+        return TC_ACT_UNSPEC; // Pass the packet if it is not IPv4 for now TODO ben!
 
     struct iphdr ip;
     bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip, sizeof(ip));
@@ -82,7 +82,7 @@ int handle_ingress(struct __sk_buff *skb)
     else
     {
         // Allow non-UDP/non-TCP/non-ICMP traffic to pass
-        return TC_ACT_OK;
+        return TC_ACT_UNSPEC;
     }
 
     key.src_port = bpf_htons(key.src_port);
@@ -91,7 +91,7 @@ int handle_ingress(struct __sk_buff *skb)
     __u8 *value = bpf_map_lookup_elem(&fw_rules, &key);
     if (value)
     {
-        return TC_ACT_OK; // Rule found, pass the packet
+        return TC_ACT_UNSPEC; // Rule found, pass the packet
     }
 
     return TC_ACT_SHOT; // Default action is to drop
@@ -105,7 +105,7 @@ int handle_egress(struct __sk_buff *skb)
     bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
 
     if (eth.h_proto != bpf_htons(ETH_P_IP))
-        return TC_ACT_OK; // Pass the packet if it is not IPv4 for now TODO ben!
+        return TC_ACT_UNSPEC; // Pass the packet if it is not IPv4 for now TODO ben!
 
     struct iphdr ip;
     bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip, sizeof(ip));
@@ -147,7 +147,7 @@ int handle_egress(struct __sk_buff *skb)
     else
     {
         // Allow non-UDP/non-TCP/non-ICMP traffic to pass
-        return TC_ACT_OK;
+        return TC_ACT_UNSPEC;
     }
 
     key.src_port = bpf_htons(key.src_port);
@@ -156,78 +156,10 @@ int handle_egress(struct __sk_buff *skb)
     __u8 *value = bpf_map_lookup_elem(&fw_rules, &key);
     if (value)
     {
-        return TC_ACT_OK; // Rule found, pass the packet
+        return TC_ACT_UNSPEC; // Rule found, pass the packet
     }
 
     return TC_ACT_SHOT; // Default action is to drop
 }
-
-//
-// SEC("xdp_prog")
-// int firewall(struct xdp_md *ctx)
-//{
-//    // Access the data and data_end from the packet context
-//    void *data = (void *)(long)ctx->data;
-//    void *data_end = (void *)(long)ctx->data_end;
-//
-//    // Check that the packet contains enough data to validate the Ethernet header
-//    struct ethhdr *eth = data;
-//    if ((void *)eth + sizeof(*eth) > data_end)
-//        return XDP_DROP;
-//
-//    // Filter only IPv4 packets, Ethertype 0x0800
-//    if (eth->h_proto != bpf_htons(ETH_P_IP))
-//        return XDP_PASS;
-//
-//    // Offset to the IP header
-//    struct iphdr *ip = data + sizeof(struct ethhdr);
-//    if ((void *)ip + sizeof(*ip) > data_end)
-//        return XDP_DROP;
-//
-//    unsigned int dest_ip = ip->daddr;
-//    int ifindex = ctx->ingress_ifindex;
-//    const char msg[] = "XDP received packet with destination IP: %x on interface: %d\n"; // TODO ben remove just here for debugging
-//    bpf_trace_printk(msg, sizeof(msg), dest_ip, ifindex);
-//
-//    struct fw_rule key = {
-//        .src_ip = ip->saddr,
-//        .dst_ip = ip->daddr,
-//        .src_port = 0,
-//        .dst_port = 0,
-//    };
-//
-//    if (ip->protocol == IPPROTO_UDP)
-//    {
-//        struct udphdr *udp = (void *)ip + sizeof(*ip);
-//        if ((void *)(udp + 1) > data_end)
-//            return XDP_DROP;
-//        key.src_port = udp->source;
-//        key.dst_port = udp->dest;
-//    }
-//    else if (ip->protocol == IPPROTO_TCP)
-//    {
-//        struct tcphdr *tcp = (void *)ip + sizeof(*ip);
-//        if ((void *)(tcp + 1) > data_end)
-//            return XDP_DROP;
-//        key.src_port = tcp->source;
-//        key.dst_port = tcp->dest;
-//    }
-//    else
-//    {
-//        // TODO ben let all traffic that is not UDP or TCP pass for now.
-//        return XDP_PASS;
-//    }
-//
-//    // Lookup the rule in the map
-//    __u8 *value = bpf_map_lookup_elem(&fw_rules, &key);
-//    if (value)
-//    {
-//        return XDP_PASS; // Rule found, pass the packet
-//    }
-//
-//    const char drp[] = "Packet was dropped\n"; // TODO ben remove just here for debugging
-//    bpf_trace_printk(drp, sizeof(drp));
-//    return XDP_DROP; // Default action is to drop
-//}
 
 char _license[] SEC("license") = "GPL";
