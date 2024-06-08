@@ -28,7 +28,7 @@ int handle_ingress(struct __sk_buff *skb)
     if (count) {
         __sync_fetch_and_add(count, 1);
     }
-    return TC_ACT_OK;
+    return TC_ACT_UNSPEC;
 }
 
 SEC("classifier")
@@ -39,7 +39,7 @@ int handle_egress(struct __sk_buff *skb)
     if (count) {
         __sync_fetch_and_add(count, 1);
     }
-    return TC_ACT_OK;
+    return TC_ACT_UNSPEC;
 }
 
 char _license[] SEC("license") = "GPL";

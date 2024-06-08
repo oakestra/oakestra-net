@@ -18,8 +18,9 @@ import (
 //go:generate ./generate_ebpf.sh
 
 type ModuleContainer struct {
-	module  ModuleInterface
-	filters []FilterPair
+	module      ModuleInterface
+	filters     []FilterPair
+	collections []*ebpf.Collection
 }
 
 type FilterPair struct {
@@ -126,7 +127,6 @@ func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collect
 	}
 
 	coll, err := e.loadEbpf(moduleContainer.module.GetModuleBase().Config.Name)
-	// TODO ben. make the ebbf manager store one copy of all collections, such that we can close them ourselves in an emergency
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +136,7 @@ func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collect
 		return nil, err
 	}
 
+	moduleContainer.collections = append(moduleContainer.collections, coll)
 	moduleContainer.filters = append(moduleContainer.filters, *fp)
 
 	return coll, nil
@@ -195,7 +196,7 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*F
 		FilterAttrs: netlink.FilterAttrs{
 			LinkIndex: iface.Index,
 			Priority:  e.currentPriority,
-			Handle:    netlink.MakeHandle(0x1, 0),
+			Handle:    netlink.MakeHandle(0x1, e.currentPriority),
 			Parent:    netlink.HANDLE_MIN_INGRESS,
 			Protocol:  unix.ETH_P_ALL,
 		},
@@ -208,7 +209,7 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*F
 		FilterAttrs: netlink.FilterAttrs{
 			LinkIndex: iface.Index,
 			Priority:  e.currentPriority,
-			Handle:    netlink.MakeHandle(0x1, 0),
+			Handle:    netlink.MakeHandle(0x1, e.currentPriority),
 			Parent:    netlink.HANDLE_MIN_EGRESS,
 			Protocol:  unix.ETH_P_ALL,
 		},
@@ -260,11 +261,21 @@ func (e EbpfManager) deleteModuleById(id uint) {
 	if moduleContainer, exists := e.idToModule[id]; exists {
 		moduleContainer.module.GetModuleBase().close()
 		moduleContainer.module.DestroyModule()
+
+		// remove ebpf filters from ethernet ports if still attached
 		for _, fp := range moduleContainer.filters {
 			netlink.FilterDel(fp.ingress)
 			netlink.FilterDel(fp.egress)
 		}
+
+		// unload ebpf program and map if still in kernel
+		for _, coll := range moduleContainer.collections {
+			coll.Close()
+		}
+
 		delete(e.idToModule, id)
+
+		// TODO ben: you can't delete handlers in gorilla mux after they were created! Find work around!
 	}
 }
 
