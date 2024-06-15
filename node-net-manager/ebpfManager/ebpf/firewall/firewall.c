@@ -32,6 +32,8 @@ struct bpf_map_def SEC("maps") fw_rules = {
     .max_entries = 1024,
 };
 
+// TODO ben this is an IPv4 only firewall. Do we need IPv6 for this example?
+// TODO ben It also just ignores non-UDP and non-TCP traffic. Is that intended behavior?
 SEC("classifier")
 int handle_ingress(struct __sk_buff *skb)
 {
@@ -40,7 +42,7 @@ int handle_ingress(struct __sk_buff *skb)
     bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
 
     if (eth.h_proto != bpf_htons(ETH_P_IP))
-        return TC_ACT_UNSPEC; // Pass the packet if it is not IPv4 for now TODO ben!
+        return TC_ACT_UNSPEC;
 
     struct iphdr ip;
     bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip, sizeof(ip));

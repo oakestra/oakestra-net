@@ -23,6 +23,15 @@ struct bpf_map_def SEC("maps") lookup_table = {
 SEC("classifier")
 int handle_ingress(struct __sk_buff *skb)
 {
+    struct ethhdr eth;
+    bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
+
+    if (eth.h_proto != bpf_htons(ETH_P_IP))
+        return TC_ACT_UNSPEC;
+
+    struct iphdr ip;
+    bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip, sizeof(ip));
+
     return TC_ACT_UNSPEC;
 }
 
