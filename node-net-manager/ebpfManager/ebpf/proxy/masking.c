@@ -16,25 +16,24 @@
 #define IPv4LEN 4
 #define IPv6LEN 16
 
-#define IPV4_SUBNET 0xC0A80100 // 192.168.1.0
-#define IPV4_MASK 0xFFFFFF00   // 255.255.255.0
+#define IPV4_SUBNET 0x00001E0A // 10.30.0.0 in big endian
+#define IPV4_MASK 0x0000FFFF // 255.255.255.0 in big endian
 
-#define IPV6_SUBNET                                                                                    \
-    {                                                                                                  \
-        0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 \
-    }
-#define IPV6_MASK                                                                                      \
-    {                                                                                                  \
-        0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 \
-    }
+#define IPV6_SUBNET { 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
+#define IPV6_MASK { 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
 
 extern bool is_ipv4_in_network(__be32 addr) {
+    char msg[] = "b: %d, addr: %x";
+    bpf_trace_printk(msg, sizeof(msg), (addr & IPV4_MASK) == (IPV4_SUBNET & IPV4_MASK), addr);
     return (addr & IPV4_MASK) == (IPV4_SUBNET & IPV4_MASK);
 }
 
-extern bool is_ipv6_in_network(struct in6_addr *addr, struct in6_addr *network, struct in6_addr *mask) {
-    for (int i = 0; i < 4; i++) {
-        if ((addr->in6_u.u6_addr32[i] & mask->in6_u.u6_addr32[i]) != (network->in6_u.u6_addr32[i] & mask->in6_u.u6_addr32[i])) {
+extern bool is_ipv6_in_network(struct in6_addr *addr) {
+    unsigned char subnet[16] = IPV6_SUBNET;
+    unsigned char mask[16] = IPV6_MASK;
+
+    for (int i = 0; i < 16; i++) {
+        if ((addr->in6_u.u6_addr8[i] & mask[i]) != (subnet[i] & mask[i])) {
             return false;
         }
     }

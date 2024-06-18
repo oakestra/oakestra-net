@@ -27,4 +27,5 @@ cd loader
 cd ..
 
 echo "Ping google from inside NS..."
-ip netns exec $NS1 ping 142.250.184.3
+# ip netns exec $NS1 ping 142.250.184.3
+ip netns exec $NS1 python3 simple_client.py

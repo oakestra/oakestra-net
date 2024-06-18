@@ -62,24 +62,24 @@ func main() {
 		Fd:           progIngress.FD(),
 	}
 
-	//egressFilter := &netlink.BpfFilter{
-	//	FilterAttrs: netlink.FilterAttrs{
-	//		LinkIndex: iface.Index,
-	//		Priority:  e.currentPriority,
-	//		Handle:    netlink.MakeHandle(0x1, e.currentPriority),
-	//		Parent:    netlink.HANDLE_MIN_EGRESS,
-	//		Protocol:  unix.ETH_P_ALL,
-	//	},
-	//	DirectAction: true,
-	//	Name:         progEgress.String(),
-	//	Fd:           progEgress.FD(),
-	//}
+	egressFilter := &netlink.BpfFilter{
+		FilterAttrs: netlink.FilterAttrs{
+			LinkIndex: iface.Index,
+			Priority:  0,
+			Handle:    netlink.MakeHandle(0x1, 0),
+			Parent:    netlink.HANDLE_MIN_EGRESS,
+			Protocol:  unix.ETH_P_ALL,
+		},
+		DirectAction: true,
+		Name:         progEgress.String(),
+		Fd:           progEgress.FD(),
+	}
 
 	if err := netlink.FilterAdd(ingressFilter); err != nil {
 		log.Fatal(err)
 	}
 
-	//if err := netlink.FilterAdd(egressFilter); err != nil {
-	//	return nil, err
-	//}
+	if err := netlink.FilterAdd(egressFilter); err != nil {
+		log.Fatal(err)
+	}
 }
