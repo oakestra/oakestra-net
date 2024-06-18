@@ -11,6 +11,7 @@
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <linux/pkt_cls.h>
+#include <stdbool.h>
 
 #define IPv4LEN 4
 #define IPv6LEN 16
