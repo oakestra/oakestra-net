@@ -1,6 +1,7 @@
 package network
 
 import (
+	"NetManager/logger"
 	"errors"
 	"fmt"
 	"log"
@@ -154,6 +155,22 @@ func EnableMasquerading(address string, mask string, addressipv6 string, ipv6pre
 			}
 		}
 	}
+}
+
+func EnableDNSMasquerading(bridgeName string) error {
+	logger.InfoLogger().Printf("add DNS NAT for %s", bridgeName)
+	err := iptable.AppendUnique("nat", "PREROUTING",
+		"-i", bridgeName,
+		"--dport", "53",
+		"-j", "DNAT",
+		"--to-destination", "127.0.0.53:53")
+	if err != nil {
+		logger.ErrorLogger().Println("Error in add PREROUTING v4 DNS rule.")
+		return err
+	}
+	// TODO: IPv6
+	// What is the 127.0.0.53 equivalent?
+	return nil
 }
 
 // ManageContainerPorts open or close container port with the nat rules

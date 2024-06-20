@@ -129,6 +129,7 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 	// Enable bridge MASQUERADING
 	logger.InfoLogger().Println("Enabling packet masquerading")
 	network.EnableMasquerading(e.config.HostBridgeIP, e.config.HostBridgeMask, e.config.HostBridgeIPv6, e.config.HostBridgeIPv6Prefix, e.config.HostBridgeName, e.config.ConnectedInternetInterface)
+	network.EnableDNSMasquerading(e.config.HostBridgeName)
 
 	// update status with current network configuration
 	logger.InfoLogger().Println("Reading the current environment configuration")
