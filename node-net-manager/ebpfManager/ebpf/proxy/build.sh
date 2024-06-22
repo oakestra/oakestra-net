@@ -14,6 +14,8 @@ clang -O2 -target bpf -emit-llvm -c masking.c -o build/masking.bc
 llvm-link -o build/main.bc build/proxy.bc build/masking.bc
 clang -O2 -target bpf -c build/main.bc -o build/main.o
 
+clang -O2 -target bpf -c print.xdp.c -o build/print.xdp.o
+
 cd loader
 go build
 cd ..
@@ -26,6 +28,6 @@ cd loader
 ./loader
 cd ..
 
-echo "Ping google from inside NS..."
+echo "Exec client inside NS1..."
 # ip netns exec $NS1 ping 142.250.184.3
 ip netns exec $NS1 python3 simple_client.py

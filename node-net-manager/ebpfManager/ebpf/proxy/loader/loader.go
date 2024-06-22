@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/link"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"log"
@@ -10,7 +11,6 @@ import (
 
 func main() {
 	ifname := "veth-ns1"
-
 	spec, err := ebpf.LoadCollectionSpec("../build/main.o")
 	if err != nil {
 		log.Fatal(err)
@@ -81,5 +81,36 @@ func main() {
 
 	if err := netlink.FilterAdd(egressFilter); err != nil {
 		log.Fatal(err)
+	}
+
+	ifname2 := "veth-ns2"
+
+	iface2, err := net.InterfaceByName(ifname2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	spec2, err := ebpf.LoadCollectionSpec("../build/print.xdp.o")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	coll2, err := ebpf.NewCollection(spec2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	xdpProg := coll2.Programs["printer"]
+	if progEgress == nil {
+		log.Fatal(err)
+	}
+
+	_, err = link.AttachXDP(link.XDPOptions{
+		Program:   xdpProg,
+		Interface: iface2.Index,
+	})
+
+	if err != nil {
+		log.Fatalf("attaching XDP program: %v", err)
 	}
 }

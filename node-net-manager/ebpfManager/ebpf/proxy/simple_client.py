@@ -5,7 +5,7 @@ import time
 host = '10.30.0.2'  # Server IP address
 port = 1234  # Port to connect to
 source_port = 49679
-
+time.sleep(5)
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind(("", source_port))
     i = 0

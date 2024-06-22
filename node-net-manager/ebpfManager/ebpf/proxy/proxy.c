@@ -1,5 +1,3 @@
-//go:build ignore
-
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <linux/if_ether.h>
@@ -14,57 +12,130 @@
 #include <bpf/bpf_helpers.h>
 #include <linux/pkt_cls.h>
 #include <stdbool.h>
-#include "masking.h"
+#include <stddef.h>
 
-struct bpf_map_def SEC("maps") lookup_table = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(__u8),
-    .value_size = sizeof(__u8),
-    .max_entries = 1024,
+struct session_key {
+    __u32 src_ip;
+    __u32 dst_ip;
+    __u16 src_port;
+    __u16 dst_port;
 };
 
-SEC("classifier")
-int handle_ingress(struct __sk_buff *skb)
-{
-    struct ethhdr eth;
-    struct iphdr ipv4;
-    struct ipv6hdr ipv6;
-    bool isInSubNet = false;
+struct bpf_map_def SEC("maps/service_to_instance") service_to_instance = {
+        .type = BPF_MAP_TYPE_HASH,
+        .key_size = sizeof(__u32),
+        .value_size = sizeof(__u32),
+        .max_entries = 128,
+};
 
-    bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
+struct bpf_map_def SEC("maps/round_robin_state") round_robin_state = {
+        .type = BPF_MAP_TYPE_HASH,
+        .key_size = sizeof(__u32),
+        .value_size = sizeof(__u32),
+        .max_entries = 128,
+};
 
-    if (eth.h_proto == bpf_htons(ETH_P_IP)) {
-        // IPv4 packet
-        if (bpf_skb_load_bytes(skb, sizeof(eth), &ipv4, sizeof(ipv4)) < 0)
-            return TC_ACT_SHOT;
+struct bpf_map_def SEC("maps/open_sessions") open_sessions = {
+        .type = BPF_MAP_TYPE_HASH,
+        .key_size = sizeof(struct session_key),
+        .value_size = sizeof(__u32),
+        .max_entries = 1024,
+};
 
-        isInSubNet = is_ipv4_in_network(ipv4.daddr);
-    } else if (eth.h_proto == bpf_htons(ETH_P_IPV6)) {
-        // IPv6 packet
-        if (bpf_skb_load_bytes(skb, sizeof(eth), &ipv6, sizeof(ipv6)) < 0)
-            return TC_ACT_SHOT;
-        isInSubNet = is_ipv6_in_network(&ipv6.daddr);
+int proxy(struct __sk_buff *skb){
+    void *data = (void *) (long) skb->data;
+    void *data_end = (void *) (long) skb->data_end;
+
+    struct ethhdr *eth = data;
+    struct iphdr *ip;
+    struct tcphdr *tcp;
+    struct udphdr *udp;
+
+    // check if enough size for ethernet header
+    if ((void *) (eth + 1) > data_end) {
+        return TC_ACT_OK;
     }
 
-    // if not in the relevant subnetworks -> pass the packet
-    if (!isInSubNet) {
-        char msg3[] = "Is not sub";
-        bpf_trace_printk(msg3, sizeof(msg3));
-        return TC_ACT_UNSPEC;
+    // check if IPv4. Ebpf proxy only supports IPv4 for now.
+    if (eth->h_proto != bpf_htons(ETH_P_IP)) {
+        return TC_ACT_OK;
     }
 
-    char msg4[] = "Is sub";
-    bpf_trace_printk(msg4, sizeof(msg4));
+    ip = (struct iphdr *)(eth + 1);
+    if ((void *)(ip + 1) > data_end)
+        return TC_ACT_OK;
 
-    return TC_ACT_UNSPEC;
+    if (ip->protocol != IPPROTO_TCP)
+        return TC_ACT_OK;
+
+    __u32 service_ip = ip->daddr;
+    __u32 *instance_ip = bpf_map_lookup_elem(&service_to_instance, &service_ip);
+    if (!instance_ip)
+        return TC_ACT_OK;
+
+    iphdr_len = ip->ihl * 4;
+    if (iphdr_len < sizeof(*ip))
+        // TODO ben, this more or less disables the use of IPv4 options
+        //  but we need some kind of a bound for IHL for the ebpf verifier
+        return TC_ACT_SHOT;
+
+    // proxy only supports TCP and UDP for now.
+    if (ip->protocol == IPPROTO_TCP) {
+        tcp = (struct tcphdr *)((__u8 *)ip + iphdr_len);
+        if ((void *)(tcp + 1) > data_end)
+            return TC_ACT_OK;
+
+        struct sock *sk = skb->sk;
+        if (!sk)
+            return TC_ACT_OK;
+
+        __u32 *existing_instance_ip = bpf_map_lookup_elem(&open_connections, &sk);
+        if (existing_instance_ip) {
+            ip->daddr = *existing_instance_ip;
+            return TC_ACT_OK;
+        }
+
+        __u32 rr_key = 0;
+        __u32 *rr_state = bpf_map_lookup_elem(&round_robin_state, &rr_key);
+        if (!rr_state)
+            return TC_ACT_OK;
+
+        __u32 next_instance_ip = instance_ip[*rr_state];
+        *rr_state = (*rr_state + 1) % MAX_INSTANCES;
+
+        bpf_map_update_elem(&round_robin_state, &rr_key, rr_state, BPF_ANY);
+        bpf_map_update_elem(&open_connections, &sk, &next_instance_ip, BPF_ANY);
+
+        ip->daddr = next_instance_ip;
+        return TC_ACT_OK;
+    } else if (ip->protocol == IPPROTO_UDP) {
+        udp = (struct udphdr *)((__u8 *)ip + (ip->ihl * 4));
+        if ((void *)(udp + 1) > data_end)
+            return TC_ACT_OK;
+
+        __u32 rr_key = 0;
+        __u32 *rr_state = bpf_map_lookup_elem(&round_robin_state, &rr_key);
+        if (!rr_state)
+            return TC_ACT_OK;
+
+        __u32 next_instance_ip = instance_ip[*rr_state];
+        *rr_state = (*rr_state + 1) % MAX_INSTANCES;
+
+        bpf_map_update_elem(&round_robin_state, &rr_key, rr_state, BPF_ANY);
+
+        ip->daddr = next_instance_ip;
+        return TC_ACT_OK;
+    }
+
+    return TC_ACT_OK;
 }
 
 SEC("classifier")
-int handle_egress(struct __sk_buff *skb)
-{
-    char msg[] = "Egress";
-    bpf_trace_printk(msg, sizeof(msg));
-    return TC_ACT_UNSPEC;
+int handle_ingress(struct __sk_buff *skb) {
+    return proxy(skb);
 }
 
-char _license[] SEC("license") = "GPL";
+SEC("classifier")
+int handle_egress(struct __sk_buff *skb) {
+    return proxy(skb);
+}

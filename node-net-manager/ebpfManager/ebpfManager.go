@@ -79,6 +79,7 @@ func (e *EbpfManager) init() {
 	})
 }
 
+// TODO ben most likely we wnat to return TC_ACT_PIPE instead of UNSPEC!! Investigate further
 func (e *EbpfManager) createNewEbpfModule(config Config) (ModuleInterface, error) {
 	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
 
