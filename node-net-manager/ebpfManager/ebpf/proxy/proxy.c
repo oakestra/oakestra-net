@@ -85,7 +85,9 @@ int outgoing_proxy(struct __sk_buff *skb){
 
         key.src_port = tcp->source;
         key.dst_port = tcp->dest;
-    } else if (ip->protocol == IPPROTO_UDP) {
+    }
+    // TODO ben why does 'else if' not work here??
+    if (ip->protocol == IPPROTO_UDP) {
         struct udphdr *udp;
 
         udp = (struct udphdr *)((__u8 *)ip + iphdr_len);
@@ -94,9 +96,13 @@ int outgoing_proxy(struct __sk_buff *skb){
 
         key.src_port = udp->source;
         key.dst_port = udp->dest;
+    } else {
+        return TC_ACT_OK;
     }
 
+
     __be32 *open_connection_ip = bpf_map_lookup_elem(&open_sessions, &key);
+
     if (open_connection_ip) {
         new_daddr = *open_connection_ip; // TODO ben this address could have gotten invalid in the meantime!
         return TC_ACT_OK;
@@ -104,8 +110,10 @@ int outgoing_proxy(struct __sk_buff *skb){
         // if no open connection found, choose new server using round robin.
         // TODO ben Implement other mechanisms than RR here
 
-        struct ip_list *ipl = bpf_map_lookup_elem(&open_sessions, &key);
+        struct ip_list *ipl = bpf_map_lookup_elem(&service_to_instance, &ip->daddr);
         if (!ipl) {
+            const char msg[] = "shot\n";
+            bpf_trace_printk(msg, sizeof(msg)); // TODO ben remove
             // TODO ben cache packet and trigger update to potentially find IP.
             return TC_ACT_SHOT;
         }
@@ -117,6 +125,9 @@ int outgoing_proxy(struct __sk_buff *skb){
         // add new 4-Tuple to our session cache
         bpf_map_update_elem(&open_sessions, &key, &new_daddr, BPF_ANY);
     }
+
+     const char msg[] = "%d\n";
+     bpf_trace_printk(msg, sizeof(msg), new_daddr); // TODO ben remove
 
     // Update the IP header with the new destination address
     ip->daddr = new_daddr;
@@ -135,3 +146,5 @@ SEC("classifier")
 int handle_egress(struct __sk_buff *skb) {
     return TC_ACT_OK;
 }
+
+char _license[] SEC("license") = "GPL";
