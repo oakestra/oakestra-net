@@ -23,7 +23,7 @@ echo "Create environment..."
 
 echo "Load and Attach ebpf..."
 cd loader
-# ./loader
+./loader
 cd ..
 
 echo "Exec client inside NS1..."
