@@ -9,8 +9,6 @@ import (
 	"net/http"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go firewall firewall.c
-
 type FirewallManager struct {
 	ebpfManager.ModuleBase
 	// maps interface name to firewall
@@ -83,11 +81,7 @@ func (f *FirewallManager) NewInterfaceCreated(ifname string) error {
 }
 
 func (f *FirewallManager) DestroyModule() error {
-	for ifname := range f.firewalls {
-		if _, exists := f.firewalls[ifname]; exists {
-			delete(f.firewalls, ifname)
-		}
-	}
+	f.firewalls = nil
 	return nil
 }
 

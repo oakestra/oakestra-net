@@ -72,6 +72,7 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 	for {
 		select {
 		case msg := <-proxy.outgoingChannel:
+			continue // TODO ben disabled outgoing proxy to demonstrate ebpf proxy is working
 			// logger.DebugLogger().Println("outgoingChannelSize: ", len(proxy.outgoingChannel))
 			// logger.DebugLogger().Printf("Msg outgoingChannel: %x\n", (*msg.content))
 			ip, prot := decodePacket(*msg.content)

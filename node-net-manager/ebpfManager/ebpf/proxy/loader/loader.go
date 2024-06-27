@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/binary"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"log"
@@ -83,34 +83,54 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ifname2 := "veth-ns2"
+	const MAX_IPS = 32
 
-	iface2, err := net.InterfaceByName(ifname2)
-	if err != nil {
-		log.Fatal(err)
+	type IPList struct {
+		Length int32
+		IPs    [MAX_IPS]uint32
 	}
 
-	spec2, err := ebpf.LoadCollectionSpec("../build/print.xdp.o")
-	if err != nil {
-		log.Fatal(err)
+	serviceToInstance := coll.Maps["service_to_instance"]
+
+	var value IPList
+	key := binary.LittleEndian.Uint32(net.ParseIP("10.30.0.2").To4())
+
+	value.Length = 1
+	value.IPs[0] = binary.LittleEndian.Uint32(net.ParseIP("10.0.0.2").To4()) //TODO ben just for debugging
+	// value.IPs[1] = binary.LittleEndian.Uint32(net.ParseIP("192.168.1.2").To4()) // TODO ben find out why little endian works... Does update function change LE to BE automatically?
+
+	if err := serviceToInstance.Update(&key, &value, ebpf.UpdateAny); err != nil {
+		log.Fatalf("Error updating map: %v", err)
 	}
 
-	coll2, err := ebpf.NewCollection(spec2)
-	if err != nil {
-		log.Fatal(err)
-	}
+	//ifname2 := "veth-ns2"
 
-	xdpProg := coll2.Programs["printer"]
-	if progEgress == nil {
-		log.Fatal(err)
-	}
+	//iface2, err := net.InterfaceByName(ifname2)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
-	_, err = link.AttachXDP(link.XDPOptions{
-		Program:   xdpProg,
-		Interface: iface2.Index,
-	})
+	//spec2, err := ebpf.LoadCollectionSpec("../build/print.xdp.o")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
-	if err != nil {
-		log.Fatalf("attaching XDP program: %v", err)
-	}
+	//coll2, err := ebpf.NewCollection(spec2)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	//xdpProg := coll2.Programs["printer"]
+	//if progEgress == nil {
+	//	log.Fatal(err)
+	//}
+
+	//_, err = link.AttachXDP(link.XDPOptions{
+	//	Program:   xdpProg,
+	//	Interface: iface2.Index,
+	//})
+
+	//if err != nil {
+	//	log.Fatalf("attaching XDP program: %v", err)
+	//}
 }

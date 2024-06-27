@@ -2,7 +2,7 @@ import socket
 import time
 
 # Client settings
-host = '10.30.0.2'  # Server IP address
+host = '10.30.0.2'  # Server Service IP address
 port = 1234  # Port to connect to
 source_port = 49679
 time.sleep(5)

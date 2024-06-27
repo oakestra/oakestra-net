@@ -1,3 +1,5 @@
+//go:build ignore
+
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <linux/if_ether.h>
@@ -97,6 +99,7 @@ int outgoing_proxy(struct __sk_buff *skb){
         key.src_port = udp->source;
         key.dst_port = udp->dest;
     } else {
+        // return for non-udp and non-tcp packets
         return TC_ACT_OK;
     }
 
@@ -105,15 +108,12 @@ int outgoing_proxy(struct __sk_buff *skb){
 
     if (open_connection_ip) {
         new_daddr = *open_connection_ip; // TODO ben this address could have gotten invalid in the meantime!
-        return TC_ACT_OK;
     } else {
         // if no open connection found, choose new server using round robin.
         // TODO ben Implement other mechanisms than RR here
 
         struct ip_list *ipl = bpf_map_lookup_elem(&service_to_instance, &ip->daddr);
         if (!ipl) {
-            const char msg[] = "shot\n";
-            bpf_trace_printk(msg, sizeof(msg)); // TODO ben remove
             // TODO ben cache packet and trigger update to potentially find IP.
             return TC_ACT_SHOT;
         }
@@ -122,29 +122,35 @@ int outgoing_proxy(struct __sk_buff *skb){
         int rand_index = bpf_get_prandom_u32() % ipl->length % MAX_IPS;
         new_daddr = ipl->ips[rand_index];
 
+         const char msg1[] = "lol: %x\n";
+         bpf_trace_printk(msg1, sizeof(msg1), new_daddr); // TODO ben remove
+
         // add new 4-Tuple to our session cache
         bpf_map_update_elem(&open_sessions, &key, &new_daddr, BPF_ANY);
+
+         const char msg2[] = "test: %x\n";
+         bpf_trace_printk(msg2, sizeof(msg2), new_daddr); // TODO ben remove
     }
 
-     const char msg[] = "%d\n";
-     bpf_trace_printk(msg, sizeof(msg), new_daddr); // TODO ben remove
-
-    // Update the IP header with the new destination address
+    // Update the checksum and destination address
+    __be32 sum = bpf_csum_diff((void *)&ip->daddr, 4, (void *)&new_daddr, 4, 0);
     ip->daddr = new_daddr;
+//    bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
 
-    // TODO ben recalculate checksum for L3 and L4.
+    const char msg[] = "done ip: %x\n";
+    bpf_trace_printk(msg, sizeof(msg), ip->daddr); // TODO ben remove
 
     return TC_ACT_OK;
 }
 
 SEC("classifier")
 int handle_ingress(struct __sk_buff *skb) {
-    return outgoing_proxy(skb);
+    return TC_ACT_OK;
 }
 
 SEC("classifier")
 int handle_egress(struct __sk_buff *skb) {
-    return TC_ACT_OK;
+    return outgoing_proxy(skb);
 }
 
 char _license[] SEC("license") = "GPL";

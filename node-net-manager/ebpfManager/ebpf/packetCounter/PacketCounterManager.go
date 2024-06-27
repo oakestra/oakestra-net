@@ -3,12 +3,9 @@ package main
 import (
 	"NetManager/ebpfManager"
 	"encoding/json"
-	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
 )
-
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go packetCounter packetCounter.c
 
 type PacketCounterManager struct {
 	ebpfManager.ModuleBase
@@ -52,10 +49,7 @@ func (p *PacketCounterManager) NewInterfaceCreated(ifname string) error {
 }
 
 func (p *PacketCounterManager) DestroyModule() error {
-	for ifname := range p.counters {
-		// TODO ben iplement destroy
-		fmt.Printf("Destroy Packetcounter on: %s\n", ifname)
-	}
+	p.counters = nil
 	return nil
 }
 
