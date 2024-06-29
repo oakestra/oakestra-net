@@ -24,9 +24,8 @@ func (p *Proxy) AddServiceTranslation(serviceIp net.IP) {
 	var value IPList
 	key := binary.LittleEndian.Uint32(net.ParseIP("10.30.0.1").To4())
 
-	value.Length = 2
+	value.Length = 1
 	value.IPs[0] = binary.LittleEndian.Uint32(net.ParseIP("192.168.1.1").To4()) //TODO ben just for debugging
-	value.IPs[1] = binary.LittleEndian.Uint32(net.ParseIP("192.168.1.2").To4()) // TODO ben find out why little endian works... Does update function change LE to BE automatically?
 
 	if err := p.serviceToInstance.Update(&key, &value, ebpf.UpdateAny); err != nil {
 		log.Fatalf("Error updating map: %v", err)
