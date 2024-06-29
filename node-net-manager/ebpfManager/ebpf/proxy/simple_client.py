@@ -4,7 +4,7 @@ import time
 # Client settings
 host = '10.30.0.2'  # Server Service IP address
 port = 1234  # Port to connect to
-source_port = 49679
+source_port = 4967
 time.sleep(5)
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
     s.bind(("", source_port))
@@ -17,3 +17,20 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         i += 1
 
         time.sleep(5)
+
+# import socket
+# import time
+#
+# host = '10.30.0.2'  # Server Service IP address
+# port = 1234  # Port to connect to
+#
+# time.sleep(5)
+#
+# with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#     s.connect((host, port))
+#     number = 1
+#     while True:
+#         s.sendall(str(number).encode())
+#         print(f'Sent: {number}')
+#         number += 1
+#         time.sleep(5)

@@ -13,7 +13,7 @@ ip netns add $NS2
 
 # Create the bridge
 ip link add name $BRIDGE type bridge
-ip addr add 10.0.0.3/16 dev $BRIDGE
+ip addr add 10.10.0.3/16 dev $BRIDGE
 
 # Create the veth pairs
 ip link add veth-$NS1 type veth peer name veth-$NS1-peer
@@ -28,8 +28,8 @@ ip link set dev veth-$NS1 master $BRIDGE
 ip link set dev veth-$NS2 master $BRIDGE
 
 # Assign IP addresses to the interfaces within the namespaces
-ip netns exec $NS1 ip addr add 10.0.0.1/16 dev veth-$NS1-peer
-ip netns exec $NS2 ip addr add 10.0.0.2/16 dev veth-$NS2-peer
+ip netns exec $NS1 ip addr add 10.10.0.1/16 dev veth-$NS1-peer
+ip netns exec $NS2 ip addr add 10.10.0.2/16 dev veth-$NS2-peer
 
 # Bring up the bridge and veths
 ip link set dev $BRIDGE up
@@ -44,14 +44,14 @@ iptables -A FORWARD -i $BRIDGE -j ACCEPT
 
 # Set up NAT using iptables to allow outbound traffic from the namespaces
 # Adjust eth0 to your default network interface if different
-iptables -t nat -A POSTROUTING -s 10.0.0.0/16 -o eth0 -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 10.10.0.0/16 -o eth0 -j MASQUERADE
 
 # Enable IP forwarding
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
 #Default Gateway for unknown IPs
-ip netns exec $NS1 ip route add default via 10.0.0.3
-ip netns exec $NS2 ip route add default via 10.0.0.3
+ip netns exec $NS1 ip route add default via 10.10.0.3
+ip netns exec $NS2 ip route add default via 10.10.0.3
 
 # Configure the namespaces to use the host's DNS settings
 mkdir -p /etc/netns/$NS1 /etc/netns/$NS2

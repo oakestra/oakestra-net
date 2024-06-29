@@ -67,10 +67,9 @@ events = {
         .max_entries = 128,
 };
 
-int outgoing_proxy(struct __sk_buff *skb) {
-    const char msg0[] = "Hello from egress\n";
-    bpf_trace_printk(msg0, sizeof(msg0)); // TODO ben remove
+extern bool is_ipv4_in_network(__be32 addr);
 
+int outgoing_proxy(struct __sk_buff *skb) {
     void *data = (void *) (long) skb->data;
     void *data_end = (void *) (long) skb->data_end;
 
@@ -79,6 +78,8 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
     struct session_key key = {};
     __u32 new_daddr;
+
+    bool isTCP = false;
 
     // check if enough size for ethernet header
     if ((void *) (eth + 1) > data_end) {
@@ -103,9 +104,17 @@ int outgoing_proxy(struct __sk_buff *skb) {
         //  but we need some kind of a bound for IHL for the ebpf verifier
         return TC_ACT_SHOT;
 
+    if (!is_ipv4_in_network(ip->daddr)) {
+        const char msg4[] = "!is_ipv4_in_network\n";
+        bpf_trace_printk(msg4, sizeof(msg4));
+        return TC_ACT_OK;
+    }
+
+
     // proxy only supports TCP and UDP for now.
     if (ip->protocol == IPPROTO_TCP) {
         struct tcphdr *tcp;
+        isTCP = true;
 
         tcp = (struct tcphdr *) ((__u8 *) ip + iphdr_len);
         if ((void *) (tcp + 1) > data_end)
@@ -124,7 +133,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
         key.src_port = udp->source;
         key.dst_port = udp->dest;
-        udp->check = 0;
+
     } else {
         // return for non-udp and non-tcp packets
         return TC_ACT_OK;
@@ -132,8 +141,9 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
 
     __be32 *open_connection_ip = bpf_map_lookup_elem(&open_sessions, &key);
-
     if (open_connection_ip) {
+        const char msg0[] = "open_connection_ip\n";
+        bpf_trace_printk(msg0, sizeof(msg0));
         new_daddr = *open_connection_ip; // TODO ben this address could have gotten invalid in the meantime!
     } else {
         // if no open connection found, choose new server using round robin.
@@ -144,38 +154,40 @@ int outgoing_proxy(struct __sk_buff *skb) {
             // TODO ben cache packet and trigger update to potentially find IP.
             return TC_ACT_SHOT;
         }
+        const char msg1[] = "ipl!\n";
+        bpf_trace_printk(msg1, sizeof(msg1));
 
         // select instance IP using RR
         int rand_index = bpf_get_prandom_u32() % ipl->length % MAX_IPS;
         new_daddr = ipl->ips[rand_index];
-
-        const char msg1[] = "lol: %x\n";
-        bpf_trace_printk(msg1, sizeof(msg1), new_daddr); // TODO ben remove
-
+        const char msg12[] = "selected: %x, idx: %d\n";
+        bpf_trace_printk(msg12, sizeof(msg12), new_daddr, rand_index);
         // add new 4-Tuple to our session cache
         bpf_map_update_elem(&open_sessions, &key, &new_daddr, BPF_ANY);
-
-        const char msg2[] = "test: %x\n";
-        bpf_trace_printk(msg2, sizeof(msg2), new_daddr); // TODO ben remove
     }
 
-    const char msg14[] = "check before: %x\n";
-    bpf_trace_printk(msg14, sizeof(msg14), ip->check); // TODO ben remove
-
     __s64 sum = bpf_csum_diff((void *)&ip->daddr, 4, (void *)&new_daddr, 4, 0);
-    if (bpf_skb_store_bytes(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, daddr), (void *)&new_daddr, 4, 0) < 0)
-        return TC_ACT_SHOT; // Drop packet if modification fails
-    bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + + offsetof(struct iphdr, check), 0, sum, 0);
+    if (bpf_skb_store_bytes(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, daddr), (void *)&new_daddr, 4, 0) < 0) {
+        const char msg123[] = "bpf_skb_store_bytes err\n";
+        bpf_trace_printk(msg123, sizeof(msg123));
+        return TC_ACT_OK; // Drop packet if modification fails
+    }
+    bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
 
-    return bpf_redirect(skb->ifindex, 0); // TODO ben redirect to egress instantly
+//    int l4_check_off = sizeof(struct ethhdr) + sizeof(struct iphdr) + (isTCP ? offsetof(struct tcphdr, check) : offsetof(struct udphdr, check));
+//    bpf_l4_csum_replace(skb, l4_check_off, 0, sum, 0);
+
+    return TC_ACT_OK;
 }
 
-SEC("classifier")
+SEC("tc")
 int handle_ingress(struct __sk_buff *skb) {
+    const char msg0[] = "Hello from ingress\n";
+    bpf_trace_printk(msg0, sizeof(msg0));
     return outgoing_proxy(skb);
 }
 
-SEC("classifier")
+SEC("tc")
 int handle_egress(struct __sk_buff *skb) {
     return TC_ACT_OK;
 }
