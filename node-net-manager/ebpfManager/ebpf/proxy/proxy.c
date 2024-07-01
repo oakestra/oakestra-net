@@ -25,12 +25,11 @@
 // implies that no more than X replicas of one service can exist
 #define MAX_IPS 32
 
-// implies that a service cannot open more than X connections to other services on the same source and destination port.
-#define MAX_CONVERSION 8
+// implies that a service cannot open more than X connections to another services on the same source and destination port.
+#define MAX_CONVERSION 4
 
-// a session is described from the perspective of the client
+// a session is described from the perspective of the client. We only need the ports because each service has its own ebpf proxy.
 struct session_key {
-    __be32 src_ip;
     __be16 src_port;
     __be16 dst_port;
 };
@@ -67,6 +66,18 @@ open_sessions = {
 };
 
 extern bool is_ipv4_in_network(__be32 addr);
+int outgoing_proxy(struct __sk_buff *skb);
+int ingoing_proxy(struct __sk_buff *skb);
+
+SEC("tc")
+int handle_ingress(struct __sk_buff *skb) {
+    return outgoing_proxy(skb);
+}
+
+SEC("tc")
+int handle_egress(struct __sk_buff *skb) {
+    return ingoing_proxy(skb);
+}
 
 int outgoing_proxy(struct __sk_buff *skb) {
     void *data = (void *) (long) skb->data;
@@ -103,8 +114,6 @@ int outgoing_proxy(struct __sk_buff *skb) {
         return TC_ACT_OK;
     }
 
-    key.src_ip = ip->saddr;
-
     // proxy only supports TCP and UDP for now.
     if (ip->protocol == IPPROTO_TCP) {
         struct tcphdr *tcp;
@@ -126,8 +135,6 @@ int outgoing_proxy(struct __sk_buff *skb) {
         key.dst_port = udp->dest;
     } else {
         // return for non-udp and non-tcp packets
-        const char msg123[] = "not tcp, nor udp\n";
-        bpf_trace_printk(msg123, sizeof(msg123), ip->saddr);
         return TC_ACT_OK;
     }
 
@@ -217,8 +224,6 @@ int ingoing_proxy(struct __sk_buff *skb) {
         return TC_ACT_SHOT;
     }
 
-    key.src_ip = ip->daddr;
-
     // proxy only supports TCP and UDP for now.
     if (ip->protocol == IPPROTO_TCP) {
         struct tcphdr *tcp;
@@ -274,16 +279,6 @@ int ingoing_proxy(struct __sk_buff *skb) {
     // bpf_l4_csum_replace(skb, l4_check_off, 0, sum, 0);
 
     return TC_ACT_OK;
-}
-
-SEC("tc")
-int handle_ingress(struct __sk_buff *skb) {
-    return outgoing_proxy(skb);
-}
-
-SEC("tc")
-int handle_egress(struct __sk_buff *skb) {
-    return ingoing_proxy(skb);
 }
 
 char _license[]

@@ -15,7 +15,7 @@
 #include <linux/pkt_cls.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "masking.h"
+#include "../masking.h"
 
 #define IP_UDP 17
 

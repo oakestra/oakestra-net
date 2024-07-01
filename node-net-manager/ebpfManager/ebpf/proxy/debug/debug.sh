@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 NS1="ns1"
 NS2="ns2"
@@ -9,8 +9,8 @@ echo "Clean up..."
 echo "Build ebpf and go..."
 rm -R build
 mkdir -p build
-clang -O2 -target bpf -emit-llvm -c proxy.c -o build/proxy.bc
-clang -O2 -target bpf -emit-llvm -c masking.c -o build/masking.bc
+clang -O2 -target bpf -emit-llvm -c ../proxy.c -o build/proxy.bc
+clang -O2 -target bpf -emit-llvm -c ../masking.c -o build/masking.bc
 llvm-link -o build/main.bc build/proxy.bc build/masking.bc
 clang -O2 -target bpf -c build/main.bc -o build/main.o
 
@@ -31,7 +31,7 @@ cd loader
 cd ..
 
 kill_processes() {
-    echo "Caught SIGINT, terminating the Python processes..."
+    echo "Caught SIGINT, terminating server"
     kill $PID1
     exit 1
 }
