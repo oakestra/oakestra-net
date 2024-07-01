@@ -17,10 +17,10 @@
 #define MAX_IPV4_HEADER_LENGTH 60
 #define MIN_IPV4_HEADER_LENGTH 20
 
-// implies that no more than X replicas of one service can exist
+// implies that no more than MAX_IPS replicas of one service can exist
 #define MAX_IPS 32
 
-// implies that a service cannot open more than X connections to another services on the same source and destination port.
+// implies that one service cannot open more than MAX_CONVERSION connections to another services on the same source and destination port.
 #define MAX_CONVERSION 4
 
 // a session is described from the perspective of the client. We only need the ports because each service has its own ebpf proxy.
@@ -35,7 +35,7 @@ struct conversion {
 };
 
 struct conversion_list {
-    uint length;
+    uint last_index;
     struct conversion conversions[MAX_CONVERSION];
 };
 
@@ -61,6 +61,7 @@ open_sessions = {
 };
 
 extern bool is_ipv4_in_network(__be32 addr);
+
 int outgoing_proxy(struct __sk_buff *skb);
 int ingoing_proxy(struct __sk_buff *skb);
 
@@ -136,7 +137,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
     // check if a TCP/UDP session was already established for this service IP
     struct conversion_list *list_ptr = bpf_map_lookup_elem(&open_sessions, &key);
     if (list_ptr) {
-        for (int i = 0; i < MAX_CONVERSION; i++) { // TODO ben (length % MAX_CONVERSION) would be better in my opinion  but verfier wants us to loop through all entries
+        for (int i = 0; i < MAX_CONVERSION; i++) {
             if (list_ptr->conversions[i].service_ip == ip->daddr) {
                 new_daddr = list_ptr->conversions[i].instance_ip; // TODO ben this address could have gotten invalid in the meantime!
             }
@@ -163,13 +164,13 @@ int outgoing_proxy(struct __sk_buff *skb) {
         struct conversion_list new_list = {};
         if (list_ptr) {
             new_list = *(list_ptr);
-            new_list.length += 1;
-            int index = new_list.length % MAX_CONVERSION;
+            int index = (new_list.last_index + 1) % MAX_CONVERSION;
             new_list.conversions[index] = new_conversion;
+            new_list.last_index = index;
         }
         else {
             new_list.conversions[0] = new_conversion;
-            new_list.length = 1;
+            new_list.last_index = 0;
         }
         bpf_map_update_elem(&open_sessions, &key, &new_list, BPF_ANY);
     }
@@ -180,10 +181,6 @@ int outgoing_proxy(struct __sk_buff *skb) {
         return TC_ACT_OK; // Drop packet if modification fails
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
-
-    // TODO ben L4 checksum should not be our concern, since we are running fully virtualized.
-    // int l4_check_off = sizeof(struct ethhdr) + sizeof(struct iphdr) + (isTCP ? offsetof(struct tcphdr, check) : offsetof(struct udphdr, check));
-    // bpf_l4_csum_replace(skb, l4_check_off, 0, sum, 0);
 
     return TC_ACT_OK;
 }
@@ -268,10 +265,6 @@ int ingoing_proxy(struct __sk_buff *skb) {
         return TC_ACT_OK; // Drop packet if modification fails
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
-
-    // TODO ben L4 checksum should not be our concern, since we are running fully virtualized.
-    // int l4_check_off = sizeof(struct ethhdr) + sizeof(struct iphdr) + (isTCP ? offsetof(struct tcphdr, check) : offsetof(struct udphdr, check));
-    // bpf_l4_csum_replace(skb, l4_check_off, 0, sum, 0);
 
     return TC_ACT_OK;
 }
