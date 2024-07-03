@@ -62,16 +62,9 @@ open_sessions = {
         .max_entries = 128, // TODO increase size if 128 is not enough
 };
 
-struct packet {
-    __u32 pkt_len;
-    __u8 data[MAX_PACKET_SIZE];
-};
-
-struct bpf_map_def SEC("maps") packet_queue = {
-        .type = BPF_MAP_TYPE_RINGBUF,
-        .key_size = 0,
-        .value_size = sizeof(struct packet),
-        .max_entries = 128,
+struct bpf_map_def SEC("maps/ip_updates") ip_updates = {
+        .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
+        .max_entries = 1024,
 };
 
 extern bool is_ipv4_in_network(__be32 addr);
@@ -163,22 +156,9 @@ int outgoing_proxy(struct __sk_buff *skb) {
     if (!new_daddr) {
         struct ip_list *ipl = bpf_map_lookup_elem(&service_to_instance, &ip->daddr);
         if (!ipl) {
-            __u32 pkt_len = data_end - data;
-
-            if (pkt_len > MAX_PACKET_SIZE) {
-                pkt_len = MAX_PACKET_SIZE;
-            }
-
-            // Allocate a packet struct on the stack
-            struct packet pkt = {};
-            pkt.pkt_len = pkt_len;
-
-            // Copy packet data to the packet struct
-            bpf_skb_load_bytes(skb, 0, pkt.data, pkt_len);
-
-            // Enqueue packet into the queue map
-            bpf_map_push_elem(&packet_queue, &pkt, BPF_ANY);
-
+            // no translation in table found. Drop the packet end request and update for this IP from user-space
+            __be32 daddr = ip->daddr;
+            bpf_perf_event_output(skb, &ip_updates, BPF_F_CURRENT_CPU, &daddr, sizeof(daddr));
             return TC_ACT_SHOT; // Drop the packet
         }
         // select instance IP using RR

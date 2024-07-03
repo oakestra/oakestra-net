@@ -50,7 +50,7 @@ func (p *ProxyManager) Configure(config ebpfManager.Config, router *mux.Router, 
 
 func (p *ProxyManager) NewInterfaceCreated(ifname string) error {
 	coll, _ := p.manager.LoadAndAttach(p.Id, ifname)
-	proxy := NewProxy(coll, ifname)
+	proxy := NewProxy(coll)
 	p.proxies[ifname] = &proxy
 	return nil
 }

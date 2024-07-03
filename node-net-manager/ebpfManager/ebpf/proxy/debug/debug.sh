@@ -25,23 +25,23 @@ cd ..
 echo "Create environment..."
 ./env.sh
 
-echo "Load and Attach ebpf..."
-cd loader
-./loader
-cd ..
-
 kill_processes() {
-    echo "Caught SIGINT, terminating server"
-    kill $PID1
+    echo "Caught SIGINT, terminating loader and server"
+    kill $PID1 $PID2
     exit 1
 }
 
 trap kill_processes SIGINT
 
+echo "Load and Attach ebpf..."
+cd loader
+./loader &
+PID1=$!
+cd ..
 
 echo "Exec server inside NS2..."
 ip netns exec $NS2 python3 simple_server.py &
-PID1=$!
+PID2=$!
 
 echo "Exec client inside NS1..."
 # ip netns exec $NS1 ping 142.250.184.3
