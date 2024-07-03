@@ -23,6 +23,8 @@
 // implies that one service cannot open more than MAX_CONVERSION connections to another services on the same source and destination port.
 #define MAX_CONVERSION 4
 
+#define MAX_PACKET_SIZE 2048
+
 // a session is described from the perspective of the client. We only need the ports because each service has its own ebpf proxy.
 struct session_key {
     __be16 src_port;
@@ -58,6 +60,18 @@ open_sessions = {
         .key_size = sizeof(struct session_key),
         .value_size = sizeof(struct conversion_list),
         .max_entries = 128, // TODO increase size if 128 is not enough
+};
+
+struct packet {
+    __u32 pkt_len;
+    __u8 data[MAX_PACKET_SIZE];
+};
+
+struct bpf_map_def SEC("maps") packet_queue = {
+        .type = BPF_MAP_TYPE_RINGBUF,
+        .key_size = 0,
+        .value_size = sizeof(struct packet),
+        .max_entries = 128,
 };
 
 extern bool is_ipv4_in_network(__be32 addr);
@@ -149,8 +163,23 @@ int outgoing_proxy(struct __sk_buff *skb) {
     if (!new_daddr) {
         struct ip_list *ipl = bpf_map_lookup_elem(&service_to_instance, &ip->daddr);
         if (!ipl) {
-            // TODO ben cache packet and trigger update to potentially find IP and register interest.
-            return TC_ACT_SHOT;
+            __u32 pkt_len = data_end - data;
+
+            if (pkt_len > MAX_PACKET_SIZE) {
+                pkt_len = MAX_PACKET_SIZE;
+            }
+
+            // Allocate a packet struct on the stack
+            struct packet pkt = {};
+            pkt.pkt_len = pkt_len;
+
+            // Copy packet data to the packet struct
+            bpf_skb_load_bytes(skb, 0, pkt.data, pkt_len);
+
+            // Enqueue packet into the queue map
+            bpf_map_push_elem(&packet_queue, &pkt, BPF_ANY);
+
+            return TC_ACT_SHOT; // Drop the packet
         }
         // select instance IP using RR
         int rand_index = bpf_get_prandom_u32() % ipl->length % MAX_IPS;
@@ -243,8 +272,6 @@ int ingoing_proxy(struct __sk_buff *skb) {
     // check if a TCP/UDP session was already established for this service IP
     struct conversion_list *list_ptr = bpf_map_lookup_elem(&open_sessions, &key);
     if (list_ptr) {
-        const char msg7[] = "found convo\n";
-        bpf_trace_printk(msg7, sizeof(msg7));
         for (int i = 0; i < MAX_CONVERSION; i++) { // TODO ben (length % MAX_CONVERSION) would be better in my opinion  but verfier wants us to loop through all entries
             if (list_ptr->conversions[i].instance_ip == ip->saddr) {
                 new_daddr = list_ptr->conversions[i].service_ip; // TODO ben this address could have gotten invalid in the meantime!

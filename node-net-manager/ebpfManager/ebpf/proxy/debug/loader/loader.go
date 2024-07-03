@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/vishvananda/netlink"
@@ -95,16 +94,45 @@ func main() {
 		IPs    [MAX_IPS]uint32
 	}
 
-	serviceToInstance := coll.Maps["service_to_instance"]
+	// 	serviceToInstance := coll.Maps["service_to_instance"]
+	//
+	// 	var value IPList
+	// 	key := binary.LittleEndian.Uint32(net.ParseIP("10.30.0.2").To4())
+	//
+	// 	value.Length = 1
+	// 	value.IPs[0] = binary.LittleEndian.Uint32(net.ParseIP("10.10.0.2").To4()) //TODO ben just for debugging
+	// 	// value.IPs[1] = binary.LittleEndian.Uint32(net.ParseIP("192.168.1.2").To4()) // TODO ben find out why little endian works... Does update function change LE to BE automatically?
+	//
+	// 	if err := serviceToInstance.Update(&key, &value, ebpf.UpdateAny); err != nil {
+	// 		log.Fatalf("Error updating map: %v", err)
+	// 	}
 
-	var value IPList
-	key := binary.LittleEndian.Uint32(net.ParseIP("10.30.0.2").To4())
-
-	value.Length = 1
-	value.IPs[0] = binary.LittleEndian.Uint32(net.ParseIP("10.10.0.2").To4()) //TODO ben just for debugging
-	// value.IPs[1] = binary.LittleEndian.Uint32(net.ParseIP("192.168.1.2").To4()) // TODO ben find out why little endian works... Does update function change LE to BE automatically?
-
-	if err := serviceToInstance.Update(&key, &value, ebpf.UpdateAny); err != nil {
-		log.Fatalf("Error updating map: %v", err)
-	}
+	// 	packetBuf := coll.Maps["packet_buf"]
+	// 	reader, err := perf.NewReader(packetBuf, os.Getpagesize())
+	// 	go func() {
+	// 		for {
+	// 			record, err := reader.Read()
+	// 			if err != nil {
+	// 				fmt.Fprintf(os.Stderr, "Error reading from perf map: %v\n", err)
+	// 				continue
+	// 			}
+	// 			defer reader.Close()
+	//
+	// 			packetData := record.RawSample
+	// 			packet := gopacket.NewPacket(packetData, layers.LayerTypeEthernet, gopacket.Default)
+	// 			ethLayer := packet.Layer(layers.LayerTypeEthernet)
+	// 			if ethLayer == nil {
+	// 				fmt.Println("No Ethernet layer found in packet")
+	// 				continue
+	// 			}
+	//
+	// 			ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	// 			if ipLayer == nil {
+	// 				fmt.Println("No IPv4 layer found in packet")
+	// 				continue
+	// 			}
+	//
+	// 			print("got packet!!")
+	// 		}
+	// 	}()
 }

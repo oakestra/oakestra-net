@@ -50,12 +50,15 @@ func (p *ProxyManager) Configure(config ebpfManager.Config, router *mux.Router, 
 
 func (p *ProxyManager) NewInterfaceCreated(ifname string) error {
 	coll, _ := p.manager.LoadAndAttach(p.Id, ifname)
-	proxy := NewProxy(coll)
+	proxy := NewProxy(coll, ifname)
 	p.proxies[ifname] = &proxy
 	return nil
 }
 
 func (p *ProxyManager) DestroyModule() error {
+	for _, proxy := range p.proxies {
+		proxy.Close()
+	}
 	p.proxies = nil
 	return nil
 }
