@@ -3,11 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/perf"
-	"golang.org/x/sys/unix"
 	"log"
 	"net"
 	"os"
@@ -19,6 +17,7 @@ type Proxy struct {
 	serviceToInstance *ebpf.Map
 	ip_updates        *ebpf.Map
 	socket            int
+	proxyManager      *ProxyManager
 }
 
 const MAX_IPS = 32 // IMPORTANT: Keep in sync with ebpf implementation
@@ -28,23 +27,27 @@ type IPList struct {
 	IPs    [MAX_IPS]uint32
 }
 
-func (p *Proxy) AddServiceTranslation(serviceIp net.IP, instanceIP net.IP) {
+func (p *Proxy) SetServiceTranslations(serviceIp net.IP, instanceIPs []net.IP) {
+	if len(instanceIPs) < 1 {
+		return
+	}
+
 	var value IPList
 	key := binary.LittleEndian.Uint32(serviceIp.To4())
 
-	if err := p.serviceToInstance.Lookup(&key, &value); err != nil {
-		if errors.Is(err, unix.ENOENT) {
-			value.Length = 0
-		} else {
-			log.Fatalf("lookup failed: %v", err)
-		}
+	length := len(instanceIPs)
+	if length > MAX_IPS {
+		length = MAX_IPS
+		log.Printf("Ebpf Proxy had to drop IP translations. You might want to increase MAX_IPS.")
 	}
 
-	index := value.Length % MAX_IPS
-	value.IPs[index] = binary.LittleEndian.Uint32(instanceIP.To4())
-	if value.Length < MAX_IPS {
-		value.Length += 1
+	var leIpList [MAX_IPS]uint32
+	for i := 0; i < length; i++ {
+		leIpList[i] = binary.LittleEndian.Uint32(instanceIPs[i].To4())
 	}
+
+	value.IPs = leIpList
+	value.Length = int32(length)
 
 	if err := p.serviceToInstance.Update(&key, &value, ebpf.UpdateAny); err != nil {
 		log.Fatalf("Error updating map: %v", err)
@@ -55,7 +58,7 @@ func (p *Proxy) Close() {
 	syscall.Close(p.socket)
 }
 
-func NewProxy(collection *ebpf.Collection) Proxy {
+func NewProxy(collection *ebpf.Collection, manager *ProxyManager) Proxy {
 	socket, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, syscall.ETH_P_ALL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create socket: %v\n", err)
@@ -68,11 +71,14 @@ func NewProxy(collection *ebpf.Collection) Proxy {
 		serviceToInstance: collection.Maps["service_to_instance"], //TODO ben this might fail!
 		ip_updates:        collection.Maps["ip_updates"],          //TODO ben this might fail!
 		socket:            socket,
+		proxyManager:      manager,
 	}
 	p.StartReadingPerfEvents()
+
 	return p
 }
 
+// this function keeps polling to check if the ebpf function requests an table lookup
 func (p *Proxy) StartReadingPerfEvents() {
 	reader, err := perf.NewReader(p.ip_updates, os.Getpagesize())
 	if err != nil {
@@ -100,7 +106,8 @@ func (p *Proxy) StartReadingPerfEvents() {
 				continue
 			}
 
-			p.AddServiceTranslation(ip, ip) // TODO ben get IP from env Manager
+			translations := p.proxyManager.manager.GetTableEntryByServiceIP(ip)
+			p.SetServiceTranslations(ip, translations) // TODO ben get IP from env Manager
 
 			fmt.Printf("Got IP: %s\n", ip.String())
 		}

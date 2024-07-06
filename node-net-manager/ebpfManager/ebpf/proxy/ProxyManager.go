@@ -2,6 +2,7 @@ package main
 
 import (
 	"NetManager/ebpfManager"
+	"NetManager/env"
 	"github.com/gorilla/mux"
 	"net/http"
 )
@@ -10,6 +11,7 @@ type ProxyManager struct {
 	ebpfManager.ModuleBase
 	proxies map[string]*Proxy
 	manager *ebpfManager.EbpfManager
+	env     *env.EnvironmentManager
 }
 
 func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) ebpfManager.ModuleInterface {
@@ -50,7 +52,7 @@ func (p *ProxyManager) Configure(config ebpfManager.Config, router *mux.Router, 
 
 func (p *ProxyManager) NewInterfaceCreated(ifname string) error {
 	coll, _ := p.manager.LoadAndAttach(p.Id, ifname)
-	proxy := NewProxy(coll)
+	proxy := NewProxy(coll, p)
 	p.proxies[ifname] = &proxy
 	return nil
 }

@@ -237,7 +237,7 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*F
 	return &fp, nil
 }
 
-func (e EbpfManager) getAllModules() []ModuleInterface {
+func (e *EbpfManager) getAllModules() []ModuleInterface {
 	values := make([]ModuleInterface, 0, len(e.idToModule))
 	for _, moduleContainer := range e.idToModule {
 		values = append(values, moduleContainer.module)
@@ -245,20 +245,20 @@ func (e EbpfManager) getAllModules() []ModuleInterface {
 	return values
 }
 
-func (e EbpfManager) getModuleById(id uint) ModuleInterface {
+func (e *EbpfManager) getModuleById(id uint) ModuleInterface {
 	if moduleContainer, exists := e.idToModule[id]; exists {
 		return moduleContainer.module
 	}
 	return nil
 }
 
-func (e EbpfManager) deleteAllModules() {
+func (e *EbpfManager) deleteAllModules() {
 	for id := range e.idToModule {
 		e.deleteModuleById(id)
 	}
 }
 
-func (e EbpfManager) deleteModuleById(id uint) {
+func (e *EbpfManager) deleteModuleById(id uint) {
 	if moduleContainer, exists := e.idToModule[id]; exists {
 		moduleContainer.module.GetModuleBase().close()
 		moduleContainer.module.DestroyModule()
@@ -280,7 +280,17 @@ func (e EbpfManager) deleteModuleById(id uint) {
 	}
 }
 
-func (e EbpfManager) Close() {
+// TODO Not really beautiful but this function has to be exposed to make the proxy work. Maybe someone has better suggestion?
+func (e *EbpfManager) GetTableEntryByServiceIP(serviceIP net.IP) []net.IP {
+	tableEntries := e.env.GetTableEntryByServiceIP(serviceIP)
+	nsips := make([]net.IP, len(tableEntries))
+	for i, entry := range tableEntries {
+		nsips[i] = entry.Nsip
+	}
+	return nsips
+}
+
+func (e *EbpfManager) Close() {
 	e.deleteAllModules()
 	for veth, qdisc := range e.vethToQdisc {
 		netlink.QdiscDel(qdisc)
