@@ -14,7 +14,6 @@ type ModuleBase struct {
 	Active   bool   `json:"active"`
 }
 
-// TODO ben write one build script for each module to make building a bit easier, especially for different architectures
 // ModuleInterface defines the interface of an eBPF module that can be plugged into the NetManager at runtime.
 // Additionally, the NetManager expects a 'New(id uint, config Config, router *mux.Router, manager *EbpfManager) ModuleInterface' function to be implemented.
 // This function return a freshly initialised instance of the ebpf module.
@@ -23,7 +22,6 @@ type ModuleInterface interface {
 	// GetModule returns ModuleBase struct
 	GetModuleBase() *ModuleBase
 
-	// TODO make this an event channel instead of a function? -> strong Coupling to go language!
 	// NewInterfaceCreated notifies the ebpf module that a new interface (+ service) was created
 	NewInterfaceCreated(ifname string) error
 

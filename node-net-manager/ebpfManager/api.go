@@ -10,13 +10,7 @@ import (
 	"strconv"
 )
 
-type ModuleModel struct {
-	ID     int    `json:"id"`
-	Config Config `json:"config"`
-}
-
-// TODO ben separate the api implementation from ebpfManager struct
-func (e *EbpfManager) createEbpfModule(writer http.ResponseWriter, request *http.Request) {
+func (e *EbpfManager) apiCreateNewModule(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP POST request - /ebpf ")
 
 	reqBody, _ := io.ReadAll(request.Body)
@@ -25,7 +19,7 @@ func (e *EbpfManager) createEbpfModule(writer http.ResponseWriter, request *http
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 	}
-	newModule, err := e.createNewEbpfModule(config)
+	newModule, err := e.createNewModule(config)
 	if err != nil {
 		// TODO ben can returning this error potentially be exploited?
 		http.Error(writer, "Error creating Ebpf: "+err.Error(), http.StatusInternalServerError)
@@ -40,7 +34,7 @@ func (e *EbpfManager) createEbpfModule(writer http.ResponseWriter, request *http
 	writer.Write(jsonResponse)
 }
 
-func (e *EbpfManager) getEbpfModules(writer http.ResponseWriter, request *http.Request) {
+func (e *EbpfManager) apiGetAllModules(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP GET request - /ebpf")
 	modules := e.getAllModules()
 	jsonResponse, err := json.Marshal(modules)
@@ -53,7 +47,7 @@ func (e *EbpfManager) getEbpfModules(writer http.ResponseWriter, request *http.R
 	writer.Write(jsonResponse)
 }
 
-func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Request) {
+func (e *EbpfManager) apiGetModuleById(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP GET request - /ebpf/{id}")
 
 	vars := mux.Vars(request)
@@ -85,7 +79,7 @@ func (e *EbpfManager) getEbpfModule(writer http.ResponseWriter, request *http.Re
 	writer.Write(jsonResponse)
 }
 
-func (e *EbpfManager) deleteEbpfModule(writer http.ResponseWriter, request *http.Request) {
+func (e *EbpfManager) apiDeleteModule(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP DELETE request - /ebpf/{id}")
 
 	vars := mux.Vars(request)
@@ -103,18 +97,18 @@ func (e *EbpfManager) deleteEbpfModule(writer http.ResponseWriter, request *http
 	writer.WriteHeader(http.StatusOK)
 }
 
-func (e *EbpfManager) deleteAllEbpfModules(writer http.ResponseWriter, request *http.Request) {
+func (e *EbpfManager) apiDeleteAllModules(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP DELETE request - /ebpf")
 	e.deleteAllModules()
 	writer.WriteHeader(http.StatusOK)
 }
 
-func (e *EbpfManager) RegisterHandles() {
-	if e.router != nil {
-		e.router.HandleFunc("", e.createEbpfModule).Methods("POST")
-		e.router.HandleFunc("", e.getEbpfModules).Methods("GET")
-		e.router.HandleFunc("/{id}", e.getEbpfModule).Methods("GET")
-		e.router.HandleFunc("", e.deleteAllEbpfModules).Methods("DELETE")
-		e.router.HandleFunc("/{id}", e.deleteEbpfModule).Methods("DELETE")
+func (e *EbpfManager) RegisterApi() {
+	if ebpfManager != nil {
+		e.router.HandleFunc("", e.apiCreateNewModule).Methods("POST")
+		e.router.HandleFunc("", e.apiGetAllModules).Methods("GET")
+		e.router.HandleFunc("/{id}", e.apiGetModuleById).Methods("GET")
+		e.router.HandleFunc("", e.apiDeleteAllModules).Methods("DELETE")
+		e.router.HandleFunc("/{id}", e.apiDeleteModule).Methods("DELETE")
 	}
 }

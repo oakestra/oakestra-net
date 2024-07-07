@@ -13,9 +13,15 @@ import (
 	"log"
 	"net"
 	"plugin"
+	"sync"
 )
 
 //go:generate ./generate_ebpf.sh
+
+var (
+	ebpfManager *EbpfManager
+	once        sync.Once
+)
 
 type ModuleContainer struct {
 	module      ModuleInterface
@@ -49,38 +55,42 @@ func (m ModuleBase) close() {
 
 }
 
-func New(router *mux.Router, env env.EnvironmentManager) EbpfManager {
-	ebpfManager := EbpfManager{
-		router:          router,
-		idToModule:      make(map[uint]*ModuleContainer),
-		vethToQdisc:     make(map[string]*netlink.GenericQdisc),
-		env:             env,
-		currentPriority: 1,
+func GetEbpfManagerInstance() *EbpfManager {
+	if ebpfManager == nil {
+		log.Fatal("ebpfManager was used before initialisation.")
+		return nil
 	}
-
-	ebpfManager.init()
-	ebpfManager.RegisterHandles()
-
 	return ebpfManager
 }
 
-func (e *EbpfManager) init() {
-	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatal("Removing memlock:", err)
-	}
-
-	// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
-	events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
-		if payload, ok := event.Payload.(events.VethCreationPayload); ok {
-			for _, moduleContainer := range e.idToModule {
-				moduleContainer.module.NewInterfaceCreated(payload.Name)
-			}
+func Init(router *mux.Router, env env.EnvironmentManager) {
+	once.Do(func() {
+		ebpfManager = &EbpfManager{
+			router:          router,
+			idToModule:      make(map[uint]*ModuleContainer),
+			vethToQdisc:     make(map[string]*netlink.GenericQdisc),
+			env:             env,
+			currentPriority: 1,
 		}
+		ebpfManager.RegisterApi()
+
+		if err := rlimit.RemoveMemlock(); err != nil {
+			log.Fatal("Removing memlock:", err)
+		}
+
+		// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
+		events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
+			if payload, ok := event.Payload.(events.VethCreationPayload); ok {
+				for _, moduleContainer := range ebpfManager.idToModule {
+					moduleContainer.module.NewInterfaceCreated(payload.Name)
+				}
+			}
+		})
 	})
 }
 
 // TODO ben most likely we wnat to return TC_ACT_PIPE instead of UNSPEC!! Investigate further
-func (e *EbpfManager) createNewEbpfModule(config Config) (ModuleInterface, error) {
+func (e *EbpfManager) createNewModule(config Config) (ModuleInterface, error) {
 	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
 
 	if !fileExists(objectPath) {
