@@ -11,8 +11,6 @@
 #include <linux/pkt_cls.h>
 #include <stdbool.h>
 
-// TODO ben tag outgoing porxy skb buffers such that the ingoin proxy does not have to look at them straight away
-
 // including options an IP header cannot get larger than (2^16 - 1) * 4 60B
 #define MAX_IPV4_HEADER_LENGTH 60
 #define MIN_IPV4_HEADER_LENGTH 20
@@ -64,7 +62,6 @@ open_sessions = {
 
 struct bpf_map_def SEC("maps/ip_updates") ip_updates = {
         .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-        .max_entries = 1024,
 };
 
 extern bool is_ipv4_in_network(__be32 addr);
@@ -94,17 +91,17 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
     // check if enough size for ethernet header
     if ((void *) (eth + 1) > data_end) {
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
     }
 
     // check if IPv4. Ebpf proxy only supports IPv4 for now.
     if (eth->h_proto != bpf_htons(ETH_P_IP)) {
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
     }
 
     ip = (struct iphdr *) (eth + 1);
     if ((void *) (ip + 1) > data_end)
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
 
 
     // uint iphdr_len = ip->ihl * 4;
@@ -114,7 +111,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
     }
 
     if (!is_ipv4_in_network(ip->daddr)) {
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
     }
 
     // proxy only supports TCP and UDP for now.
@@ -123,7 +120,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
         tcp = (struct tcphdr *) ((__u8 *) ip + iphdr_len);
         if ((void *) (tcp + 1) > data_end)
-            return TC_ACT_OK;
+            return TC_ACT_PIPE;
 
         key.src_port = tcp->source;
         key.dst_port = tcp->dest;
@@ -132,13 +129,13 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
         udp = (struct udphdr *) ((__u8 *) ip + iphdr_len);
         if ((void *) (udp + 1) > data_end)
-            return TC_ACT_OK;
+            return TC_ACT_PIPE;
 
         key.src_port = udp->source;
         key.dst_port = udp->dest;
     } else {
         // return for non-udp and non-tcp packets
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
     }
 
     // check if a TCP/UDP session was already established for this service IP
@@ -187,11 +184,11 @@ int outgoing_proxy(struct __sk_buff *skb) {
     // replace destination ip and recalculate L3 checksum
     __s64 sum = bpf_csum_diff((void *)&ip->daddr, 4, (void *)&new_daddr, 4, 0);
     if (bpf_skb_store_bytes(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, daddr), (void *)&new_daddr, 4, 0) < 0) {
-        return TC_ACT_OK; // Drop packet if modification fails
+        return TC_ACT_PIPE; // Drop packet if modification fails
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
 
-    return TC_ACT_OK;
+    return TC_ACT_PIPE;
 }
 
 int ingoing_proxy(struct __sk_buff *skb) {
@@ -206,17 +203,17 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
     // check if enough size for ethernet header
     if ((void *) (eth + 1) > data_end) {
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
     }
 
     // check if IPv4. Ebpf proxy only supports IPv4 for now.
     if (eth->h_proto != bpf_htons(ETH_P_IP)) {
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
     }
 
     ip = (struct iphdr *) (eth + 1);
     if ((void *) (ip + 1) > data_end)
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
 
 
     // uint iphdr_len = ip->ihl * 4;
@@ -231,7 +228,7 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
         tcp = (struct tcphdr *) ((__u8 *) ip + iphdr_len);
         if ((void *) (tcp + 1) > data_end)
-            return TC_ACT_OK;
+            return TC_ACT_PIPE;
 
         key.src_port = tcp->dest;
         key.dst_port = tcp->source;
@@ -240,13 +237,13 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
         udp = (struct udphdr *) ((__u8 *) ip + iphdr_len);
         if ((void *) (udp + 1) > data_end)
-            return TC_ACT_OK;
+            return TC_ACT_PIPE;
 
         key.src_port = udp->dest;
         key.dst_port = udp->source;
     } else {
         // return for non-udp and non-tcp packets
-        return TC_ACT_OK;
+        return TC_ACT_PIPE;
     }
 
     // check if a TCP/UDP session was already established for this service IP
@@ -261,7 +258,7 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
     // seems like we haven't found an open session -> no conversion needed
     if (!new_daddr) {
-       return TC_ACT_OK;
+       return TC_ACT_PIPE;
     }
 
     // replace destination ip and recalculate L3 checksum
@@ -269,11 +266,11 @@ int ingoing_proxy(struct __sk_buff *skb) {
     if (bpf_skb_store_bytes(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, saddr), (void *)&new_daddr, 4, 0) < 0) {
         const char msg123[] = "bpf_skb_store_bytes err\n";
         bpf_trace_printk(msg123, sizeof(msg123));
-        return TC_ACT_OK; // Drop packet if modification fails
+        return TC_ACT_PIPE; // Drop packet if modification fails
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
 
-    return TC_ACT_OK;
+    return TC_ACT_PIPE;
 }
 
 char _license[]

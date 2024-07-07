@@ -3,44 +3,31 @@ package main
 import (
 	"NetManager/ebpfManager"
 	"encoding/json"
-	"github.com/gorilla/mux"
 	"io"
+	"log"
 	"net"
 	"net/http"
 )
 
 type FirewallManager struct {
-	ebpfManager.ModuleBase
+	base ebpfManager.ModuleBase
 	// maps interface name to firewall
 	firewalls map[string]*Firewall
 	manager   *ebpfManager.EbpfManager
 }
 
-func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) ebpfManager.ModuleInterface {
+func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
 	module := FirewallManager{
+		base:      base,
 		firewalls: make(map[string]*Firewall),
 	}
-	module.ModuleBase.Id = id
-	module.ModuleBase.Config = config
-	module.manager = manager
-
-	//TODO ben handler functions
-	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		writer.WriteHeader(http.StatusOK)
-	}).Methods("GET")
+	module.Configure()
 
 	return &module
 }
 
-func (f *FirewallManager) GetModuleBase() *ebpfManager.ModuleBase {
-	return &f.ModuleBase
-}
-
-func (f *FirewallManager) Configure(config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) {
-	f.ModuleBase.Config = config
-	f.manager = manager
-	router.HandleFunc("/rule", func(writer http.ResponseWriter, request *http.Request) {
+func (f *FirewallManager) Configure() {
+	f.base.Router.HandleFunc("/rule", func(writer http.ResponseWriter, request *http.Request) {
 		type FirewallRequest struct {
 			Proto   string `json:"proto"`
 			SrcIp   string `json:"srcIp"`
@@ -73,11 +60,16 @@ func (f *FirewallManager) Configure(config ebpfManager.Config, router *mux.Route
 	})
 }
 
-func (f *FirewallManager) NewInterfaceCreated(ifname string) error {
-	coll, _ := f.manager.LoadAndAttach(f.Id, ifname)
-	firewall := NewFirewall(coll)
-	f.firewalls[ifname] = &firewall
-	return nil
+func (f *FirewallManager) OnEvent(event ebpfManager.Event) {
+	switch event.Type {
+	case ebpfManager.AttachEvent:
+		attachEvent, ok := event.Data.(ebpfManager.AttachEventData)
+		if !ok {
+			log.Println("Invalid EventData")
+		}
+		fw := NewFirewall(attachEvent.Collection)
+		f.firewalls[attachEvent.Ifname] = &fw
+	}
 }
 
 func (f *FirewallManager) DestroyModule() error {

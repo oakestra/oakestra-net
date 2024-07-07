@@ -24,6 +24,7 @@ var (
 )
 
 type ModuleContainer struct {
+	base        ModuleBase
 	module      ModuleInterface
 	filters     []FilterPair
 	collections []*ebpf.Collection
@@ -41,18 +42,6 @@ type EbpfManager struct {
 	env             env.EnvironmentManager
 	idToModule      map[uint]*ModuleContainer
 	vethToQdisc     map[string]*netlink.GenericQdisc
-}
-
-type FirewallRequest struct {
-	Proto   string `json:"proto"`
-	SrcIp   string `json:"srcIp"`
-	DstIp   string `json:"dstIp"`
-	SrcPort uint16 `json:"scrPort"`
-	DstPort uint16 `json:"dstPort"`
-}
-
-func (m ModuleBase) close() {
-
 }
 
 func GetEbpfManagerInstance() *EbpfManager {
@@ -81,8 +70,8 @@ func Init(router *mux.Router, env env.EnvironmentManager) {
 		// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
 		events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
 			if payload, ok := event.Payload.(events.VethCreationPayload); ok {
-				for _, moduleContainer := range ebpfManager.idToModule {
-					moduleContainer.module.NewInterfaceCreated(payload.Name)
+				for id := range ebpfManager.idToModule {
+					ebpfManager.loadAndAttach(id, payload.Name)
 				}
 			}
 		})
@@ -90,8 +79,8 @@ func Init(router *mux.Router, env env.EnvironmentManager) {
 }
 
 // TODO ben most likely we wnat to return TC_ACT_PIPE instead of UNSPEC!! Investigate further
-func (e *EbpfManager) createNewModule(config Config) (ModuleInterface, error) {
-	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", config.Name, config.Name)
+func (e *EbpfManager) createNewModule(name string, config interface{}) (*ModuleBase, error) {
+	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", name, name)
 
 	if !fileExists(objectPath) {
 		return nil, errors.New("no ebpf module installed with this name")
@@ -109,40 +98,54 @@ func (e *EbpfManager) createNewModule(config Config) (ModuleInterface, error) {
 		return nil, errors.New("the ebpf module does not adhere to the expected interface")
 	}
 
-	newModule, ok := sym.(func(id uint, config Config, router *mux.Router, manager *EbpfManager) ModuleInterface)
+	newModule, ok := sym.(func(base ModuleBase) ModuleInterface)
 	if !ok {
 		return nil, errors.New("the ebpf module does not export a function with the name New or it does not follow the required interface")
 	}
 
 	id := e.nextId
 	e.nextId += 1
+	priority := e.currentPriority
+	e.currentPriority += 1
+
 	subRouter := e.router.PathPrefix(fmt.Sprintf("/%d", id)).Subrouter()
-	module := newModule(id, config, subRouter, e)
+	base := ModuleBase{
+		Id:       id,
+		Name:     name,
+		Priority: priority,
+		Config:   config,
+		Router:   subRouter,
+	}
+	module := newModule(base)
 	e.idToModule[id] = &ModuleContainer{
+		base:    base,
 		module:  module,
 		filters: make([]FilterPair, 0),
 	}
 
 	for _, service := range e.env.GetDeployedServices() {
-		module.NewInterfaceCreated(service.Veth.Name)
+		e.loadAndAttach(id, service.Veth.Name)
 	}
 
-	return module, nil
+	return &base, nil
 }
 
-func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collection, error) {
+func (e *EbpfManager) loadAndAttach(moduleId uint, ifname string) (*ebpf.Collection, error) {
 	moduleContainer, exists := e.idToModule[moduleId]
+	priority := moduleContainer.base.Priority
+	moduleName := moduleContainer.base.Name
+	path := fmt.Sprintf("ebpfManager/ebpf/%s/%s.o", moduleName, moduleName)
 
 	if !exists || moduleContainer.module == nil {
 		return nil, errors.New(fmt.Sprintf("there is no module with id %d", moduleId))
 	}
 
-	coll, err := e.loadEbpf(moduleContainer.module.GetModuleBase().Config.Name)
+	coll, err := e.loadEbpf(path)
 	if err != nil {
 		return nil, err
 	}
 
-	fp, err := e.attachEbpf(ifname, coll)
+	fp, err := e.attachEbpf(ifname, priority, coll)
 	if err != nil {
 		return nil, err
 	}
@@ -150,11 +153,19 @@ func (e *EbpfManager) LoadAndAttach(moduleId uint, ifname string) (*ebpf.Collect
 	moduleContainer.collections = append(moduleContainer.collections, coll)
 	moduleContainer.filters = append(moduleContainer.filters, *fp)
 
+	event := Event{
+		Type: AttachEvent,
+		Data: AttachEventData{
+			Ifname:     ifname,
+			Collection: coll,
+		},
+	}
+	e.emitEvent(moduleId, event)
+
 	return coll, nil
 }
 
-func (e *EbpfManager) loadEbpf(moduleName string) (*ebpf.Collection, error) {
-	path := fmt.Sprintf("ebpfManager/ebpf/%s/%s.o", moduleName, moduleName)
+func (e *EbpfManager) loadEbpf(path string) (*ebpf.Collection, error) {
 	spec, err := ebpf.LoadCollectionSpec(path)
 	if err != nil {
 		return nil, err
@@ -169,8 +180,7 @@ func (e *EbpfManager) loadEbpf(moduleName string) (*ebpf.Collection, error) {
 }
 
 // AttachEbpf can be called by plugins in order to request an attachment of an ebpf function. This function will handle chaining
-func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*FilterPair, error) {
-	// TODO ben check if tcln != null ??
+func (e *EbpfManager) attachEbpf(ifname string, priority uint16, collection *ebpf.Collection) (*FilterPair, error) {
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("Getting interface %s: %s", ifname, err))
@@ -206,8 +216,8 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*F
 	ingressFilter := &netlink.BpfFilter{
 		FilterAttrs: netlink.FilterAttrs{
 			LinkIndex: iface.Index,
-			Priority:  e.currentPriority,
-			Handle:    netlink.MakeHandle(0x1, e.currentPriority),
+			Priority:  priority,
+			Handle:    netlink.MakeHandle(0x1, priority),
 			Parent:    netlink.HANDLE_MIN_INGRESS,
 			Protocol:  unix.ETH_P_ALL,
 		},
@@ -219,8 +229,8 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*F
 	egressFilter := &netlink.BpfFilter{
 		FilterAttrs: netlink.FilterAttrs{
 			LinkIndex: iface.Index,
-			Priority:  e.currentPriority,
-			Handle:    netlink.MakeHandle(0x1, e.currentPriority),
+			Priority:  priority,
+			Handle:    netlink.MakeHandle(0x1, priority),
 			Parent:    netlink.HANDLE_MIN_EGRESS,
 			Protocol:  unix.ETH_P_ALL,
 		},
@@ -228,8 +238,6 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*F
 		Name:         progEgress.String(),
 		Fd:           progEgress.FD(),
 	}
-
-	e.currentPriority += 1
 
 	if err := netlink.FilterAdd(ingressFilter); err != nil {
 		return nil, err
@@ -247,17 +255,31 @@ func (e *EbpfManager) attachEbpf(ifname string, collection *ebpf.Collection) (*F
 	return &fp, nil
 }
 
-func (e *EbpfManager) getAllModules() []ModuleInterface {
-	values := make([]ModuleInterface, 0, len(e.idToModule))
+func (e *EbpfManager) emitEventToAll(event Event) {
 	for _, moduleContainer := range e.idToModule {
-		values = append(values, moduleContainer.module)
+		e.emitEvent(moduleContainer.base.Id, event)
+	}
+}
+
+func (e *EbpfManager) emitEvent(moduleId uint, event Event) {
+	moduleContainer, exists := e.idToModule[moduleId]
+	if !exists {
+		return
+	}
+	moduleContainer.module.OnEvent(event)
+}
+
+func (e *EbpfManager) getAllModules() []ModuleBase {
+	values := make([]ModuleBase, 0, len(e.idToModule))
+	for _, moduleContainer := range e.idToModule {
+		values = append(values, moduleContainer.base)
 	}
 	return values
 }
 
-func (e *EbpfManager) getModuleById(id uint) ModuleInterface {
+func (e *EbpfManager) getModuleById(id uint) *ModuleBase {
 	if moduleContainer, exists := e.idToModule[id]; exists {
-		return moduleContainer.module
+		return &moduleContainer.base
 	}
 	return nil
 }
@@ -270,7 +292,6 @@ func (e *EbpfManager) deleteAllModules() {
 
 func (e *EbpfManager) deleteModuleById(id uint) {
 	if moduleContainer, exists := e.idToModule[id]; exists {
-		moduleContainer.module.GetModuleBase().close()
 		moduleContainer.module.DestroyModule()
 
 		// remove ebpf filters from ethernet ports if still attached
@@ -290,6 +311,14 @@ func (e *EbpfManager) deleteModuleById(id uint) {
 	}
 }
 
+func (e *EbpfManager) Close() {
+	e.deleteAllModules()
+	for veth, qdisc := range e.vethToQdisc {
+		netlink.QdiscDel(qdisc)
+		delete(e.vethToQdisc, veth)
+	}
+}
+
 // TODO Not really beautiful but this function has to be exposed to make the proxy work. Maybe someone has better suggestion?
 func (e *EbpfManager) GetTableEntryByServiceIP(serviceIP net.IP) []net.IP {
 	tableEntries := e.env.GetTableEntryByServiceIP(serviceIP)
@@ -298,12 +327,4 @@ func (e *EbpfManager) GetTableEntryByServiceIP(serviceIP net.IP) []net.IP {
 		nsips[i] = entry.Nsip
 	}
 	return nsips
-}
-
-func (e *EbpfManager) Close() {
-	e.deleteAllModules()
-	for veth, qdisc := range e.vethToQdisc {
-		netlink.QdiscDel(qdisc)
-		delete(e.vethToQdisc, veth)
-	}
 }

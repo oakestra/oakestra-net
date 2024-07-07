@@ -56,7 +56,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	logger.DebugLogger().Printf("Creating Namespace for unikernel (%s)", sname)
 	nscreation := exec.Command("ip", "netns", "add", sname)
 	err = nscreation.Run()
-	// ns, err := netns.NewNamed(sname) ## Changes Namespace of current application
+	// ns, err := netns.NewNamed(Sname) ## Changes Namespace of current application
 	if err != nil {
 		cleanup(vethIfce)
 		return nil, nil, err
@@ -196,7 +196,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	env.deployedServicesLock.Lock()
 	env.deployedServices[sname] = service{
 		ip:          ip,
-		sname:       name,
+		Sname:       name,
 		portmapping: portmapping,
 		Veth:        vethIfce,
 	}

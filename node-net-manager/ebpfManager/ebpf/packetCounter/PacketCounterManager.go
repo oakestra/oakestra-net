@@ -3,25 +3,22 @@ package main
 import (
 	"NetManager/ebpfManager"
 	"encoding/json"
-	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 )
 
 type PacketCounterManager struct {
-	ebpfManager.ModuleBase
-	counters map[string]*PacketCounter
-	manager  *ebpfManager.EbpfManager
+	base     ebpfManager.ModuleBase
+	counters map[string]*PacketCounter // maps ifname to *packetCounter
 }
 
-func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) ebpfManager.ModuleInterface {
+func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
 	module := PacketCounterManager{
+		base:     base,
 		counters: make(map[string]*PacketCounter),
 	}
-	module.ModuleBase.Id = id
 
-	module.ModuleBase.Config = config
-	module.manager = manager
-	router.HandleFunc("/counts", func(writer http.ResponseWriter, request *http.Request) {
+	module.base.Router.HandleFunc("/counts", func(writer http.ResponseWriter, request *http.Request) {
 		module.RefreshAllCounters()
 		jsonResponse, err := json.Marshal(module.counters)
 		if err != nil {
@@ -36,16 +33,16 @@ func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfMa
 	return &module
 }
 
-func (p *PacketCounterManager) GetModuleBase() *ebpfManager.ModuleBase {
-	return &p.ModuleBase
-}
-
-// TODO ben instead of creating one function per Event, pass a Event channel to the module that emits all events
-func (p *PacketCounterManager) NewInterfaceCreated(ifname string) error {
-	coll, _ := p.manager.LoadAndAttach(p.Id, ifname) // TODO ben handle error
-	pc := NewPacketCounter(coll)
-	p.counters[ifname] = &pc
-	return nil
+func (p *PacketCounterManager) OnEvent(event ebpfManager.Event) {
+	switch event.Type {
+	case ebpfManager.AttachEvent:
+		attachEvent, ok := event.Data.(ebpfManager.AttachEventData)
+		if !ok {
+			log.Println("Invalid EventData")
+		}
+		counter := NewPacketCounter(attachEvent.Collection)
+		p.counters[attachEvent.Ifname] = &counter
+	}
 }
 
 func (p *PacketCounterManager) DestroyModule() error {

@@ -149,7 +149,7 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	env.deployedServices[fmt.Sprintf("%s.%d", sname, instancenumber)] = service{
 		ip:          ip,
 		ipv6:        ipv6,
-		sname:       sname,
+		Sname:       sname,
 		portmapping: portmapping,
 		Veth:        vethIfce,
 	}

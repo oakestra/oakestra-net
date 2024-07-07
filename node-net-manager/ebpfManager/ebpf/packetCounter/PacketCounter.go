@@ -6,8 +6,9 @@ import (
 )
 
 type PacketCounter struct {
-	Ingress    uint64           `json:"ingress"`
-	Egress     uint64           `json:"egress"`
+	// ingress and egress are exposed the opposite way to make it more intuitive for the user
+	Ingress    uint64           `json:"egress"`
+	Egress     uint64           `json:"ingress"`
 	collection *ebpf.Collection `json:"-"`
 }
 

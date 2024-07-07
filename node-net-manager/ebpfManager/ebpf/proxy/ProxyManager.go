@@ -3,27 +3,24 @@ package main
 import (
 	"NetManager/ebpfManager"
 	"NetManager/env"
-	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 )
 
 type ProxyManager struct {
-	ebpfManager.ModuleBase
+	base    ebpfManager.ModuleBase
 	proxies map[string]*Proxy
-	manager *ebpfManager.EbpfManager
 	env     *env.EnvironmentManager
 }
 
-func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) ebpfManager.ModuleInterface {
+func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
 	module := ProxyManager{
+		base:    base,
 		proxies: make(map[string]*Proxy),
 	}
-	module.ModuleBase.Id = id
-	module.ModuleBase.Config = config
-	module.manager = manager
 
-	//TODO ben handler functions
-	router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+	//TODO ben add custom configuration to proxy
+	module.base.Router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusOK)
 	}).Methods("GET")
@@ -31,30 +28,16 @@ func New(id uint, config ebpfManager.Config, router *mux.Router, manager *ebpfMa
 	return &module
 }
 
-func (p *ProxyManager) GetModuleBase() *ebpfManager.ModuleBase {
-	return &p.ModuleBase
-}
-
-func (p *ProxyManager) Configure(config ebpfManager.Config, router *mux.Router, manager *ebpfManager.EbpfManager) {
-	p.ModuleBase.Config = config
-	p.manager = manager
-	router.HandleFunc("/rule", func(writer http.ResponseWriter, request *http.Request) {
-		type ProxyRequest struct {
-			Proto   string `json:"proto"`
-			SrcIp   string `json:"srcIp"`
-			DstIp   string `json:"dstIp"`
-			SrcPort uint16 `json:"scrPort"`
-			DstPort uint16 `json:"dstPort"`
+func (p *ProxyManager) OnEvent(event ebpfManager.Event) {
+	switch event.Type {
+	case ebpfManager.AttachEvent:
+		attachEvent, ok := event.Data.(ebpfManager.AttachEventData)
+		if !ok {
+			log.Println("Invalid EventData")
 		}
-		writer.WriteHeader(http.StatusOK)
-	})
-}
-
-func (p *ProxyManager) NewInterfaceCreated(ifname string) error {
-	coll, _ := p.manager.LoadAndAttach(p.Id, ifname)
-	proxy := NewProxy(coll, p)
-	p.proxies[ifname] = &proxy
-	return nil
+		proxy := NewProxy(attachEvent.Collection, p)
+		p.proxies[attachEvent.Ifname] = &proxy
+	}
 }
 
 func (p *ProxyManager) DestroyModule() error {

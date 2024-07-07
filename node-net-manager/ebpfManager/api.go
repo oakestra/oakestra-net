@@ -10,16 +10,21 @@ import (
 	"strconv"
 )
 
+type CreateModuleRequest struct {
+	Name   string      `json:"name"`
+	Config interface{} `json:"config"`
+}
+
 func (e *EbpfManager) apiCreateNewModule(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP POST request - /ebpf ")
 
 	reqBody, _ := io.ReadAll(request.Body)
-	var config Config
-	err := json.Unmarshal(reqBody, &config)
+	var req CreateModuleRequest
+	err := json.Unmarshal(reqBody, &req)
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 	}
-	newModule, err := e.createNewModule(config)
+	newModule, err := e.createNewModule(req.Name, req.Config)
 	if err != nil {
 		// TODO ben can returning this error potentially be exploited?
 		http.Error(writer, "Error creating Ebpf: "+err.Error(), http.StatusInternalServerError)

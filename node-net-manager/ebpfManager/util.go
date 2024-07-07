@@ -16,20 +16,3 @@ func fileExists(filename string) bool {
 	}
 	return !info.IsDir() // Ensure the path is not a directory
 }
-
-func InterfaceMapToList(modules []ModuleInterface) []ModuleBase {
-	mapped := make([]ModuleBase, len(modules))
-	for i, module := range modules {
-		mapped[i] = *module.GetModuleBase()
-	}
-	return mapped
-}
-
-func getModuleBaseById(modules []ModuleInterface, id uint) *ModuleBase {
-	for _, module := range modules {
-		if module.GetModuleBase().Id == id {
-			return module.GetModuleBase()
-		}
-	}
-	return nil
-}

@@ -42,7 +42,7 @@ int handle_ingress(struct __sk_buff *skb)
     bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
 
     if (eth.h_proto != bpf_htons(ETH_P_IP))
-        return TC_ACT_UNSPEC;
+        return TC_ACT_PIPE;
 
     struct iphdr ip;
     bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip, sizeof(ip));
@@ -84,7 +84,7 @@ int handle_ingress(struct __sk_buff *skb)
     else
     {
         // Allow non-UDP/non-TCP/non-ICMP traffic to pass
-        return TC_ACT_UNSPEC;
+        return TC_ACT_PIPE;
     }
 
     key.src_port = bpf_htons(key.src_port);
@@ -93,7 +93,7 @@ int handle_ingress(struct __sk_buff *skb)
     __u8 *value = bpf_map_lookup_elem(&fw_rules, &key);
     if (value)
     {
-        return TC_ACT_UNSPEC; // Rule found, pass the packet
+        return TC_ACT_PIPE; // Rule found, pass the packet
     }
 
     return TC_ACT_SHOT; // Default action is to drop
@@ -107,7 +107,7 @@ int handle_egress(struct __sk_buff *skb)
     bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
 
     if (eth.h_proto != bpf_htons(ETH_P_IP))
-        return TC_ACT_UNSPEC; // Pass the packet if it is not IPv4 for now TODO ben!
+        return TC_ACT_PIPE; // Pass the packet if it is not IPv4 for now TODO ben!
 
     struct iphdr ip;
     bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip, sizeof(ip));
@@ -149,7 +149,7 @@ int handle_egress(struct __sk_buff *skb)
     else
     {
         // Allow non-UDP/non-TCP/non-ICMP traffic to pass
-        return TC_ACT_UNSPEC;
+        return TC_ACT_PIPE;
     }
 
     key.src_port = bpf_htons(key.src_port);
@@ -158,7 +158,7 @@ int handle_egress(struct __sk_buff *skb)
     __u8 *value = bpf_map_lookup_elem(&fw_rules, &key);
     if (value)
     {
-        return TC_ACT_UNSPEC; // Rule found, pass the packet
+        return TC_ACT_PIPE; // Rule found, pass the packet
     }
 
     return TC_ACT_SHOT; // Default action is to drop

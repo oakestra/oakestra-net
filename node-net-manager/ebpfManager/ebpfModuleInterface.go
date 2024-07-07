@@ -1,17 +1,36 @@
 package ebpfManager
 
-type Config struct {
-	Name   string      `json:"name"`
-	Config interface{} `json:"config"`
+import (
+	"github.com/cilium/ebpf"
+	"github.com/gorilla/mux"
+)
+
+type EventType int
+
+const (
+	AttachEvent EventType = iota
+)
+
+type Event struct {
+	Type EventType
+	Data interface{}
+}
+
+// AttachEventData is emitted by the ebpfManager when a module was attached to an interface.
+type AttachEventData struct {
+	Ifname     string           // name of the interface it was attached to
+	Collection *ebpf.Collection // wrapper for FDs for in-/egress programs and maps
 }
 
 // ModuleBase represents the attributes that every eBPF module has.
 // Every implementation of the ModuleInterface should embed the ModuleBase struct.
 type ModuleBase struct {
-	Id       uint   `json:"id"`
-	Config   Config `json:"config"`
-	Priority uint   `json:"priority"`
-	Active   bool   `json:"active"`
+	Id       uint         `json:"id"`
+	Name     string       `json:"name"`
+	Priority uint16       `json:"priority"`
+	Config   interface{}  `json:"config"`
+	Router   *mux.Router  `json:"-"`
+	Manager  *EbpfManager `json:"-"`
 }
 
 // ModuleInterface defines the interface of an eBPF module that can be plugged into the NetManager at runtime.
@@ -19,13 +38,10 @@ type ModuleBase struct {
 // This function return a freshly initialised instance of the ebpf module.
 type ModuleInterface interface {
 
-	// GetModule returns ModuleBase struct
-	GetModuleBase() *ModuleBase
+	// OnEvent receives Events from ebpfManager
+	OnEvent(event Event)
 
-	// NewInterfaceCreated notifies the ebpf module that a new interface (+ service) was created
-	NewInterfaceCreated(ifname string) error
-
-	// DestroyModule releases all ressources that were allocated by the module and are not manages by the ebpf manager
+	// DestroyModule releases all resources that were allocated by the module and are not manages by the ebpf manager
 	DestroyModule() error
 
 	// TODO ben handle service undeployment or removal of veths!

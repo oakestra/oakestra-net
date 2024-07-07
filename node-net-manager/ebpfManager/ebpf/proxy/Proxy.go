@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 	"syscall"
 )
 
@@ -90,6 +91,7 @@ func (p *Proxy) StartReadingPerfEvents() {
 		defer reader.Close()
 		for {
 			record, err := reader.Read()
+			runtime.Breakpoint()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error reading from perf map: %v\n", err)
 				continue
@@ -106,7 +108,7 @@ func (p *Proxy) StartReadingPerfEvents() {
 				continue
 			}
 
-			translations := p.proxyManager.manager.GetTableEntryByServiceIP(ip)
+			translations := p.proxyManager.base.Manager.GetTableEntryByServiceIP(ip)
 			p.SetServiceTranslations(ip, translations) // TODO ben get IP from env Manager
 
 			fmt.Printf("Got IP: %s\n", ip.String())
