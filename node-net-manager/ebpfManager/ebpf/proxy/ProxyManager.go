@@ -35,9 +35,23 @@ func (p *ProxyManager) OnEvent(event ebpfManager.Event) {
 		if !ok {
 			log.Println("Invalid EventData")
 		}
-		proxy := NewProxy(attachEvent.Collection, p)
-		p.proxies[attachEvent.Ifname] = &proxy
+		if proxy := NewProxy(attachEvent.Collection, p); proxy != nil {
+			p.proxies[attachEvent.Ifname] = proxy
+		}
+		break
+	case ebpfManager.UnattachEvent:
+		unattachEvent, ok := event.Data.(ebpfManager.UnattachEventData)
+		if !ok {
+			log.Println("Invalid EventData")
+		}
+		proxy, exists := p.proxies[unattachEvent.Ifname]
+		if exists {
+			proxy.Close()
+		}
+		delete(p.proxies, unattachEvent.Ifname)
+		break
 	}
+
 }
 
 func (p *ProxyManager) DestroyModule() error {

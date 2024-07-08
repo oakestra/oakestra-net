@@ -9,16 +9,14 @@ import (
 	"log"
 	"net"
 	"os"
-	"runtime"
-	"syscall"
 )
 
 type Proxy struct {
 	Collection        *ebpf.Collection `json:"-"`
 	serviceToInstance *ebpf.Map
 	ip_updates        *ebpf.Map
-	socket            int
 	proxyManager      *ProxyManager
+	done              chan struct{} // stop go routine
 }
 
 const MAX_IPS = 32 // IMPORTANT: Keep in sync with ebpf implementation
@@ -55,28 +53,31 @@ func (p *Proxy) SetServiceTranslations(serviceIp net.IP, instanceIPs []net.IP) {
 	}
 }
 
-func (p *Proxy) Close() {
-	syscall.Close(p.socket)
-}
-
-func NewProxy(collection *ebpf.Collection, manager *ProxyManager) Proxy {
-	socket, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, syscall.ETH_P_ALL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create socket: %v\n", err)
-		os.Exit(1)
+func NewProxy(collection *ebpf.Collection, manager *ProxyManager) *Proxy {
+	serviceToInstance, exists := collection.Maps["service_to_instance"]
+	if !exists {
+		log.Printf("'service_to_instance map' missing. Cannot init proxy")
+		return nil
 	}
-	defer syscall.Close(socket)
+	ipUpdates, exists := collection.Maps["ip_updates"]
+	if !exists {
+		log.Printf("'ip_updates' map missing. Cannot init proxy")
+		return nil
+	}
 
 	p := Proxy{
 		Collection:        collection,
-		serviceToInstance: collection.Maps["service_to_instance"], //TODO ben this might fail!
-		ip_updates:        collection.Maps["ip_updates"],          //TODO ben this might fail!
-		socket:            socket,
+		serviceToInstance: serviceToInstance,
+		ip_updates:        ipUpdates,
 		proxyManager:      manager,
 	}
 	p.StartReadingPerfEvents()
 
-	return p
+	return &p
+}
+
+func (p *Proxy) Close() {
+	close(p.done)
 }
 
 // this function keeps polling to check if the ebpf function requests an table lookup
@@ -86,32 +87,40 @@ func (p *Proxy) StartReadingPerfEvents() {
 		log.Fatalf("creating perf reader: %v", err)
 	}
 
-	//TODO BEN close go routine when program closes
+	p.done = make(chan struct{})
 	go func() {
 		defer reader.Close()
 		for {
-			record, err := reader.Read()
-			runtime.Breakpoint()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error reading from perf map: %v\n", err)
-				continue
+			select {
+			case <-p.done:
+				return
+			default:
+				record, err := reader.Read()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error reading from perf map: %v\n", err)
+					continue
+				}
+
+				if record.LostSamples != 0 {
+					log.Printf("perf event ring buffer full, dropped %d samples", record.LostSamples)
+					continue
+				}
+
+				var ip = make(net.IP, 4)
+				if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.BigEndian, &ip); err != nil {
+					log.Printf("parsing event: %v", err)
+					continue
+				}
+
+				// check if IP is in serviceIP subnet. Should always be the case.
+				_, ipNet, _ := net.ParseCIDR("10.30.0.0/16")
+				if !ipNet.Contains(ip) {
+					fmt.Printf("Got IP %s but its not in subnet %s. This should not happen\n", ip.String(), ipNet.String())
+				}
+
+				translations := p.proxyManager.base.Manager.GetTableEntryByServiceIP(ip)
+				p.SetServiceTranslations(ip, translations)
 			}
-
-			if record.LostSamples != 0 {
-				log.Printf("perf event ring buffer full, dropped %d samples", record.LostSamples)
-				continue
-			}
-
-			var ip = make(net.IP, 4)
-			if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.BigEndian, &ip); err != nil {
-				log.Printf("parsing event: %v", err)
-				continue
-			}
-
-			translations := p.proxyManager.base.Manager.GetTableEntryByServiceIP(ip)
-			p.SetServiceTranslations(ip, translations) // TODO ben get IP from env Manager
-
-			fmt.Printf("Got IP: %s\n", ip.String())
 		}
 	}()
 }

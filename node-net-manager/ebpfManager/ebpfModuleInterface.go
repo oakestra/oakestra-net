@@ -9,6 +9,7 @@ type EventType int
 
 const (
 	AttachEvent EventType = iota
+	UnattachEvent
 )
 
 type Event struct {
@@ -20,6 +21,11 @@ type Event struct {
 type AttachEventData struct {
 	Ifname     string           // name of the interface it was attached to
 	Collection *ebpf.Collection // wrapper for FDs for in-/egress programs and maps
+}
+
+// UnattachEventData is emitted by the ebpfManager when a module was unattached from an interface.
+type UnattachEventData struct {
+	Ifname string // name of the interface it was unattached from
 }
 
 // ModuleBase represents the attributes that every eBPF module has.

@@ -115,6 +115,7 @@ func (e *EbpfManager) createNewModule(name string, config interface{}) (*ModuleB
 		Priority: priority,
 		Config:   config,
 		Router:   subRouter,
+		Manager:  e,
 	}
 	module := newModule(base)
 	e.idToModule[id] = &ModuleContainer{

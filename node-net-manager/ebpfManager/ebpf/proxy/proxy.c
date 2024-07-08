@@ -149,15 +149,16 @@ int outgoing_proxy(struct __sk_buff *skb) {
     }
 
     // seems like we haven't found an open session -> choose new server using RR and create new session
-    // TODO ben Implement other mechanisms than RR here
     if (!new_daddr) {
         struct ip_list *ipl = bpf_map_lookup_elem(&service_to_instance, &ip->daddr);
+        __be32 daddr = ip->daddr;
+        bpf_perf_event_output(skb, &ip_updates, BPF_F_CURRENT_CPU, &daddr, sizeof(daddr));
         if (!ipl) {
-            // no translation in table found. Drop the packet end request and update for this IP from user-space
-            __be32 daddr = ip->daddr;
-            bpf_perf_event_output(skb, &ip_updates, BPF_F_CURRENT_CPU, &daddr, sizeof(daddr));
+            // no translation in table found. Drop the packet and hope there is an update next time this IP is used
             return TC_ACT_SHOT; // Drop the packet
         }
+
+        // TODO Implement other mechanisms than RR here
         // select instance IP using RR
         int rand_index = bpf_get_prandom_u32() % ipl->length % MAX_IPS;
         new_daddr = ipl->ips[rand_index];
@@ -264,8 +265,6 @@ int ingoing_proxy(struct __sk_buff *skb) {
     // replace destination ip and recalculate L3 checksum
     __s64 sum = bpf_csum_diff((void *)&ip->saddr, 4, (void *)&new_daddr, 4, 0);
     if (bpf_skb_store_bytes(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, saddr), (void *)&new_daddr, 4, 0) < 0) {
-        const char msg123[] = "bpf_skb_store_bytes err\n";
-        bpf_trace_printk(msg123, sizeof(msg123));
         return TC_ACT_PIPE; // Drop packet if modification fails
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
