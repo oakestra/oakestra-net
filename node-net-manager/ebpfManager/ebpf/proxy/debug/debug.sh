@@ -9,10 +9,10 @@ echo "Clean up..."
 echo "Build ebpf and go..."
 rm -R build
 mkdir -p build
-clang -O2 -target bpf -emit-llvm -c ../proxy.c -o build/proxy.bc
-clang -O2 -target bpf -emit-llvm -c ../masking.c -o build/masking.bc
+clang -O2 -g -target bpf -emit-llvm -c ../proxy.c -o build/proxy.bc
+clang -O2 -g -target bpf -emit-llvm -c ../masking.c -o build/masking.bc
 llvm-link -o build/main.bc build/proxy.bc build/masking.bc
-clang -O2 -target bpf -c build/main.bc -o build/main.o
+clang -O2 -g -target bpf -c build/main.bc -o build/main.o
 
 # clang -O2 -target bpf -c xdp_udp_count.c -o build/xdp_udp_count.o
 # ip link set dev veth-ns2 xdp obj build/xdp_udp_count.o sec xdp

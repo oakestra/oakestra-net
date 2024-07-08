@@ -172,7 +172,13 @@ func (e *EbpfManager) loadEbpf(path string) (*ebpf.Collection, error) {
 		return nil, err
 	}
 
-	coll, err := ebpf.NewCollection(spec)
+	opts := ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: "/sys/fs/bpf", // TODO ben!
+		},
+	}
+
+	coll, err := ebpf.NewCollectionWithOptions(spec, opts)
 	if err != nil {
 		return nil, err
 	}

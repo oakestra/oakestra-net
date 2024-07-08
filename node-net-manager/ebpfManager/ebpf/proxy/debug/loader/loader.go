@@ -27,7 +27,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	coll, err := ebpf.NewCollection(spec)
+	opts := ebpf.CollectionOptions{
+		Maps: ebpf.MapOptions{
+			PinPath: "/sys/fs/bpf",
+		},
+	}
+
+	coll, err := ebpf.NewCollectionWithOptions(spec, opts)
 	if err != nil {
 		log.Fatal(err)
 	}

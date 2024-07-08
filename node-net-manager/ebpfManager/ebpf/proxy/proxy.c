@@ -21,8 +21,6 @@
 // implies that one service cannot open more than MAX_CONVERSION connections to another services on the same source and destination port.
 #define MAX_CONVERSION 4
 
-#define MAX_PACKET_SIZE 2048
-
 // a session is described from the perspective of the client. We only need the ports because each service has its own ebpf proxy.
 struct session_key {
     __be16 src_port;
@@ -52,13 +50,13 @@ service_to_instance = {
         .max_entries = 128, // TODO increase size if 128 is not enough
 };
 
-struct bpf_map_def SEC("maps/open_sessions")
-open_sessions = {
-        .type = BPF_MAP_TYPE_HASH,
-        .key_size = sizeof(struct session_key),
-        .value_size = sizeof(struct conversion_list),
-        .max_entries = 128, // TODO increase size if 128 is not enough
-};
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, struct session_key);
+    __type(value, struct conversion_list);
+    __uint(max_entries, 128);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+} open_sessions SEC(".maps");
 
 struct bpf_map_def SEC("maps/ip_updates") ip_updates = {
         .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
