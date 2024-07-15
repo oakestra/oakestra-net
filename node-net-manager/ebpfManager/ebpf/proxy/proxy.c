@@ -58,10 +58,9 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } open_sessions SEC(".maps");
 
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 256 * 1024);
-} ip_updates SEC(".maps");
+struct bpf_map_def SEC(".maps") ip_updates = {
+        .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
+};
 
 extern bool is_ipv4_in_network(__be32 addr);
 
