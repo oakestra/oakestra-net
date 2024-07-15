@@ -71,7 +71,7 @@ func Init(router *mux.Router, env env.EnvironmentManager) {
 		events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
 			if payload, ok := event.Payload.(events.VethCreationPayload); ok {
 				for id := range ebpfManager.idToModule {
-					ebpfManager.loadAndAttach(id, payload.Name)
+					ebpfManager.loadAndAttach(id, payload.Name) // TODO ben handle error
 				}
 			}
 		})
@@ -125,7 +125,7 @@ func (e *EbpfManager) createNewModule(name string, config interface{}) (*ModuleB
 	}
 
 	for _, service := range e.env.GetDeployedServices() {
-		e.loadAndAttach(id, service.Veth.Name)
+		e.loadAndAttach(id, service.Veth.Name) // TODO ben handle error
 	}
 
 	return &base, nil
@@ -174,7 +174,7 @@ func (e *EbpfManager) loadEbpf(path string) (*ebpf.Collection, error) {
 
 	opts := ebpf.CollectionOptions{
 		Maps: ebpf.MapOptions{
-			PinPath: "/sys/fs/bpf", // TODO ben!
+			PinPath: "/sys/fs/bpf",
 		},
 	}
 

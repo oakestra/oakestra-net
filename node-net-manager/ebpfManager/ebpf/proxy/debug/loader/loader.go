@@ -1,19 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
-	"fmt"
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"log"
 	"net"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func main() {
@@ -119,43 +112,4 @@ func main() {
 	// 	if err := serviceToInstance.Update(&key, &value, ebpf.UpdateAny); err != nil {
 	// 		log.Fatalf("Error updating map: %v", err)
 	// 	}
-
-	packetBuf := coll.Maps["ip_updates"]
-	reader, err := perf.NewReader(packetBuf, os.Getpagesize())
-	if err != nil {
-		log.Fatalf("creating perf reader: %v", err)
-	}
-	defer reader.Close()
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sig
-		reader.Close()
-		os.Exit(0)
-	}()
-
-	fmt.Println("Listening for events..")
-	go func() {
-		for {
-			record, err := reader.Read()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error reading from perf map: %v\n", err)
-				continue
-			}
-
-			if record.LostSamples != 0 {
-				log.Printf("perf event ring buffer full, dropped %d samples", record.LostSamples)
-				continue
-			}
-
-			var ip = make(net.IP, 4)
-			if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.BigEndian, &ip); err != nil {
-				log.Printf("parsing event: %v", err)
-				continue
-			}
-
-			fmt.Printf(ip.String())
-		}
-	}()
 }

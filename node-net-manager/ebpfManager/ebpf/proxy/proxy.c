@@ -42,13 +42,13 @@ struct ip_list {
     __be32 ips[MAX_IPS];
 };
 
-struct bpf_map_def SEC("maps/service_to_instance")
-service_to_instance = {
-        .type = BPF_MAP_TYPE_HASH,
-        .key_size = sizeof(__be32),
-        .value_size = sizeof(struct ip_list),
-        .max_entries = 128, // TODO increase size if 128 is not enough
-};
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __be32);
+    __type(value, struct ip_list);
+    __uint(max_entries, 128); // TODO maybe increase size in future
+    __uint(pinning, LIBBPF_PIN_BY_NAME); // pin by name -> just one map for all proxy instances
+} service_to_instance SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
@@ -58,9 +58,10 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } open_sessions SEC(".maps");
 
-struct bpf_map_def SEC("maps/ip_updates") ip_updates = {
-        .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 256 * 1024);
+} ip_updates SEC(".maps");
 
 extern bool is_ipv4_in_network(__be32 addr);
 
@@ -103,10 +104,11 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
 
     // uint iphdr_len = ip->ihl * 4;
-    uint iphdr_len = 20; // TODO ben
-    if (iphdr_len < MIN_IPV4_HEADER_LENGTH || iphdr_len > MAX_IPV4_HEADER_LENGTH) {
-        return TC_ACT_SHOT;
-    }
+    // TODO for some reason the verifier does not like this. Seting iphdr_len to 20 effectively disables IP options!
+    uint iphdr_len = 20;
+    // if (iphdr_len < MIN_IPV4_HEADER_LENGTH || iphdr_len > MAX_IPV4_HEADER_LENGTH) {
+    //     return TC_ACT_SHOT;
+    // }
 
     if (!is_ipv4_in_network(ip->daddr)) {
         return TC_ACT_PIPE;
@@ -216,10 +218,11 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
 
     // uint iphdr_len = ip->ihl * 4;
-    uint iphdr_len = 20; // TODO ben
-    if (iphdr_len < MIN_IPV4_HEADER_LENGTH || iphdr_len > MAX_IPV4_HEADER_LENGTH) {
-        return TC_ACT_SHOT;
-    }
+    // TODO for some reason the verifier does not like this. Seting iphdr_len to 20 effectively disables IP options!
+    uint iphdr_len = 20;
+    // if (iphdr_len < MIN_IPV4_HEADER_LENGTH || iphdr_len > MAX_IPV4_HEADER_LENGTH) {
+    //     return TC_ACT_SHOT;
+    // }
 
     // proxy only supports TCP and UDP for now.
     if (ip->protocol == IPPROTO_TCP) {

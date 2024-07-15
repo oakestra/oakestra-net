@@ -26,7 +26,6 @@ func (e *EbpfManager) apiCreateNewModule(writer http.ResponseWriter, request *ht
 	}
 	newModule, err := e.createNewModule(req.Name, req.Config)
 	if err != nil {
-		// TODO ben can returning this error potentially be exploited?
 		http.Error(writer, "Error creating Ebpf: "+err.Error(), http.StatusInternalServerError)
 	}
 	jsonResponse, err := json.Marshal(newModule)
