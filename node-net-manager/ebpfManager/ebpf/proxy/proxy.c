@@ -55,7 +55,6 @@ struct {
     __type(key, struct session_key);
     __type(value, struct conversion_list);
     __uint(max_entries, 128);
-    __uint(pinning, LIBBPF_PIN_BY_NAME);
 } open_sessions SEC(".maps");
 
 struct {
@@ -86,6 +85,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
     struct session_key key = {};
     __u32 new_daddr = 0;
+    bool is_tcp = false;
 
     // check if enough size for ethernet header
     if ((void *) (eth + 1) > data_end) {
@@ -115,6 +115,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
     // proxy only supports TCP and UDP for now.
     if (ip->protocol == IPPROTO_TCP) {
+        is_tcp = true;
         struct tcphdr *tcp;
 
         tcp = (struct tcphdr *) ((__u8 *) ip + iphdr_len);
@@ -124,6 +125,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
         key.src_port = tcp->source;
         key.dst_port = tcp->dest;
     } else if (ip->protocol == IPPROTO_UDP) {
+        is_tcp = false;
         struct udphdr *udp;
 
         udp = (struct udphdr *) ((__u8 *) ip + iphdr_len);
@@ -187,6 +189,13 @@ int outgoing_proxy(struct __sk_buff *skb) {
         return TC_ACT_PIPE; // Drop packet if modification fails
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
+    uint l4_offset = sizeof(struct ethhdr) + iphdr_len;
+    if(is_tcp){
+        l4_offset += offsetof(struct tcphdr, check);
+    } else {
+        l4_offset += offsetof(struct udphdr, check);
+    }
+    bpf_l4_csum_replace(skb, l4_offset, 0, sum, BPF_F_PSEUDO_HDR);
 
     return TC_ACT_PIPE;
 }
@@ -200,6 +209,7 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
     struct session_key key = {};
     __u32 new_daddr = 0;
+    bool is_tcp = false;
 
     // check if enough size for ethernet header
     if ((void *) (eth + 1) > data_end) {
@@ -225,6 +235,7 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
     // proxy only supports TCP and UDP for now.
     if (ip->protocol == IPPROTO_TCP) {
+        is_tcp = true;
         struct tcphdr *tcp;
 
         tcp = (struct tcphdr *) ((__u8 *) ip + iphdr_len);
@@ -234,6 +245,7 @@ int ingoing_proxy(struct __sk_buff *skb) {
         key.src_port = tcp->dest;
         key.dst_port = tcp->source;
     } else if (ip->protocol == IPPROTO_UDP) {
+        is_tcp = false;
         struct udphdr *udp;
 
         udp = (struct udphdr *) ((__u8 *) ip + iphdr_len);
@@ -268,6 +280,13 @@ int ingoing_proxy(struct __sk_buff *skb) {
         return TC_ACT_PIPE; // Drop packet if modification fails
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
+    uint l4_offset = sizeof(struct ethhdr) + iphdr_len;
+    if(is_tcp){
+        l4_offset += offsetof(struct tcphdr, check);
+    } else {
+        l4_offset += offsetof(struct udphdr, check);
+    }
+    bpf_l4_csum_replace(skb, l4_offset, 0, sum, BPF_F_PSEUDO_HDR);
 
     return TC_ACT_PIPE;
 }
