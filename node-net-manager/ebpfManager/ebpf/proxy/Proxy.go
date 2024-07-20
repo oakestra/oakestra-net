@@ -16,7 +16,8 @@ type Proxy struct {
 	serviceToInstance *ebpf.Map
 	ip_updates        *ebpf.Map
 	proxyManager      *ProxyManager
-	done              chan struct{} // stop go routine
+	done              chan struct{}
+	perfReader        *perf.Reader
 }
 
 const MAX_IPS = 32 // IMPORTANT: Keep in sync with ebpf implementation
@@ -78,26 +79,27 @@ func NewProxy(collection *ebpf.Collection, manager *ProxyManager) *Proxy {
 
 func (p *Proxy) Close() {
 	close(p.done)
+	p.perfReader.Close()
 }
 
-// this function keeps polling to check if the ebpf function requests an table lookup
+// StartReadingPerfEvents keeps polling perf events to check if the ebpf function requests a table lookup
 func (p *Proxy) StartReadingPerfEvents() {
-	reader, err := perf.NewReader(p.ip_updates, os.Getpagesize())
+	var err error
+	p.perfReader, err = perf.NewReader(p.ip_updates, os.Getpagesize())
 	if err != nil {
 		log.Fatalf("creating perf reader: %v", err)
 	}
 
 	p.done = make(chan struct{})
 	go func() {
-		defer reader.Close()
 		for {
 			select {
 			case <-p.done:
 				return
 			default:
-				record, err := reader.Read()
+				record, err := p.perfReader.Read()
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error reading from perf map: %v\n", err)
+					log.Printf("Error reading from perf map: %v\n", err)
 					continue
 				}
 

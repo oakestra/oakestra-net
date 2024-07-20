@@ -229,15 +229,6 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 		return nil, err
 	}
 
-	// TODO ben also emit event for UniKernels
-	// TODO ben find reason why this event is sometimes emitted twice even though there is just one service deployed
-	events.GetInstance().EmitCallback(events.CallbackEvent{
-		EventType: events.VethCreation,
-		Payload: events.VethCreationPayload{
-			Name:     veth.Name,
-			PeerName: veth.PeerName,
-		},
-	})
 	return veth, nil
 }
 

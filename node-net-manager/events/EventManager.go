@@ -37,9 +37,11 @@ type CallbackEvent struct {
 	Payload   interface{}
 }
 
-type VethCreationPayload struct {
-	Name     string
-	PeerName string
+// Payload for events fo type ServiceCreated and ServiceRemoved.
+type ServicePayload struct {
+	ServiceName  string
+	VethName     string
+	VethPeerName string
 }
 
 // TODO ben add short doc of why we need ChannelEvents and CallbackEvents and what they are
@@ -48,7 +50,8 @@ const (
 	TableQuery EventType = iota
 
 	// CallbackEvents
-	VethCreation
+	ServiceCreated
+	ServiceRemoved
 )
 
 /* ------------- singleton instance ------- */

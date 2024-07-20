@@ -1,6 +1,7 @@
 package env
 
 import (
+	"NetManager/events"
 	"NetManager/logger"
 	"NetManager/mqtt"
 	"NetManager/network"
@@ -155,6 +156,17 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	}
 	env.deployedServicesLock.Unlock()
 	logger.DebugLogger().Printf("New deployedServices table: %v", env.deployedServices)
+
+	// TODO also emit event for UniKernels
+	events.GetInstance().EmitCallback(events.CallbackEvent{
+		EventType: events.ServiceCreated,
+		Payload: events.ServicePayload{
+			ServiceName:  sname,
+			VethName:     vethIfce.Name,
+			VethPeerName: vethIfce.PeerName,
+		},
+	})
+
 	return ip, ipv6, nil
 }
 
@@ -177,5 +189,13 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		if !mqtt.MqttIsInterestRegistered(sname) {
 			env.RemoveServiceEntries(sname)
 		}
+		events.GetInstance().EmitCallback(events.CallbackEvent{
+			EventType: events.ServiceRemoved,
+			Payload: events.ServicePayload{
+				ServiceName:  sname,
+				VethName:     s.Veth.Name,
+				VethPeerName: s.Veth.PeerName,
+			},
+		})
 	}
 }

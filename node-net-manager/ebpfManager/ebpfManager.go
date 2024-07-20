@@ -24,15 +24,15 @@ var (
 )
 
 type ModuleContainer struct {
-	base        ModuleBase
-	module      ModuleInterface
-	filters     []FilterPair
-	collections []*ebpf.Collection
+	base         ModuleBase
+	module       ModuleInterface
+	vethToFilter map[string]*FilterPair
 }
 
 type FilterPair struct {
-	ingress *netlink.BpfFilter
-	egress  *netlink.BpfFilter
+	collection *ebpf.Collection
+	ingress    *netlink.BpfFilter
+	egress     *netlink.BpfFilter
 }
 
 type EbpfManager struct {
@@ -67,11 +67,20 @@ func Init(router *mux.Router, env env.EnvironmentManager) {
 			log.Fatal("Removing memlock:", err)
 		}
 
-		// callback that notifies all currently registered ebpf modules about the creation of a new veth pair
-		events.GetInstance().RegisterCallback(events.VethCreation, func(event events.CallbackEvent) {
-			if payload, ok := event.Payload.(events.VethCreationPayload); ok {
+		// attach currently active modules if new service is deployed
+		events.GetInstance().RegisterCallback(events.ServiceCreated, func(event events.CallbackEvent) {
+			if payload, ok := event.Payload.(events.ServicePayload); ok {
 				for id := range ebpfManager.idToModule {
-					ebpfManager.loadAndAttach(id, payload.Name) // TODO ben handle error
+					ebpfManager.loadAndAttach(id, payload.VethName) // TODO ben handle error
+				}
+			}
+		})
+
+		// detach currently active modules if service is undeployed
+		events.GetInstance().RegisterCallback(events.ServiceRemoved, func(event events.CallbackEvent) {
+			if payload, ok := event.Payload.(events.ServicePayload); ok {
+				for id := range ebpfManager.idToModule {
+					ebpfManager.detach(id, payload.VethName) // TODO ben handle error
 				}
 			}
 		})
@@ -119,9 +128,9 @@ func (e *EbpfManager) createNewModule(name string, config interface{}) (*ModuleB
 	}
 	module := newModule(base)
 	e.idToModule[id] = &ModuleContainer{
-		base:    base,
-		module:  module,
-		filters: make([]FilterPair, 0),
+		base:         base,
+		module:       module,
+		vethToFilter: make(map[string]*FilterPair),
 	}
 
 	for _, service := range e.env.GetDeployedServices() {
@@ -151,8 +160,7 @@ func (e *EbpfManager) loadAndAttach(moduleId uint, ifname string) (*ebpf.Collect
 		return nil, err
 	}
 
-	moduleContainer.collections = append(moduleContainer.collections, coll)
-	moduleContainer.filters = append(moduleContainer.filters, *fp)
+	moduleContainer.vethToFilter[ifname] = fp
 
 	event := Event{
 		Type: AttachEvent,
@@ -164,6 +172,32 @@ func (e *EbpfManager) loadAndAttach(moduleId uint, ifname string) (*ebpf.Collect
 	e.emitEvent(moduleId, event)
 
 	return coll, nil
+}
+
+func (e *EbpfManager) detach(moduleId uint, ifname string) error {
+	event := Event{
+		Type: DetachEvent,
+		Data: DetachEventData{
+			Ifname: ifname,
+		},
+	}
+	e.emitEvent(moduleId, event)
+
+	moduleContainer, exists := e.idToModule[moduleId]
+
+	if !exists || moduleContainer.module == nil {
+		return errors.New(fmt.Sprintf("there is no module with id %d", moduleId))
+	}
+
+	filterPair := moduleContainer.vethToFilter[ifname]
+
+	if filterPair != nil {
+		netlink.FilterDel(filterPair.ingress)
+		netlink.FilterDel(filterPair.egress)
+		filterPair.collection.Close()
+	}
+
+	return nil
 }
 
 func (e *EbpfManager) loadEbpf(path string) (*ebpf.Collection, error) {
@@ -255,8 +289,9 @@ func (e *EbpfManager) attachEbpf(ifname string, priority uint16, collection *ebp
 	}
 
 	fp := FilterPair{
-		ingress: ingressFilter,
-		egress:  egressFilter,
+		collection: collection,
+		ingress:    ingressFilter,
+		egress:     egressFilter,
 	}
 
 	return &fp, nil
@@ -301,15 +336,9 @@ func (e *EbpfManager) deleteModuleById(id uint) {
 	if moduleContainer, exists := e.idToModule[id]; exists {
 		moduleContainer.module.DestroyModule()
 
-		// remove ebpf filters from ethernet ports if still attached
-		for _, fp := range moduleContainer.filters {
-			netlink.FilterDel(fp.ingress)
-			netlink.FilterDel(fp.egress)
-		}
-
-		// unload ebpf program and map if still in kernel
-		for _, coll := range moduleContainer.collections {
-			coll.Close()
+		// detach module from all veths
+		for veth := range moduleContainer.vethToFilter {
+			e.detach(id, veth)
 		}
 
 		delete(e.idToModule, id)

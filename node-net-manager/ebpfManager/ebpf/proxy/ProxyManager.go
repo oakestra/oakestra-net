@@ -39,8 +39,8 @@ func (p *ProxyManager) OnEvent(event ebpfManager.Event) {
 			p.proxies[attachEvent.Ifname] = proxy
 		}
 		break
-	case ebpfManager.UnattachEvent:
-		unattachEvent, ok := event.Data.(ebpfManager.UnattachEventData)
+	case ebpfManager.DetachEvent:
+		unattachEvent, ok := event.Data.(ebpfManager.DetachEventData)
 		if !ok {
 			log.Println("Invalid EventData")
 		}

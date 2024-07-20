@@ -46,8 +46,8 @@ struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __type(key, __be32);
     __type(value, struct ip_list);
-    __uint(max_entries, 128); // TODO maybe increase size in future
-    __uint(pinning, LIBBPF_PIN_BY_NAME); // pin by name -> just one map for all proxy instances
+    __uint(max_entries, 128);
+   // __uint(pinning, LIBBPF_PIN_BY_NAME); // pin by name -> just one map for all proxy instances
 } service_to_instance SEC(".maps");
 
 struct {
