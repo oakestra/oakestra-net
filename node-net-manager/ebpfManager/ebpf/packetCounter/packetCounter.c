@@ -20,7 +20,7 @@ struct {
     __uint(max_entries, 2);
 } pkt_count SEC(".maps");
 
-SEC("classifier")
+SEC("tc")
 int handle_ingress(struct __sk_buff *skb)
 {
     __u32 key    = 0;
@@ -31,7 +31,7 @@ int handle_ingress(struct __sk_buff *skb)
     return TC_ACT_PIPE;
 }
 
-SEC("classifier")
+SEC("tc")
 int handle_egress(struct __sk_buff *skb)
 {
     __u32 key    = 1;

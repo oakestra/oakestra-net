@@ -17,7 +17,7 @@ struct fw_rule
 {
     __u32 src_ip;
     __u32 dst_ip;
-    __u8 proto; //TODO ben can weird padding be ommited somehow?
+    __u8 proto;
     __u8 p1;
     __u8 p2;
     __u8 p3;
@@ -25,16 +25,14 @@ struct fw_rule
     __u16 dst_port;
 };
 
-struct bpf_map_def SEC("maps") fw_rules = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(struct fw_rule),
-    .value_size = sizeof(__u8),
-    .max_entries = 1024,
-};
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, struct fw_rule);
+    __type(value, __u8);
+    __uint(max_entries, 1024);
+} open_sessions SEC(".maps");
 
-// TODO ben this is an IPv4 only firewall. Do we need IPv6 for this example?
-// TODO ben It also just ignores non-UDP and non-TCP traffic. Is that intended behavior?
-SEC("classifier")
+SEC("tc")
 int handle_ingress(struct __sk_buff *skb)
 {
     // Access the packet data using bpf_skb_load_bytes
@@ -75,7 +73,6 @@ int handle_ingress(struct __sk_buff *skb)
     }
     else if (ip.protocol == IPPROTO_ICMP)
     {
-        // TODO ben currently doing nothing!
         struct icmphdr icmp;
         bpf_skb_load_bytes(skb, sizeof(struct ethhdr) + sizeof(struct iphdr), &icmp, sizeof(icmp));
         key.src_port = 0;
@@ -99,7 +96,7 @@ int handle_ingress(struct __sk_buff *skb)
     return TC_ACT_SHOT; // Default action is to drop
 }
 
-SEC("classifier")
+SEC("tc")
 int handle_egress(struct __sk_buff *skb)
 {
     // Access the packet data using bpf_skb_load_bytes
@@ -107,7 +104,7 @@ int handle_egress(struct __sk_buff *skb)
     bpf_skb_load_bytes(skb, 0, &eth, sizeof(eth));
 
     if (eth.h_proto != bpf_htons(ETH_P_IP))
-        return TC_ACT_PIPE; // Pass the packet if it is not IPv4 for now TODO ben!
+        return TC_ACT_PIPE;
 
     struct iphdr ip;
     bpf_skb_load_bytes(skb, sizeof(struct ethhdr), &ip, sizeof(ip));
@@ -140,7 +137,6 @@ int handle_egress(struct __sk_buff *skb)
     }
     else if (ip.protocol == IPPROTO_ICMP)
     {
-        // TODO ben currently doing nothing!
         struct icmphdr icmp;
         bpf_skb_load_bytes(skb, sizeof(struct ethhdr) + sizeof(struct iphdr), &icmp, sizeof(icmp));
         key.src_port = 0;

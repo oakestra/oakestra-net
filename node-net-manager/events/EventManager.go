@@ -44,7 +44,6 @@ type ServicePayload struct {
 	VethPeerName string
 }
 
-// TODO ben add short doc of why we need ChannelEvents and CallbackEvents and what they are
 const (
 	// ChannelEvents
 	TableQuery EventType = iota

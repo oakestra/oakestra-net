@@ -46,7 +46,6 @@ func (f *FirewallManager) Configure() {
 		src := net.ParseIP(firewallRequest.SrcIp).To4()
 		dst := net.ParseIP(firewallRequest.DstIp).To4()
 
-		// TODO ben default is always TCP. Does that make sense? + can I add this parsing step to JSON serialiser?
 		proto := TCP
 		if request.Proto == "UDP" {
 			proto = UDP

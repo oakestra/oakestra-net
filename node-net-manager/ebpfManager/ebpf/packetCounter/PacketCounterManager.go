@@ -42,6 +42,17 @@ func (p *PacketCounterManager) OnEvent(event ebpfManager.Event) {
 		}
 		counter := NewPacketCounter(attachEvent.Collection)
 		p.counters[attachEvent.Ifname] = &counter
+	case ebpfManager.DetachEvent:
+		unattachEvent, ok := event.Data.(ebpfManager.DetachEventData)
+		if !ok {
+			log.Println("Invalid EventData")
+		}
+		counter, exists := p.counters[unattachEvent.Ifname]
+		if exists {
+			counter.Close()
+		}
+		delete(p.counters, unattachEvent.Ifname)
+		break
 	}
 }
 

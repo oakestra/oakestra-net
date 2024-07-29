@@ -4,7 +4,6 @@ import (
 	"os"
 )
 
-// TODO ben is this the best place to place util functions like this?
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
 	if err != nil {

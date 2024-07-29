@@ -51,7 +51,7 @@ type Environment struct {
 	config            Configuration
 	translationTable  TableEntryCache.TableManager
 	//### Deployment management variables
-	deployedServices     map[string]service // all the deployed services with the ip and ports //TODO ben all deployed services here!!!
+	deployedServices     map[string]service // all the deployed services with the ip and ports
 	deployedServicesLock sync.RWMutex
 	nextContainerIP      net.IP // next address for the next container to be deployed
 	nextContainerIPv6    net.IP

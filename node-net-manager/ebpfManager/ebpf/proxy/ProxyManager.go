@@ -19,7 +19,7 @@ func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
 		proxies: make(map[string]*Proxy),
 	}
 
-	//TODO ben add custom configuration to proxy
+	//TODO add custom configuration to proxy
 	module.base.Router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusOK)
@@ -51,7 +51,6 @@ func (p *ProxyManager) OnEvent(event ebpfManager.Event) {
 		delete(p.proxies, unattachEvent.Ifname)
 		break
 	}
-
 }
 
 func (p *ProxyManager) DestroyModule() error {

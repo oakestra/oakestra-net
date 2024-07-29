@@ -103,7 +103,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
 
 
     // uint iphdr_len = ip->ihl * 4;
-    // TODO for some reason the verifier does not like this. Seting iphdr_len to 20 effectively disables IP options!
+    // TODO for some reason the verifier does not like this. Setting iphdr_len to 20 works but effectively disables IPv4 options
     uint iphdr_len = 20;
     // if (iphdr_len < MIN_IPV4_HEADER_LENGTH || iphdr_len > MAX_IPV4_HEADER_LENGTH) {
     //     return TC_ACT_SHOT;
@@ -144,7 +144,7 @@ int outgoing_proxy(struct __sk_buff *skb) {
     if (list_ptr) {
         for (int i = 0; i < MAX_CONVERSION; i++) {
             if (list_ptr->conversions[i].service_ip == ip->daddr) {
-                new_daddr = list_ptr->conversions[i].instance_ip; // TODO ben this address could have gotten invalid in the meantime!
+                new_daddr = list_ptr->conversions[i].instance_ip;
             }
         }
     }
@@ -227,7 +227,7 @@ int ingoing_proxy(struct __sk_buff *skb) {
 
 
     // uint iphdr_len = ip->ihl * 4;
-    // TODO for some reason the verifier does not like this. Seting iphdr_len to 20 effectively disables IP options!
+    // TODO for some reason the verifier does not like this. Setting iphdr_len to 20 works but effectively disables IPv4 options
     uint iphdr_len = 20;
     // if (iphdr_len < MIN_IPV4_HEADER_LENGTH || iphdr_len > MAX_IPV4_HEADER_LENGTH) {
     //     return TC_ACT_SHOT;
@@ -262,9 +262,9 @@ int ingoing_proxy(struct __sk_buff *skb) {
     // check if a TCP/UDP session was already established for this service IP
     struct conversion_list *list_ptr = bpf_map_lookup_elem(&open_sessions, &key);
     if (list_ptr) {
-        for (int i = 0; i < MAX_CONVERSION; i++) { // TODO ben (length % MAX_CONVERSION) would be better in my opinion  but verfier wants us to loop through all entries
+        for (int i = 0; i < MAX_CONVERSION; i++) {
             if (list_ptr->conversions[i].instance_ip == ip->saddr) {
-                new_daddr = list_ptr->conversions[i].service_ip; // TODO ben this address could have gotten invalid in the meantime!
+                new_daddr = list_ptr->conversions[i].service_ip;
             }
         }
     }
@@ -291,5 +291,4 @@ int ingoing_proxy(struct __sk_buff *skb) {
     return TC_ACT_PIPE;
 }
 
-char _license[]
-SEC("license") = "GPL";
+char _license[] SEC("license") = "GPL";

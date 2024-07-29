@@ -18,6 +18,8 @@ func NewPacketCounter(collection *ebpf.Collection) PacketCounter {
 	}
 }
 
+func (p *PacketCounter) Close() {}
+
 func (p *PacketCounter) refreshCountsFromKernel() {
 	err := p.collection.Maps["pkt_count"].Lookup(uint32(0), &p.Ingress)
 	if err != nil {

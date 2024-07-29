@@ -71,7 +71,7 @@ func Init(router *mux.Router, env env.EnvironmentManager) {
 		events.GetInstance().RegisterCallback(events.ServiceCreated, func(event events.CallbackEvent) {
 			if payload, ok := event.Payload.(events.ServicePayload); ok {
 				for id := range ebpfManager.idToModule {
-					ebpfManager.loadAndAttach(id, payload.VethName) // TODO ben handle error
+					ebpfManager.loadAndAttach(id, payload.VethName) // TODO handle error
 				}
 			}
 		})
@@ -80,14 +80,13 @@ func Init(router *mux.Router, env env.EnvironmentManager) {
 		events.GetInstance().RegisterCallback(events.ServiceRemoved, func(event events.CallbackEvent) {
 			if payload, ok := event.Payload.(events.ServicePayload); ok {
 				for id := range ebpfManager.idToModule {
-					ebpfManager.detach(id, payload.VethName) // TODO ben handle error
+					ebpfManager.detach(id, payload.VethName) // TODO handle error
 				}
 			}
 		})
 	})
 }
 
-// TODO ben most likely we wnat to return TC_ACT_PIPE instead of UNSPEC!! Investigate further
 func (e *EbpfManager) createNewModule(name string, config interface{}) (*ModuleBase, error) {
 	objectPath := fmt.Sprintf("ebpfManager/ebpf/%s/%s.so", name, name)
 
@@ -340,10 +339,9 @@ func (e *EbpfManager) deleteModuleById(id uint) {
 		for veth := range moduleContainer.vethToFilter {
 			e.detach(id, veth)
 		}
-
 		delete(e.idToModule, id)
 
-		// TODO ben: you can't delete handlers in gorilla mux after they were created! Find work around!
+		// TODO: Sub-Router must also be removed again, but once added to the main router, a sub-routers can't be just removed again.
 	}
 }
 
@@ -355,7 +353,7 @@ func (e *EbpfManager) Close() {
 	}
 }
 
-// TODO Not really beautiful but this function has to be exposed to make the proxy work. Maybe someone has better suggestion?
+// TODO Not really beautiful but this function has to be exposed to make the proxy work. Open for more beautiful solutions here?
 func (e *EbpfManager) GetTableEntryByServiceIP(serviceIP net.IP) []net.IP {
 	tableEntries := e.env.GetTableEntryByServiceIP(serviceIP)
 	nsips := make([]net.IP, len(tableEntries))
