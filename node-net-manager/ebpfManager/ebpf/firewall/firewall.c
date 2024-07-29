@@ -9,8 +9,6 @@
 #include <linux/tcp.h>
 #include <netinet/in.h>
 #include <bpf/bpf_endian.h>
-#include <linux/bpf.h>
-#include <bpf/bpf_helpers.h>
 #include <linux/pkt_cls.h>
 
 struct fw_rule
