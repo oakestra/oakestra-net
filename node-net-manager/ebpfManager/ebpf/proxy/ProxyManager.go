@@ -19,9 +19,8 @@ func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
 		proxies: make(map[string]*Proxy),
 	}
 
-	//TODO add custom configuration to proxy
-	module.base.Router.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
+	// TODO add more routes. E.g. for monitoring and configuration purposes.
+	module.base.Router.HandleFunc("/alive", func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 

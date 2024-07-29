@@ -9,7 +9,7 @@ import (
 
 type PacketCounterManager struct {
 	base     ebpfManager.ModuleBase
-	counters map[string]*PacketCounter // maps ifname to *packetCounter
+	counters map[string]*PacketCounter
 }
 
 func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
@@ -17,6 +17,10 @@ func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
 		base:     base,
 		counters: make(map[string]*PacketCounter),
 	}
+
+	module.base.Router.HandleFunc("/alive", func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+	}).Methods("GET")
 
 	module.base.Router.HandleFunc("/counts", func(writer http.ResponseWriter, request *http.Request) {
 		module.RefreshAllCounters()

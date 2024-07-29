@@ -30,7 +30,7 @@ struct {
     __type(key, struct fw_rule);
     __type(value, __u8);
     __uint(max_entries, 1024);
-} open_sessions SEC(".maps");
+} fw_rules SEC(".maps");
 
 SEC("tc")
 int handle_ingress(struct __sk_buff *skb)

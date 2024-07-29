@@ -29,7 +29,6 @@ type DetachEventData struct {
 }
 
 // ModuleBase represents the attributes that every eBPF module has.
-// Every implementation of the ModuleInterface should embed the ModuleBase struct.
 type ModuleBase struct {
 	Id       uint         `json:"id"`
 	Name     string       `json:"name"`

@@ -66,3 +66,5 @@ func (e *Firewall) DeleteRule(srcIp net.IP, dstIp net.IP, proto Protocol, srcPor
 	}
 	return nil
 }
+
+func (e *Firewall) Close() {}

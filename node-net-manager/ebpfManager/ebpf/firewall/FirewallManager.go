@@ -10,8 +10,7 @@ import (
 )
 
 type FirewallManager struct {
-	base ebpfManager.ModuleBase
-	// maps interface name to firewall
+	base      ebpfManager.ModuleBase
 	firewalls map[string]*Firewall
 	manager   *ebpfManager.EbpfManager
 }
@@ -21,12 +20,16 @@ func New(base ebpfManager.ModuleBase) ebpfManager.ModuleInterface {
 		base:      base,
 		firewalls: make(map[string]*Firewall),
 	}
-	module.Configure()
+	module.configureRouter()
 
 	return &module
 }
 
-func (f *FirewallManager) Configure() {
+func (f *FirewallManager) configureRouter() {
+	f.base.Router.HandleFunc("/alive", func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+	}).Methods("GET")
+
 	f.base.Router.HandleFunc("/rule", func(writer http.ResponseWriter, request *http.Request) {
 		type FirewallRequest struct {
 			Proto   string `json:"proto"`
@@ -68,6 +71,17 @@ func (f *FirewallManager) OnEvent(event ebpfManager.Event) {
 		}
 		fw := NewFirewall(attachEvent.Collection)
 		f.firewalls[attachEvent.Ifname] = &fw
+	case ebpfManager.DetachEvent:
+		unattachEvent, ok := event.Data.(ebpfManager.DetachEventData)
+		if !ok {
+			log.Println("Invalid EventData")
+		}
+		fw, exists := f.firewalls[unattachEvent.Ifname]
+		if exists {
+			fw.Close()
+		}
+		delete(f.firewalls, unattachEvent.Ifname)
+		break
 	}
 }
 
