@@ -196,7 +196,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	env.deployedServicesLock.Lock()
 	env.deployedServices[sname] = service{
 		ip:          ip,
-		Sname:       name,
+		sname:       name,
 		portmapping: portmapping,
 		Veth:        vethIfce,
 	}

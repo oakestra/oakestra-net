@@ -150,7 +150,7 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	env.deployedServices[fmt.Sprintf("%s.%d", sname, instancenumber)] = service{
 		ip:          ip,
 		ipv6:        ipv6,
-		Sname:       sname,
+		sname:       sname,
 		portmapping: portmapping,
 		Veth:        vethIfce,
 	}
@@ -189,6 +189,8 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		if !mqtt.MqttIsInterestRegistered(sname) {
 			env.RemoveServiceEntries(sname)
 		}
+
+		// TODO also emit event for UniKernels
 		events.GetInstance().EmitCallback(events.CallbackEvent{
 			EventType: events.ServiceRemoved,
 			Payload: events.ServicePayload{

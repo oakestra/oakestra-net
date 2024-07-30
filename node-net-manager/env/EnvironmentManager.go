@@ -68,7 +68,7 @@ type Environment struct {
 type service struct {
 	ip          net.IP
 	ipv6        net.IP
-	Sname       string
+	sname       string
 	portmapping string
 	Veth        *netlink.Veth
 }
@@ -178,7 +178,7 @@ func (env *Environment) IsServiceDeployed(jobName string) bool {
 	env.deployedServicesLock.RLock()
 	defer env.deployedServicesLock.RUnlock()
 	for _, element := range env.deployedServices {
-		if element.Sname == jobName {
+		if element.sname == jobName {
 			return true
 		}
 	}
