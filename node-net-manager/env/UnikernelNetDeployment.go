@@ -40,7 +40,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		_ = netlink.LinkDel(veth)
 	}
 
-	logger.DebugLogger().Println("Creating Veth pair for unikernel deployment")
+	logger.DebugLogger().Println("Creating veth pair for unikernel deployment")
 	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
 	if err != nil {
 		cleanup(vethIfce)
@@ -56,7 +56,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	logger.DebugLogger().Printf("Creating Namespace for unikernel (%s)", sname)
 	nscreation := exec.Command("ip", "netns", "add", sname)
 	err = nscreation.Run()
-	// ns, err := netns.NewNamed(Sname) ## Changes Namespace of current application
+	// ns, err := netns.NewNamed(sname) ## Changes Namespace of current application
 	if err != nil {
 		cleanup(vethIfce)
 		return nil, nil, err
@@ -82,7 +82,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		return nil, nil, err
 	}
 
-	// Get IP for Veth interface
+	// Get IP for veth interface
 	ip, err := env.generateAddress()
 	if err != nil {
 		cleanup(vethIfce)

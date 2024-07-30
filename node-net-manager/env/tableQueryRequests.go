@@ -29,7 +29,7 @@ Asks the MQTT client for a table query and parses the result
 */
 func tableQueryByJobName(jobname string, force_optional ...bool) ([]TableEntryCache.TableEntry, error) {
 
-	log.Println("[MQTT TABLE QUERY] Sname:", jobname)
+	log.Println("[MQTT TABLE QUERY] sname:", jobname)
 	var mqttTablequery mqttifce.TablequeryMqttInterface = mqttifce.GetTableQueryRequestCacheInstance()
 
 	responseStruct, err := mqttTablequery.TableQueryByJobNameRequestBlocking(jobname, force_optional...)
