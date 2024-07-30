@@ -139,27 +139,37 @@ int outgoing_proxy(struct __sk_buff *skb) {
         return TC_ACT_PIPE;
     }
 
+    // Triggers GetTableEntryByServiceIP in user-space for every packet with a service IP as a destination IP.
+    // TODO This is a bit of a work-around and quite inefficient but we need to keep the interest registered in user-space.
+    // In worst case, a session is still open while the timer already expired -> this packet gets dropped but an update should be there soon
+    __be32 daddr = ip->daddr;
+    bpf_perf_event_output(skb, &ip_updates, BPF_F_CURRENT_CPU, &daddr, sizeof(daddr));
+
     // check if a TCP/UDP session was already established for this service IP
     struct conversion_list *list_ptr = bpf_map_lookup_elem(&open_sessions, &key);
     if (list_ptr) {
         for (int i = 0; i < MAX_CONVERSION; i++) {
             if (list_ptr->conversions[i].service_ip == ip->daddr) {
                 new_daddr = list_ptr->conversions[i].instance_ip;
+                // TODO this instance IP might have gotten invalid in the meantime.
+                // Solution: Do the lookup in service_to_instance here and keep the result for later. This does not add a lot of overhead.
             }
         }
     }
 
-    // seems like we haven't found an open session -> choose new server using RR and create new session
+    // seems like we haven't found an open session -> choose new server using an appropriate algorithm
     if (!new_daddr) {
         struct ip_list *ipl = bpf_map_lookup_elem(&service_to_instance, &ip->daddr);
-        __be32 daddr = ip->daddr;
-        bpf_perf_event_output(skb, &ip_updates, BPF_F_CURRENT_CPU, &daddr, sizeof(daddr));
         if (!ipl) {
-            // no translation in table found. Drop the packet and hope there is an update next time this IP is used
+            // no translation in table found. Drop the packet and hope there is an update next time this service IP is used.
+            /* TODO Instead of dropping the packet, send it to user-space (slow path).
+             * If user-space finds a table entry for the service ip, it can update the service_to_instance and re-inject
+             * the packet into the ethernet port. This removes unnecessary retransmissions */
             return TC_ACT_SHOT; // Drop the packet
         }
 
         // TODO Implement other mechanisms than RR here
+
         // select instance IP using RR
         int rand_index = bpf_get_prandom_u32() % ipl->length % MAX_IPS;
         new_daddr = ipl->ips[rand_index];
@@ -281,6 +291,8 @@ int ingoing_proxy(struct __sk_buff *skb) {
     }
     bpf_l3_csum_replace(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, check), 0, sum, 0);
     uint l4_offset = sizeof(struct ethhdr) + iphdr_len;
+
+    // recalculate L4 checksum
     if(is_tcp){
         l4_offset += offsetof(struct tcphdr, check);
     } else {

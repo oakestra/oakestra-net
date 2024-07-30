@@ -72,7 +72,7 @@ func NewProxy(collection *ebpf.Collection, manager *ProxyManager) *Proxy {
 		ip_updates:        ipUpdates,
 		proxyManager:      manager,
 	}
-	p.StartReadingPerfEvents()
+	p.startReadingPerfEvents()
 
 	return &p
 }
@@ -82,8 +82,8 @@ func (p *Proxy) Close() {
 	p.perfReader.Close()
 }
 
-// StartReadingPerfEvents keeps polling perf events to check if the ebpf function requests a table lookup
-func (p *Proxy) StartReadingPerfEvents() {
+// startReadingPerfEvents waits for perf events to update the lookup table
+func (p *Proxy) startReadingPerfEvents() {
 	var err error
 	p.perfReader, err = perf.NewReader(p.ip_updates, os.Getpagesize())
 	if err != nil {
