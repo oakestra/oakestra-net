@@ -284,7 +284,7 @@ int ingoing_proxy(struct __sk_buff *skb) {
        return TC_ACT_PIPE;
     }
 
-    // replace destination ip and recalculate L3 checksum
+    // replace source ip and recalculate L3 checksum
     __s64 sum = bpf_csum_diff((void *)&ip->saddr, 4, (void *)&new_daddr, 4, 0);
     if (bpf_skb_store_bytes(skb, sizeof(struct ethhdr) + offsetof(struct iphdr, saddr), (void *)&new_daddr, 4, 0) < 0) {
         return TC_ACT_PIPE; // Drop packet if modification fails
