@@ -1,6 +1,7 @@
 package env
 
 import (
+	"NetManager/events"
 	"NetManager/logger"
 	"NetManager/mqtt"
 	"NetManager/network"
@@ -151,10 +152,21 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		ipv6:        ipv6,
 		sname:       sname,
 		portmapping: portmapping,
-		veth:        vethIfce,
+		Veth:        vethIfce,
 	}
 	env.deployedServicesLock.Unlock()
 	logger.DebugLogger().Printf("New deployedServices table: %v", env.deployedServices)
+
+	// TODO also emit event for UniKernels
+	events.GetInstance().EmitCallback(events.CallbackEvent{
+		EventType: events.ServiceCreated,
+		Payload: events.ServicePayload{
+			ServiceName:  sname,
+			VethName:     vethIfce.Name,
+			VethPeerName: vethIfce.PeerName,
+		},
+	})
+
 	return ip, ipv6, nil
 }
 
@@ -172,10 +184,20 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		env.freeContainerAddress(s.ipv6)
 		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
 		_ = network.ManageContainerPorts(s.ipv6, s.portmapping, network.ClosePorts)
-		_ = netlink.LinkDel(s.veth)
+		_ = netlink.LinkDel(s.Veth)
 		// if no interest registered delete all remaining info about the service
 		if !mqtt.MqttIsInterestRegistered(sname) {
 			env.RemoveServiceEntries(sname)
 		}
+
+		// TODO also emit event for UniKernels
+		events.GetInstance().EmitCallback(events.CallbackEvent{
+			EventType: events.ServiceRemoved,
+			Payload: events.ServicePayload{
+				ServiceName:  sname,
+				VethName:     s.Veth.Name,
+				VethPeerName: s.Veth.PeerName,
+			},
+		})
 	}
 }
