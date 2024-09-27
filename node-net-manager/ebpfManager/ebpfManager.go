@@ -16,8 +16,6 @@ import (
 	"sync"
 )
 
-//go:generate ./generate_ebpf.sh
-
 var (
 	ebpfManager *EbpfManager
 	once        sync.Once
