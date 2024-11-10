@@ -43,9 +43,7 @@ func HandleRequests(port int) {
 
 	handlers.RegisterAllManagers(&Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
 
-	// TODO only load if experimental feature is specified
-	ebpfRouter := netRouter.PathPrefix("/ebpf").Subrouter()
-	ebpfManager.Init(ebpfRouter, &Env)
+	ebpfManager.Init(netRouter, &Env)
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 }

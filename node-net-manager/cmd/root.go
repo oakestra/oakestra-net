@@ -4,8 +4,10 @@ import (
 	"NetManager/logger"
 	"NetManager/network"
 	"log"
+	"strings"
 	"time"
 
+	"NetManager/ebpfManager"
 	"NetManager/server"
 
 	"github.com/spf13/cobra"
@@ -21,10 +23,11 @@ var (
 			return startNetManager()
 		},
 	}
-	cfgFile    string
-	localPort  int
-	debugMode  bool
-	daemonMode bool
+	cfgFile              string
+	localPort            int
+	debugMode            bool
+	daemonMode           bool
+	experimentalFeatures map[string]bool
 )
 
 const MONITORING_CYCLE = time.Second * 2
@@ -38,6 +41,16 @@ func init() {
 	rootCmd.Flags().StringVarP(&cfgFile, "cfg", "c", "/etc/netmanager/netcfg.json", "Path of the netcfg.json configuration file")
 	rootCmd.Flags().IntVarP(&localPort, "port", "p", 6000, "Default local port of the NetManager")
 	rootCmd.Flags().BoolVarP(&debugMode, "debug", "D", false, "Enable debug logs")
+	experimental := rootCmd.Flags().StringP("experimental", "e", "", "Comma-separated list of experimental features to enable")
+	cobra.OnInitialize(func() {
+		// Parse experimental features if provided
+		experimentalFeatures = make(map[string]bool)
+		if *experimental != "" {
+			for _, feature := range strings.Split(*experimental, ",") {
+				experimentalFeatures[strings.TrimSpace(feature)] = true
+			}
+		}
+	})
 }
 
 func startNetManager() error {
@@ -48,6 +61,10 @@ func startNetManager() error {
 
 	if debugMode {
 		logger.SetDebugMode()
+	}
+
+	if experimentalFeatures["ebpf"] {
+		ebpfManager.SetEnableEbpf(true)
 	}
 
 	log.Print(server.Configuration)
