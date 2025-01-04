@@ -31,14 +31,14 @@ func InitContainerDeployment(env *Environment) {
 }
 
 // AttachNetworkToContainer Attach a Docker container to the bridge and the current network environment
-func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instancenumber int, portmapping string) (net.IP, net.IP, error) {
+func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, jobHash string, instancenumber int, portmapping string) (net.IP, net.IP, error) {
 	env := h.env
 
 	cleanup := func(veth *netlink.Veth) {
 		_ = netlink.LinkDel(veth)
 	}
 
-	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
+	vethIfce, err := env.createVethsPairAndAttachToBridge(jobHash, env.mtusize)
 	if err != nil {
 		go cleanup(vethIfce)
 		return nil, nil, err
@@ -116,8 +116,6 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		env.freeContainerAddress(ipv6)
 		return nil, nil, err
 	}
-
-	env.BookVethNumber()
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
 		logger.ErrorLogger().Println("Error in setFirewallRules")

@@ -14,6 +14,7 @@ import (
 type ContainerDeployTask struct {
 	Pid            int    `json:"pid"`
 	ServiceName    string `json:"serviceName"`
+	JobHash        string `json:"jobHash"`
 	Instancenumber int    `json:"instanceNumber"`
 	PortMappings   string `json:"portMappings"`
 	Runtime        string
@@ -87,7 +88,7 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, net.IP, erro
 	// attach network to the container
 	netHandler := env.GetNetDeployment(requestStruct.Runtime)
 	logger.DebugLogger().Printf("Got netHandler: %v", netHandler)
-	addr, addrv6, err := netHandler.DeployNetwork(requestStruct.Pid, requestStruct.ServiceName, requestStruct.Instancenumber, requestStruct.PortMappings)
+	addr, addrv6, err := netHandler.DeployNetwork(requestStruct.Pid, requestStruct.ServiceName, requestStruct.JobHash, requestStruct.Instancenumber, requestStruct.PortMappings)
 	if err != nil {
 		logger.ErrorLogger().Println("[ERROR]:", err)
 		return nil, nil, err

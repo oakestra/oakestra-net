@@ -31,7 +31,7 @@ func InitUnikernelDeployment(env *Environment) {
 	}
 }
 
-func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instancenumber int, portmapping string) (net.IP, net.IP, error) {
+func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, jobHash string, instancenumber int, portmapping string) (net.IP, net.IP, error) {
 	env := h.env
 	name := sname
 	sname = fmt.Sprintf("%s.instance.%d", sname, instancenumber)
@@ -41,7 +41,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	}
 
 	logger.DebugLogger().Println("Creating veth pair for unikernel deployment")
-	vethIfce, err := env.createVethsPairAndAttachToBridge(sname, env.mtusize)
+	vethIfce, err := env.createVethsPairAndAttachToBridge(jobHash, env.mtusize)
 	if err != nil {
 		cleanup(vethIfce)
 		return nil, nil, err
@@ -177,8 +177,6 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		env.freeContainerAddress(ip)
 		return nil, nil, err
 	}
-
-	env.BookVethNumber()
 
 	if err = env.setVethFirewallRules(vethIfce.Name); err != nil {
 		cleanup(vethIfce)
