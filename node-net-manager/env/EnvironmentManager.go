@@ -45,7 +45,6 @@ type Environment struct {
 	nodeNetworkv6     net.IPNet
 	nameSpaces        []string
 	networkInterfaces []networkInterface
-	nextVethNumber    int
 	proxyName         string
 	config            Configuration
 	translationTable  TableEntryCache.TableManager
@@ -89,7 +88,6 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 	e := Environment{
 		nameSpaces:        make([]string, 0),
 		networkInterfaces: make([]networkInterface, 0),
-		nextVethNumber:    0,
 		proxyName:         proxyname,
 		config:            customConfig,
 		translationTable:  TableEntryCache.NewTableManager(),
@@ -191,7 +189,7 @@ func (env *Environment) ConfigureDockerNetwork(containername string) (string, er
 
 // create veth pair and connect one to the host bridge
 // returns: bridgeVeth name, free Veth name, Vether interface to the veth pair and eventually an error
-func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) (*netlink.Veth, error) {
+func (env *Environment) createVethsPairAndAttachToBridge(jobHash string, mtu int) (*netlink.Veth, error) {
 	// Retrieve current bridge
 	logger.DebugLogger().Println("Retrieving current bridge ")
 	bridge, err := netlink.LinkByName(env.config.HostBridgeName)
@@ -200,9 +198,12 @@ func (env *Environment) createVethsPairAndAttachToBridge(sname string, mtu int) 
 		return nil, err
 	}
 	logger.DebugLogger().Println("Retrieved current bridge")
-	hashedName := network.NameUniqueHash(sname, 4)
-	veth1name := fmt.Sprintf("veth%s%s%s", "00", strconv.Itoa(env.nextVethNumber), hashedName)
-	veth2name := fmt.Sprintf("veth%s%s%s", "01", strconv.Itoa(env.nextVethNumber), hashedName)
+	// hashedName := network.NameUniqueHash(sname, 4)
+	// Limit jobHash to ensure veth name doesn't exceed 15 chars
+	jobHash = jobHash[:8]
+
+	veth1name := fmt.Sprintf("vetho%s%s", "00", jobHash)
+	veth2name := fmt.Sprintf("vetho%s%s", "01", jobHash)
 	logger.DebugLogger().Println("creating veth pair: " + veth1name + "@" + veth2name)
 
 	veth := &netlink.Veth{
@@ -402,11 +403,6 @@ func (env *Environment) execInsideNsByName(Nsname string, function func() error)
 		}
 	}
 	return err
-}
-
-// BookVethNumber Update the veth number to be used for the next veth
-func (env *Environment) BookVethNumber() {
-	env.nextVethNumber = env.nextVethNumber + 1
 }
 
 // CreateHostBridge create host bridge if it has not been created yet, return the current host bridge name or the newly created one
