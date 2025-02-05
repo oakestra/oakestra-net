@@ -26,7 +26,7 @@ type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
 	GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool)
-	GetDeployedServices() map[string]service
+	GetDeployedServices() map[string]Service
 }
 
 type Configuration struct {
@@ -51,7 +51,7 @@ type Environment struct {
 	config            Configuration
 	translationTable  TableEntryCache.TableManager
 	//### Deployment management variables
-	deployedServices     map[string]service // all the deployed services with the ip and ports
+	deployedServices     map[string]Service // all the deployed services with the ip and ports
 	deployedServicesLock sync.RWMutex
 	nextContainerIP      net.IP // next address for the next container to be deployed
 	nextContainerIPv6    net.IP
@@ -65,7 +65,7 @@ type Environment struct {
 	mtusize     int
 }
 
-type service struct {
+type Service struct {
 	ip          net.IP
 	ipv6        net.IP
 	sname       string
@@ -100,7 +100,7 @@ func NewCustom(proxyname string, customConfig Configuration) *Environment {
 		totNextAddrv6:     1,
 		addrCache:         make([]net.IP, 0),
 		addrCachev6:       make([]net.IP, 0),
-		deployedServices:  make(map[string]service, 0),
+		deployedServices:  make(map[string]Service, 0),
 		clusterAddr:       os.Getenv("CLUSTER_MANAGER_IP"),
 		clusterPort:       os.Getenv("CLUSTER_MANAGER_PORT"),
 		mtusize:           customConfig.Mtusize,
@@ -511,7 +511,7 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 	return TableEntryCache.TableEntry{}, false
 }
 
-func (env *Environment) GetDeployedServices() map[string]service {
+func (env *Environment) GetDeployedServices() map[string]Service {
 	return env.deployedServices
 }
 
@@ -535,7 +535,7 @@ func (env *Environment) AddTableQueryEntry(entry TableEntryCache.TableEntry) {
 	}
 }
 
-// RefreshServiceTable force a table query refresh for a service
+// RefreshServiceTable force a table query refresh for a Service
 func (env *Environment) RefreshServiceTable(jobname string) {
 	logger.DebugLogger().Printf("Requested table query refresh for %s", jobname)
 	entryList, err := tableQueryByJobName(jobname, true)

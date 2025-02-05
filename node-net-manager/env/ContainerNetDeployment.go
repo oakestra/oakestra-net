@@ -147,7 +147,7 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 	}
 
 	env.deployedServicesLock.Lock()
-	env.deployedServices[fmt.Sprintf("%s.%d", sname, instancenumber)] = service{
+	env.deployedServices[fmt.Sprintf("%s.%d", sname, instancenumber)] = Service{
 		ip:          ip,
 		ipv6:        ipv6,
 		sname:       sname,
@@ -185,7 +185,7 @@ func (env *Environment) DetachContainer(sname string, instance int) {
 		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
 		_ = network.ManageContainerPorts(s.ipv6, s.portmapping, network.ClosePorts)
 		_ = netlink.LinkDel(s.Veth)
-		// if no interest registered delete all remaining info about the service
+		// if no interest registered delete all remaining info about the Service
 		if !mqtt.MqttIsInterestRegistered(sname) {
 			env.RemoveServiceEntries(sname)
 		}
