@@ -1,20 +1,15 @@
-from flask import Flask, request
-from flask_socketio import SocketIO
-from interfaces.mongodb_requests import mongo_init
-from network.tablequery import *
-from network import subnetwork_management, routes_interests
-from network.utils import sanitize
-from operations import instances_management, cluster_management
-from operations import service_management
-from net_logging import configure_logging
-from network import routes_interests, subnetwork_management
-from network.tablequery import *
-from network import subnetwork_management, routes_interests
-from operations import instances_management, cluster_management
-from operations import service_management
-from net_logging import configure_logging
 import os
 import socket
+
+from flask import Flask, request
+from flask_socketio import SocketIO
+
+from interfaces.mongodb_requests import mongo_init
+from net_logging import configure_logging
+from network import subnetwork_management, routes_interests
+from network.utils import sanitize
+from operations import instances_management, cluster_management, netinfo_management
+from operations import service_management
 
 my_logger = configure_logging()
 
@@ -209,6 +204,34 @@ def table_query_resolution_by_ip(service_ip):
     return instances_management.get_service_instances(
         ip=service_ip, cluster_ip=request.remote_addr
     )
+
+
+# ........ Service networking information endpoints for public use  .............#
+# ......................................................#
+
+
+@app.route("/api/net/service/<service_name>/netinfo", methods=["GET"])
+def service_netinfo_by_name(service_name):
+    """
+    Get the networking info of a service given the complete name
+    """
+    service_name = service_name.replace("_", ".")
+    app.logger.info(
+        "Incoming Request /api/net/service/" + str(service_name) + "/netinfo"
+    )
+    return netinfo_management.get_service_netinfo_by_name(name=service_name)
+
+
+@app.route("/api/net/service/ip/<service_ip>/netinfo", methods=["GET"])
+def service_netinfo_by_ip(service_ip):
+    """
+    Get the networking info of a service given a Service IP in 172_30_x_y notation
+    """
+    service_ip = service_ip.replace("_", ".")
+    app.logger.info(
+        "Incoming Request /api/net/service/ip/" + str(service_ip) + "/netinfo"
+    )
+    return netinfo_management.get_service_netinfo_by_ip(ip=service_ip)
 
 
 # ........ Subnetwork management endpoints .............#
