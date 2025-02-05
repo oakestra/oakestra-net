@@ -348,7 +348,6 @@ func (e *EbpfManager) deleteModuleById(id uint) {
 			e.detach(id, veth)
 		}
 		delete(e.idToModule, id)
-
 		// TODO: Sub-Router must also be removed again, but once added to the main router, a sub-routers can't be just removed again.
 	}
 }
