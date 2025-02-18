@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"NetManager/TableEntryCache"
+	"NetManager/env"
 	"NetManager/proxy/iputils"
 	"encoding/hex"
 	"math/rand"
@@ -75,6 +76,10 @@ func (fakeenv *FakeEnv) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEnt
 
 func (fakeenv *FakeEnv) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool) {
 	return TableEntryCache.TableEntry{}, false
+}
+
+func (fakeenv *FakeEnv) GetDeployedServices() map[string]env.Service {
+	return make(map[string]env.Service, 0)
 }
 
 func getFakeTunnel() GoProxyTunnel {
