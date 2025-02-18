@@ -79,7 +79,8 @@ func (fakeenv *FakeEnv) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 }
 
 func (fakeenv *FakeEnv) GetDeployedServices() map[string]env.Service {
-	return make(map[string]env.Service, 0)
+	// TODO add tests for ebpf Manager
+	return make(map[string]env.Service)
 }
 
 func getFakeTunnel() GoProxyTunnel {

@@ -5,18 +5,20 @@ import (
 	"NetManager/events"
 	"errors"
 	"fmt"
+	"log"
+	"net"
+	"plugin"
+	"sync"
+
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/gorilla/mux"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"log"
-	"net"
-	"plugin"
-	"sync"
 )
 
 var (
+	enableEbpf  bool
 	ebpfManager *EbpfManager
 	once        sync.Once
 )
@@ -42,6 +44,10 @@ type EbpfManager struct {
 	vethToQdisc     map[string]*netlink.GenericQdisc
 }
 
+func SetEnableEbpf(enable bool) {
+	enableEbpf = enable
+}
+
 func GetEbpfManagerInstance() *EbpfManager {
 	if ebpfManager == nil {
 		log.Fatal("ebpfManager was used before initialisation.")
@@ -51,9 +57,13 @@ func GetEbpfManagerInstance() *EbpfManager {
 }
 
 func Init(router *mux.Router, env env.EnvironmentManager) {
+	if !enableEbpf {
+		return
+	}
+
 	once.Do(func() {
 		ebpfManager = &EbpfManager{
-			router:          router,
+			router:          router.PathPrefix("/ebpf").Subrouter(),
 			idToModule:      make(map[uint]*ModuleContainer),
 			vethToQdisc:     make(map[string]*netlink.GenericQdisc),
 			env:             env,

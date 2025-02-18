@@ -535,7 +535,7 @@ func (env *Environment) AddTableQueryEntry(entry TableEntryCache.TableEntry) {
 	}
 }
 
-// RefreshServiceTable force a table query refresh for a service
+// RefreshServiceTable force a table query refresh for a Service
 func (env *Environment) RefreshServiceTable(jobname string) {
 	logger.DebugLogger().Printf("Requested table query refresh for %s", jobname)
 	entryList, err := tableQueryByJobName(jobname, true)
