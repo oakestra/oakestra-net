@@ -1,6 +1,7 @@
 package server
 
 import (
+	"NetManager/ebpfManager"
 	"NetManager/env"
 	"NetManager/handlers"
 	"NetManager/logger"
@@ -66,6 +67,10 @@ func HandleRequests(port int) {
 	} else {
 		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
 	}
+
+	// TODO only load if experimental feature is specified
+	ebpfRouter := netRouter.PathPrefix("/ebpf").Subrouter()
+	ebpfManager.Init(ebpfRouter, &Env)
 }
 
 var (

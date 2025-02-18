@@ -198,7 +198,7 @@ func (h *UnikernelDeyplomentHandler) DeployNetwork(pid int, sname string, instan
 		ip:          ip,
 		sname:       name,
 		portmapping: portmapping,
-		veth:        vethIfce,
+		Veth:        vethIfce,
 	}
 	env.deployedServicesLock.Unlock()
 	logger.DebugLogger().Println("Successful Network creation for Unikernel")
@@ -215,7 +215,7 @@ func (env *Environment) DeleteUnikernelNamespace(sname string, instance int) {
 		env.deployedServicesLock.Unlock()
 		env.freeContainerAddress(s.ip)
 		_ = network.ManageContainerPorts(s.ip, s.portmapping, network.ClosePorts)
-		_ = netlink.LinkDel(s.veth)
+		_ = netlink.LinkDel(s.Veth)
 		_ = netns.DeleteNamed(name)
 	}
 }
