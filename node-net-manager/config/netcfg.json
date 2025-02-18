@@ -5,5 +5,6 @@
   "ClusterMqttPort": "10003",
   "Debug": false,
   "MqttCert": "",
-  "MqttKey": ""
+  "MqttKey": "",
+  "Experimental":[]
 }

@@ -1,14 +1,13 @@
 package cmd
 
 import (
+	"NetManager/ebpfManager"
 	"NetManager/logger"
 	"NetManager/network"
-	"log"
-	"strings"
-	"time"
-
-	"NetManager/ebpfManager"
 	"NetManager/server"
+	"log"
+	"slices"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/tkanos/gonfig"
@@ -23,10 +22,8 @@ var (
 			return startNetManager()
 		},
 	}
-	cfgFile              string
-	localPort            int
-	daemonMode           bool
-	experimentalFeatures map[string]bool
+	cfgFile    string
+	daemonMode bool
 )
 
 const MONITORING_CYCLE = time.Second * 2
@@ -38,17 +35,6 @@ func Execute() error {
 
 func init() {
 	rootCmd.Flags().StringVarP(&cfgFile, "cfg", "c", "/etc/netmanager/netcfg.json", "Path of the netcfg.json configuration file")
-	rootCmd.Flags().IntVarP(&localPort, "port", "p", 6000, "Default local port of the NetManager")
-	experimental := rootCmd.Flags().StringP("experimental", "e", "", "Comma-separated list of experimental features to enable")
-	cobra.OnInitialize(func() {
-		// Parse experimental features if provided
-		experimentalFeatures = make(map[string]bool)
-		if *experimental != "" {
-			for _, feature := range strings.Split(*experimental, ",") {
-				experimentalFeatures[strings.TrimSpace(feature)] = true
-			}
-		}
-	})
 }
 
 func startNetManager() error {
@@ -62,7 +48,7 @@ func startNetManager() error {
 		logger.SetDebugMode()
 	}
 
-	if experimentalFeatures["ebpf"] {
+	if slices.Contains(server.Configuration.Experimental, "ebpf") {
 		ebpfManager.SetEnableEbpf(true)
 	}
 
@@ -71,7 +57,7 @@ func startNetManager() error {
 	network.IptableFlushAll()
 
 	log.Println("NetManager started, but waiting for NodeEngine registration 🟠")
-	server.HandleRequests(localPort)
+	server.HandleRequests()
 
 	return nil
 

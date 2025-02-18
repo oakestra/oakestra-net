@@ -9,7 +9,6 @@ import (
 	"NetManager/network"
 	"NetManager/proxy"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -42,9 +41,10 @@ type netConfiguration struct {
 	Debug             bool
 	MqttCert          string
 	MqttKey           string
+	Experimental      []string
 }
 
-func HandleRequests(port int) {
+func HandleRequests() {
 	netRouter := mux.NewRouter().StrictSlash(true)
 	netRouter.HandleFunc("/register", register).Methods("POST")
 
@@ -56,23 +56,19 @@ func HandleRequests(port int) {
 
 	handlers.RegisterAllManagers(&Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
 
-	if port <= 0 {
-		logger.InfoLogger().Println("Starting NetManager on unix socket /etc/netmanager/netmanager.sock")
-		_ = os.Remove("/etc/netmanager/netmanager.sock")
-		listener, err := net.Listen("unix", "/etc/netmanager/netmanager.sock")
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Fatal(http.Serve(listener, netRouter))
-	} else {
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
+	logger.InfoLogger().Println("Starting NetManager on unix socket /etc/netmanager/netmanager.sock")
+	_ = os.Remove("/etc/netmanager/netmanager.sock")
+	listener, err := net.Listen("unix", "/etc/netmanager/netmanager.sock")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// TODO only load if experimental feature is specified
+	//try to register ebpf routes
 	ebpfRouter := netRouter.PathPrefix("/ebpf").Subrouter()
 	ebpfManager.Init(ebpfRouter, &Env)
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), netRouter))
+	log.Fatal(http.Serve(listener, netRouter))
+
 }
 
 var (
