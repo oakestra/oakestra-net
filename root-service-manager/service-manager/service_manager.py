@@ -1,19 +1,29 @@
 import os
 import socket
+from datetime import timedelta
 
 from flask import Flask, request
 from flask_socketio import SocketIO
+from flask_jwt_extended import JWTManager
 
+from interfaces.jwt_generator_requests import get_public_key
 from interfaces.mongodb_requests import mongo_init
 from net_logging import configure_logging
 from network import subnetwork_management, routes_interests
 from network.utils import sanitize
 from operations import instances_management, cluster_management, netinfo_management
 from operations import service_management
+from utils.security_utils import jwt_auth_required
 
 my_logger = configure_logging()
 
 app = Flask(__name__)
+
+app.config["JWT_ALGORITHM"] = "RS256"
+app.config["JWT_PUBLIC_KEY"] = get_public_key()
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=10)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
+
 app.secret_key = b"\xc8I\xae\x85\x90E\x9aBxQP\xde\x8es\xfdY"
 app.logger.addHandler(my_logger)
 
@@ -24,6 +34,8 @@ socketio = SocketIO(
     engineio_logger=True,
     cors_allowed_origins="*",
 )
+
+jwt = JWTManager(app)
 
 MY_PORT = os.environ.get("MY_PORT") or 10100
 
@@ -211,6 +223,7 @@ def table_query_resolution_by_ip(service_ip):
 
 
 @app.route("/api/net/service/<service_name>/netinfo", methods=["GET"])
+@jwt_auth_required()
 def service_netinfo_by_name(service_name):
     """
     Get the networking info of a service given the complete name
