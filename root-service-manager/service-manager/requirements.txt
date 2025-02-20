@@ -1,6 +1,7 @@
 Flask==2.3.2
 Flask-PyMongo==2.3.0
 Flask-SocketIO==5.3.4
+flask_jwt_extended
 eventlet==0.30.2
 PyYAML
 requests
