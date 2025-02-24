@@ -1,3 +1,4 @@
+import json
 import re
 import traceback
 from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork
@@ -30,6 +31,8 @@ def handle_mqtt_message(client, userdata, message):
         "^nodes/.*/net/service/undeployed", topic)
     re_job_tablequery_topic = re.search(
         "^nodes/.*/net/tablequery/request", topic)
+    re_job_nattraversal_topic = re.search(
+        "^nodes/.*/net/nattraversal/request", topic)
     re_job_subnet_topic = re.search("^nodes/.*/net/subnet", topic)
     re_job_interest_remove = re.search("^nodes/.*/net/interest/remove", topic)
 
@@ -46,6 +49,9 @@ def handle_mqtt_message(client, userdata, message):
     if re_job_tablequery_topic is not None:
         logging.debug("JOB-TABLEQUERY-REQUEST")
         _tablequery_handler(client_id, payload)
+    if re_job_nattraversal_topic is not None:
+        logging.debug("JOB-NATTRAVERSAL-REQUEST")
+        _nattraversal_handler(client_id, payload)
     if re_job_subnet_topic is not None:
         logging.debug("JOB-SUBNET-REQUEST")
         _subnet_handler(client_id, payload)
@@ -77,7 +83,6 @@ def mqtt_init(flask_app):
             app.logger.error("MQTT - Unable to load certificate files")
             app.logger.error(e)
 
-
     mqtt.connect(
         os.environ.get("MQTT_BROKER_URL").strip("[]"),
         int(os.environ.get("MQTT_BROKER_PORT")),
@@ -99,7 +104,6 @@ def _deployment_handler(client_id, payload):
     except Exception as e:
         traceback.print_exc()
         print(e)
-    
 
 
 def _undeployment_handler(client_id, payload):
@@ -143,6 +147,16 @@ def _tablequery_handler(client_id, payload):
     }
     mqtt_publish_tablequery_result(client_id, result)
 
+def _nattraversal_handler(client_id, payload):
+    # forward request to relevant nodes
+    dstId = payload.get("dst_id")
+    srcId = client_id
+    # tell src to connect to dst and tell dst to connect to src
+    mqtt_publish_nat_traversal_result(srcId, payload)
+    mqtt_publish_nat_traversal_result(dstId, {
+        "dst_id": srcId,
+    })
+
 
 def _subnet_handler(client_id, payload):
     method = payload.get("METHOD")
@@ -163,6 +177,12 @@ def _subnet_handler(client_id, payload):
     elif method == 'DELETE':
         # remove subnetwork from node
         pass
+
+# Informs node about nat traversal attempt from other node
+def mqtt_publish_nat_traversal_result(client_id, payload):
+    topic = "nodes/" + client_id + "/net/nattraversal/result"
+    mqtt.publish(topic, json.dumps(payload), qos=1)
+    pass
 
 
 def mqtt_publish_tablequery_result(client_id, result):
