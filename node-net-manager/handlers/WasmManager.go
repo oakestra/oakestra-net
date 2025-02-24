@@ -4,6 +4,7 @@ import (
 	"NetManager/env"
 	"NetManager/logger"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -54,7 +55,8 @@ Response JSON:
 
 	{
 		"serviceName": "example-wasm-service",
-		"nsAddress":   "10.10.0.2"
+		"nsAddress":   "10.20.0.2",
+		"nsAddressV6": "fd00:1:2:3::2"
 	}
 */
 func (m *WasmManager) DeployWasmNamespace(writer http.ResponseWriter, request *http.Request) {
@@ -66,11 +68,25 @@ func (m *WasmManager) DeployWasmNamespace(writer http.ResponseWriter, request *h
 		return
 	}
 
-	reqBody, _ := io.ReadAll(request.Body)
+	reqBody, err := io.ReadAll(request.Body)
+	if err != nil {
+		logger.ErrorLogger().Printf("Failed to read request body: %v", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	
 	log.Printf("ReqBody received: %s", reqBody)
 	var requestStruct ContainerDeployTask
-	err := json.Unmarshal(reqBody, &requestStruct)
+	err = json.Unmarshal(reqBody, &requestStruct)
 	if err != nil {
+		logger.ErrorLogger().Printf("Failed to unmarshal request: %v", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if requestStruct.ServiceName == "" {
+		logger.ErrorLogger().Printf("Missing required field: serviceName")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -87,13 +103,23 @@ func (m *WasmManager) DeployWasmNamespace(writer http.ResponseWriter, request *h
 
 	result := <-requestStruct.Finish
 	if result.Err != nil {
+		logger.ErrorLogger().Printf("Failed to deploy WASM namespace: %v", result.Err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	response := DeployResponse{
+	// Create response with both IPv4 and IPv6 addresses
+	response := struct {
+		ServiceName string `json:"serviceName"`
+		NsAddress   string `json:"nsAddress"`
+		NsAddressV6 string `json:"nsAddressV6,omitempty"`
+	}{
 		ServiceName: requestStruct.ServiceName,
 		NsAddress:   result.IP.String(),
+	}
+	
+	if result.IPv6 != nil {
+		response.NsAddressV6 = result.IPv6.String()
 	}
 
 	logger.InfoLogger().Println("Response to /wasm/deploy: ", response)
@@ -101,6 +127,7 @@ func (m *WasmManager) DeployWasmNamespace(writer http.ResponseWriter, request *h
 	writer.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(writer).Encode(response)
 	if err != nil {
+		logger.ErrorLogger().Printf("Failed to encode response: %v", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 	}
 }
@@ -127,15 +154,44 @@ func (m *WasmManager) DeleteWasmNamespace(writer http.ResponseWriter, request *h
 		return
 	}
 
-	reqBody, _ := io.ReadAll(request.Body)
-	var requestStruct undeployRequest
-	err := json.Unmarshal(reqBody, &requestStruct)
+	reqBody, err := io.ReadAll(request.Body)
 	if err != nil {
+		logger.ErrorLogger().Printf("Failed to read request body: %v", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	
+	var requestStruct undeployRequest
+	err = json.Unmarshal(reqBody, &requestStruct)
+	if err != nil {
+		logger.ErrorLogger().Printf("Failed to unmarshal request: %v", err)
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields
+	if requestStruct.Servicename == "" {
+		logger.ErrorLogger().Printf("Missing required field: serviceName")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	log.Println("WASM undeploy request:", requestStruct)
 	m.Env.DeleteWasmNamespace(requestStruct.Servicename, requestStruct.Instancenumber)
+	
+	// Return success response
+	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: fmt.Sprintf("Successfully removed WASM namespace for service %s instance %d", 
+			requestStruct.Servicename, requestStruct.Instancenumber),
+	}
+	
+	if err := json.NewEncoder(writer).Encode(response); err != nil {
+		logger.ErrorLogger().Printf("Failed to encode response: %v", err)
+	}
 }
