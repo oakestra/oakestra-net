@@ -3,22 +3,31 @@ import socket
 from datetime import timedelta
 
 from flask import Flask, request
-from flask_socketio import SocketIO
 from flask_jwt_extended import JWTManager
+from flask_smorest import Api
+from flask_socketio import SocketIO
+from flask_swagger_ui import get_swaggerui_blueprint
 
+from blueprints.netinfo_blueprints import netinfoblp
 from interfaces.jwt_generator_requests import get_public_key
 from interfaces.mongodb_requests import mongo_init
 from net_logging import configure_logging
 from network import subnetwork_management, routes_interests
 from network.utils import sanitize
-from operations import instances_management, cluster_management, netinfo_management
+from operations import instances_management, cluster_management
 from operations import service_management
-from utils.security_utils import jwt_auth_required
 
 my_logger = configure_logging()
 
 app = Flask(__name__)
 
+# OpenAPI/Swagger Environment
+app.config["OPENAPI_VERSION"] = "3.0.2"
+app.config["API_TITLE"] = "Oakestra Root Service Manager"
+app.config["API_VERSION"] = "v1"
+app.config["OPENAPI_URL_PREFIX"] = "/docs"
+
+# JWT Config
 app.config["JWT_ALGORITHM"] = "RS256"
 app.config["JWT_PUBLIC_KEY"] = get_public_key()
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=10)
@@ -26,6 +35,23 @@ app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
 
 app.secret_key = b"\xc8I\xae\x85\x90E\x9aBxQP\xde\x8es\xfdY"
 app.logger.addHandler(my_logger)
+
+
+# OpenAPI/Swagger Configuration
+api = Api(app, spec_kwargs={"host": "oakestra.io", "x-internal-id": "1"})
+api.spec.components.security_scheme("bearer", {
+    "type": "http",
+    "scheme": "bearer",
+    "bearerFormat": "JWT"
+})
+api.spec.options["security"] = [{"bearer": []}]
+app.register_blueprint(get_swaggerui_blueprint(
+    "/api/docs",
+    "/docs/openapi.json",
+    config={"app_name": "Oakestra Root Service Manager"}
+))
+
+api.register_blueprint(netinfoblp)
 
 socketio = SocketIO(
     app,
@@ -216,35 +242,6 @@ def table_query_resolution_by_ip(service_ip):
     return instances_management.get_service_instances(
         ip=service_ip, cluster_ip=request.remote_addr
     )
-
-
-# ........ Service networking information endpoints for public use  .............#
-# ......................................................#
-
-
-@app.route("/api/net/service/<service_name>/netinfo", methods=["GET"])
-@jwt_auth_required()
-def service_netinfo_by_name(service_name):
-    """
-    Get the networking info of a service given the complete name
-    """
-    service_name = service_name.replace("_", ".")
-    app.logger.info(
-        "Incoming Request /api/net/service/" + str(service_name) + "/netinfo"
-    )
-    return netinfo_management.get_service_netinfo_by_name(name=service_name)
-
-
-@app.route("/api/net/service/ip/<service_ip>/netinfo", methods=["GET"])
-def service_netinfo_by_ip(service_ip):
-    """
-    Get the networking info of a service given a Service IP in 172_30_x_y notation
-    """
-    service_ip = service_ip.replace("_", ".")
-    app.logger.info(
-        "Incoming Request /api/net/service/ip/" + str(service_ip) + "/netinfo"
-    )
-    return netinfo_management.get_service_netinfo_by_ip(ip=service_ip)
 
 
 # ........ Subnetwork management endpoints .............#
