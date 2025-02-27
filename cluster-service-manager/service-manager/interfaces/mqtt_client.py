@@ -2,6 +2,7 @@ import json
 import re
 import traceback
 from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork
+from mongodb_requests import mongo_find_worker_id_by_host_ip_and_port
 from network.deployment import *
 from network.tablequery import resolution, interests
 import paho.mqtt.client as paho_mqtt
@@ -149,13 +150,16 @@ def _tablequery_handler(client_id, payload):
 
 def _nattraversal_handler(client_id, payload):
     # forward request to relevant nodes
-    dstId = payload.get("dst_id")
-    srcId = client_id
+    dstId = mongo_find_worker_id_by_host_ip_and_port(payload.get("dst_ip"), payload.get("dst_port"))
+
     # tell src to connect to dst and tell dst to connect to src
-    mqtt_publish_nat_traversal_result(srcId, payload)
     mqtt_publish_nat_traversal_result(dstId, {
-        "dst_id": srcId,
+        "dst_ip": payload.get("src_ip"),
+        "dst_port": payload.get("src_port"),
+        "src_ip": payload.get("dst_ip"),
+        "src_port": payload.get("dst_port"),
     })
+    mqtt_publish_nat_traversal_result(client_id, payload)
 
 
 def _subnet_handler(client_id, payload):
@@ -182,7 +186,6 @@ def _subnet_handler(client_id, payload):
 def mqtt_publish_nat_traversal_result(client_id, payload):
     topic = "nodes/" + client_id + "/net/nattraversal/result"
     mqtt.publish(topic, json.dumps(payload), qos=1)
-    pass
 
 
 def mqtt_publish_tablequery_result(client_id, result):

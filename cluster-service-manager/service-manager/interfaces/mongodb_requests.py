@@ -1,4 +1,6 @@
 import os
+
+import bson
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
 
@@ -98,6 +100,18 @@ def mongo_update_job(job):
     # Otherwise, insert the job
     else:
         mongo_insert_job(job)
+
+# finds
+def mongo_find_worker_id_by_host_ip_and_port(host_ip, host_port):
+    job = mongo_jobs.db.jobs.find_one({
+        'instance_list': {'$elem_match' : { 'host_ip': host_ip, host_port: host_port} }
+    })
+
+    for k, v in bson.loads(job)['instance_list'].items():
+        if k == 'worker_id':
+            return v
+
+    return None
 
 
 def mongo_update_job_instance(job_name, instance):
