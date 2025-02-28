@@ -42,7 +42,7 @@ def mongo_find_node_by_id_and_update_subnetwork(node_id, addr, addr_v6):
         {'$set': {
             'node_subnet': addr,
             'node_subnet_v6': addr_v6
-            }},
+        }},
         upsert=True)
 
     return 1
@@ -101,10 +101,11 @@ def mongo_update_job(job):
     else:
         mongo_insert_job(job)
 
-# finds
+
+# finds worker id by host ip and port
 def mongo_find_worker_id_by_host_ip_and_port(host_ip, host_port):
     job = mongo_jobs.db.jobs.find_one({
-        'instance_list': {'$elem_match' : { 'host_ip': host_ip, host_port: host_port} }
+        'instance_list': {'$elem_match': {'host_ip': host_ip, 'host_port': host_port}}
     })
 
     for k, v in bson.loads(job)['instance_list'].items():
@@ -112,6 +113,30 @@ def mongo_find_worker_id_by_host_ip_and_port(host_ip, host_port):
             return v
 
     return None
+
+
+#find worker ip and port by worker id
+def mongo_find_worker_ip_and_port_by_id(worker_id):
+    job = mongo_jobs.db.jobs.find_one({
+        'instance_list': {'$elem_match': {'worker_id': worker_id}}
+    })
+
+    ip = None
+    for k, v in bson.loads(job)['instance_list'].items():
+        if k == 'host_ip':
+            ip = v
+            break
+
+    port = None
+    for k, v in bson.loads(job)['instance_list'].items():
+        if k == 'host_port':
+            port = v
+            break
+
+    if ip is None or port is None:
+        return None, None
+
+    return ip, port
 
 
 def mongo_update_job_instance(job_name, instance):
@@ -185,12 +210,13 @@ def mongo_find_job_by_ip(ip):
         job = mongo_jobs.db.jobs.find_one({'instance_list.instance_ip_v6': ip})
     return job
 
+
 def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instance_number, host_ip, host_port):
     global mongo_jobs
     job = mongo_jobs.db.jobs.find_one({'job_name': job_name})
     if job is None:
         return None
-    instance_list = job.get('instance_list',[])
+    instance_list = job.get('instance_list', [])
     for instance in instance_list:
         if int(instance["instance_number"]) == int(instance_number):
             instance['worker_id'] = node_id
@@ -200,8 +226,8 @@ def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instanc
             instance['host_port'] = int(host_port)
             break
     return mongo_jobs.db.jobs.find_one_and_update({'job_name': job_name},
-                                         {'$set': {'status': status, 'instance_list': instance_list}},
-                                         return_document=True)
+                                                  {'$set': {'status': status, 'instance_list': instance_list}},
+                                                  return_document=True)
 
 
 def mongo_find_job_by_id(id):

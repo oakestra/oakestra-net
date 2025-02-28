@@ -1,8 +1,7 @@
 import json
 import re
 import traceback
-from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork
-from mongodb_requests import mongo_find_worker_id_by_host_ip_and_port
+from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork, mongo_find_worker_ip_and_port_by_id, mongo_find_worker_id_by_host_ip_and_port
 from network.deployment import *
 from network.tablequery import resolution, interests
 import paho.mqtt.client as paho_mqtt
@@ -152,14 +151,22 @@ def _nattraversal_handler(client_id, payload):
     # forward request to relevant nodes
     dstId = mongo_find_worker_id_by_host_ip_and_port(payload.get("dst_ip"), payload.get("dst_port"))
 
+    # find ip and port of src
+    ip, port = mongo_find_worker_ip_and_port_by_id(client_id)
+
     # tell src to connect to dst and tell dst to connect to src
     mqtt_publish_nat_traversal_result(dstId, {
-        "dst_ip": payload.get("src_ip"),
-        "dst_port": payload.get("src_port"),
+        "dst_ip": ip,
+        "dst_port": port,
         "src_ip": payload.get("dst_ip"),
         "src_port": payload.get("dst_port"),
     })
-    mqtt_publish_nat_traversal_result(client_id, payload)
+    mqtt_publish_nat_traversal_result(client_id, {
+        "dst_ip": payload.get("dst_ip"),
+        "dst_port": payload.get("dst_port"),
+        "src_ip": ip,
+        "src_port": port,
+    })
 
 
 def _subnet_handler(client_id, payload):
