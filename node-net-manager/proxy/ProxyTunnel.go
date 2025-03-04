@@ -4,6 +4,7 @@ import (
 	"NetManager/TableEntryCache"
 	"NetManager/env"
 	"NetManager/logger"
+	"NetManager/mqtt"
 	"NetManager/proxy/iputils"
 	"fmt"
 	"github.com/google/gopacket"
@@ -11,7 +12,9 @@ import (
 	"github.com/songgao/water"
 	"math/rand"
 	"net"
+	"strconv"
 	"sync"
+	"time"
 )
 
 // const
@@ -354,7 +357,7 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	// TODO: flush connection buffer by time to time
 	if !exist {
 		logger.DebugLogger().Println("Establishing a new connection to node ", hoststring)
-		connection, err := createUDPChannel(hoststring)
+		connection, err := proxy.createUDPChannel(hoststring)
 		if nil != err {
 			return
 		}
@@ -372,7 +375,7 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	if err != nil {
 		_ = (*con).Close()
 		logger.ErrorLogger().Println(err)
-		connection, err := createUDPChannel(hoststring)
+		connection, err := proxy.createUDPChannel(hoststring)
 		if nil != err {
 			return
 		}
@@ -385,7 +388,7 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	}
 }
 
-func createUDPChannel(hoststring string) (*net.UDPConn, error) {
+func (proxy *GoProxyTunnel) createUDPChannel(hoststring string) (*net.UDPConn, error) {
 	raddr, err := net.ResolveUDPAddr("udp", hoststring)
 	if err != nil {
 		logger.ErrorLogger().Println("Unable to resolve remote addr:", err)
@@ -394,7 +397,11 @@ func createUDPChannel(hoststring string) (*net.UDPConn, error) {
 	connection, err := net.DialUDP("udp", nil, raddr)
 	if nil != err {
 		logger.ErrorLogger().Println("Unable to connect to remote addr:", err)
-		return nil, err
+		// remote destination could be behind NAT
+		connection, err = proxy.initiateNatTraversal(raddr)
+		if err != nil {
+			return nil, err
+		}
 	}
 	err = connection.SetWriteBuffer(BUFFER_SIZE)
 	if nil != err {
@@ -402,6 +409,31 @@ func createUDPChannel(hoststring string) (*net.UDPConn, error) {
 		return nil, err
 	}
 	return connection, nil
+}
+
+func (proxy *GoProxyTunnel) initiateNatTraversal(raddr *net.UDPAddr) (*net.UDPConn, error) {
+
+	// send to cluster service manager
+	err := mqtt.RequestNATTraversal(raddr.IP.String(), strconv.Itoa(raddr.Port))
+	if err != nil {
+		logger.ErrorLogger().Println("Unable to request nat traversal:", err)
+		return nil, err
+	}
+
+	// wait for response and then retry connection
+	// ToDo: Let's try without this
+
+	// repeat up to 5 times with slight delay between each attempt
+	for i := 0; i < 5; i++ {
+		connection, err := net.DialUDP("udp", nil, raddr)
+		if err != nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		return connection, nil
+	}
+
+	return nil, nil
 }
 
 // read output from an interface and wrap the read operation with a channel

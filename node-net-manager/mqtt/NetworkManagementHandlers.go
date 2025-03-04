@@ -28,6 +28,13 @@ type mqttDeployNotification struct {
 	Hostip         string `json:"host_ip"`
 }
 
+type natTraversalPayload struct {
+	SrcIp   string `json:"src_ip"`
+	SrcPort string `json:"src_port"`
+	DstIp   string `json:"dst_ip"`
+	DstPort string `json:"dst_port"`
+}
+
 func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	responseStruct := mqttSubnetworkResponse{}
 	err := json.Unmarshal(msg.Payload(), &responseStruct)
@@ -37,6 +44,19 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		return
 	}
 	subnetworkResponseChannel <- responseStruct
+}
+
+// RequestNATTraversal sends request to the cluster to facilitate NAT traversal
+func RequestNATTraversal(dstIp string, dstPort string) error {
+	payload := natTraversalPayload{DstIp: dstIp, DstPort: dstPort}
+	req, err := json.Marshal(&payload)
+	if err != nil {
+		return err
+	}
+	go func() {
+		_ = GetNetMqttClient().PublishToBroker("nattraversal", string(req))
+	}()
+	return nil
 }
 
 /*Request a subnetwork to the cluster using the mqtt broker*/
