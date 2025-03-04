@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"time"
@@ -57,6 +58,32 @@ func RequestNATTraversal(dstIp string, dstPort string) error {
 		_ = GetNetMqttClient().PublishToBroker("nattraversal", string(req))
 	}()
 	return nil
+}
+
+// natTraversalMqttHandler receives a nat traversal request from the cluster
+func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
+	// msg is natTraversalPayload
+	responseStruct := natTraversalPayload{}
+	err := json.Unmarshal(msg.Payload(), &responseStruct)
+	if err != nil {
+		log.Println("ERROR - Invalid nat traversal response")
+		return
+	}
+
+	// create udp channel
+	hoststring := fmt.Sprintf("%s:%s", responseStruct.DstIp, responseStruct.DstPort)
+	raddr, err := net.ResolveUDPAddr("udp", hoststring)
+
+	go func() {
+		// repeat up to 5 times with slight delay between each attempt
+		for i := 0; i < 5; i++ {
+			_, err := net.DialUDP("udp", nil, raddr)
+			if err != nil {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+		}
+	}()
 }
 
 /*Request a subnetwork to the cluster using the mqtt broker*/

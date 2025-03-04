@@ -412,7 +412,6 @@ func (proxy *GoProxyTunnel) createUDPChannel(hoststring string) (*net.UDPConn, e
 }
 
 func (proxy *GoProxyTunnel) initiateNatTraversal(raddr *net.UDPAddr) (*net.UDPConn, error) {
-
 	// send to cluster service manager
 	err := mqtt.RequestNATTraversal(raddr.IP.String(), strconv.Itoa(raddr.Port))
 	if err != nil {
@@ -421,6 +420,7 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(raddr *net.UDPAddr) (*net.UDPCo
 	}
 
 	// wait for response and then retry connection
+	// use response channel
 	// ToDo: Let's try without this
 
 	// repeat up to 5 times with slight delay between each attempt

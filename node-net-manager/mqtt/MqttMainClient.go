@@ -68,7 +68,6 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			for key, _ := range netMqttClient.topics {
 				topicsQosMap[key] = 1
 			}
-
 			//subscribe to all the topics
 			tqtoken := client.SubscribeMultiple(topicsQosMap, subscribeHandlerDispatcher)
 			tqtoken.Wait()
@@ -84,6 +83,8 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			netMqttClient.tableQueryRequestCache.TablequeryResultMqttHandler
 		netMqttClient.topics[fmt.Sprintf("nodes/%s/net/subnetwork/result", netMqttClient.clientID)] =
 			subnetworkAssignmentMqttHandler
+		netMqttClient.topics[fmt.Sprintf("nodes/%s/net/nattraversal/result", netMqttClient.clientID)] =
+			natTraversalMqttHandler
 
 		opts := mqtt.NewClientOptions()
 		opts.AddBroker(fmt.Sprintf("tcp://%s:%s", netMqttClient.brokerUrl, netMqttClient.brokerPort))
