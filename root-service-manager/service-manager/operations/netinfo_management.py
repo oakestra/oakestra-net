@@ -43,7 +43,7 @@ def _convert_job_to_netinfo(job):
     for instance in job.get("instance_list", []):
         instance_list.append(_subdict(instance, [
             "cluster_id",
-            "instance_number"
+            "instance_number",
             "instance_ip",
             "instance_ip_v6",
         ]))
