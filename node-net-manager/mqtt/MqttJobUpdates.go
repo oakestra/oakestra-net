@@ -5,10 +5,11 @@ import (
 	"NetManager/logger"
 	"NetManager/utils"
 	"encoding/json"
-	"github.com/eclipse/paho.mqtt.golang"
 	"log"
 	"sync"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 var runningHandlers = utils.NewStringSlice()
@@ -105,10 +106,7 @@ func MqttRegisterInterest(jobName string, env jobEnvironmentManagerActions, inst
 func MqttIsInterestRegistered(jobName string) bool {
 	runningHandlersLock.RLock()
 	defer runningHandlersLock.RUnlock()
-	if runningHandlers.Exists(jobName) {
-		return true
-	}
-	return false
+	return runningHandlers.Exists(jobName)
 }
 
 func cleanInterestTowardsJob(jobName string) {

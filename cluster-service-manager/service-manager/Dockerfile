@@ -1,7 +1,9 @@
 FROM python:3.8.5-slim-buster
-LABEL org.opencontainers.image.source https://github.com/oakestra/oakestra-net
+LABEL org.opencontainers.image.source=https://github.com/oakestra/oakestra-net
 
-ADD requirements.txt /
+WORKDIR /app
+
+ADD requirements.txt .
 RUN apt-get update \
     && apt-get install -y g++ \
     && apt-get install -y --no-install-recommends gcc musl-dev linux-libc-dev libc6-dev \
@@ -10,7 +12,7 @@ RUN apt-get update \
     && pip install -r requirements.txt \
     && apt-get purge -y --auto-remove gcc musl-dev linux-libc-dev libc6-dev
 
-ADD . /
+ADD . .
 
 ENV FLASK_ENV=development
 # TRUE for verbose logging

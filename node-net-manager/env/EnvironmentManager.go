@@ -459,9 +459,9 @@ func (env *Environment) CreateHostBridge() error {
 
 // GetTableEntryByServiceIP Given a ServiceIP this method performs a search in the local ServiceCache
 // If the entry is not present a TableQuery is performed and the interest registered
-func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry {
+func (env *Environment) GetTableEntryByServiceIP(sip net.IP) []TableEntryCache.TableEntry {
 	// If entry already available
-	table := env.translationTable.SearchByServiceIP(ip)
+	table := env.translationTable.SearchByServiceIP(sip)
 	if len(table) > 0 {
 		// Fire table instance usage event
 		events.GetInstance().Emit(events.Event{
@@ -472,7 +472,9 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 	}
 
 	// if no entry available -> TableQuery
-	entryList, err := tableQueryByIP(ip)
+	entryList, err := tableQueryByIP(sip)
+
+	logger.InfoLogger().Println("GetTableEntryByServiceIP entryList", entryList)
 
 	if err == nil {
 		var once sync.Once
@@ -480,9 +482,10 @@ func (env *Environment) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 			once.Do(func() { mqtt.MqttRegisterInterest(tableEntry.JobName, env) })
 			env.AddTableQueryEntry(tableEntry)
 		}
-		table = env.translationTable.SearchByServiceIP(ip)
+		table = env.translationTable.SearchByServiceIP(sip)
 		// register interest for sip as well to avoid querying the address too many times
-		mqtt.MqttRegisterInterest(ip.String(), env)
+		mqtt.MqttRegisterInterest(sip.String(), env)
+		// mqtt.MqttRegisterInterestV2(tableEntry.JobName, sip.String(), env)
 	}
 
 	return table
@@ -498,6 +501,7 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 			for _, elemIp := range elem.ServiceIP {
 				if elemIp.IpType == TableEntryCache.InstanceNumber &&
 					(elemIp.Address.Equal(ip) || elemIp.Address_v6.Equal(ip)) {
+					logger.InfoLogger().Println("GetTableEntryByInstanceIP table[elemindex]", table[elemindex])
 					return table[elemindex], true
 				}
 			}
@@ -512,8 +516,10 @@ func (env *Environment) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEnt
 	// If entry already available
 	entry, exist := env.translationTable.SearchByNsIP(ip)
 	if exist {
+		logger.InfoLogger().Println("GetTableEntryByNsIP entry", entry)
 		return entry, true
 	}
+	logger.InfoLogger().Println("GetTableEntryByNsIP entry", entry)
 	return entry, false
 }
 
@@ -521,6 +527,7 @@ func (env *Environment) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEnt
 func (env *Environment) AddTableQueryEntry(entry TableEntryCache.TableEntry) {
 	_ = env.translationTable.RemoveByNsip(entry.Nsip)
 	err := env.translationTable.Add(entry)
+	logger.InfoLogger().Println("AddTableQueryEntry entry", entry)
 	if err != nil {
 		logger.ErrorLogger().Println(err)
 	}
