@@ -40,7 +40,6 @@ func (h *ContainerDeyplomentHandler) DeployNetwork(pid int, sname string, jobHas
 
 	vethIfce, err := env.createVethsPairAndAttachToBridge(jobHash, env.mtusize)
 	if err != nil {
-		go cleanup(vethIfce)
 		return nil, nil, err
 	}
 

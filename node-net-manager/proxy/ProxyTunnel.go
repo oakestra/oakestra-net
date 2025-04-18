@@ -6,12 +6,13 @@ import (
 	"NetManager/logger"
 	"NetManager/proxy/iputils"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/songgao/water"
 	"math/rand"
 	"net"
 	"sync"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/songgao/water"
 )
 
 // const
@@ -164,13 +165,13 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip iputils.NetworkLayerPacket, prot ip
 	}
 
 	if semanticRoutingSubnetwork {
-		// Check if the ServiceIP is known
+		// Check if the destination ServiceIP is known
 		tableEntryList := proxy.environment.GetTableEntryByServiceIP(dstIP)
 		if len(tableEntryList) < 1 {
 			return nil
 		}
 
-		// Find the instanceIP of the current service
+		// Find the instanceIP of the current sending service
 		instanceIP, err := proxy.convertToInstanceIp(ip)
 		if err != nil {
 			return nil
@@ -182,7 +183,11 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip iputils.NetworkLayerPacket, prot ip
 		if !exist || entry.dstport < 1 || !TableEntryCache.IsNamespaceStillValid(entry.dstip, &tableEntryList) {
 			// Choose between the table entry according to the ServiceIP algorithm
 			// TODO: so far this only uses RR, ServiceIP policies should be implemented here
+
+			// Roung Robin routing implementation
 			tableEntry := tableEntryList[proxy.randseed.Intn(len(tableEntryList))]
+
+			// TODO: implement routing manager querying for selective policies
 
 			entryDstIP := tableEntry.Nsipv6
 			if ip.GetProtocolVersion() == 4 {

@@ -12,11 +12,11 @@ import (
 /*
 Asks the MQTT client for a table query and parses the result
 */
-func tableQueryByIP(ip net.IP, force_optional ...bool) ([]TableEntryCache.TableEntry, error) {
-	log.Println("[MQTT TABLE QUERY] sip:", ip.String())
+func tableQueryByIP(sip net.IP, force_optional ...bool) ([]TableEntryCache.TableEntry, error) {
+	log.Println("[MQTT TABLE QUERY] sip:", sip.String())
 	var mqttTablequery mqttifce.TablequeryMqttInterface = mqttifce.GetTableQueryRequestCacheInstance()
 
-	responseStruct, err := mqttTablequery.TableQueryByIpRequestBlocking(ip.String(), force_optional...)
+	responseStruct, err := mqttTablequery.TableQueryByIpRequestBlocking(sip.String(), force_optional...)
 	if err != nil {
 		return nil, err
 	}

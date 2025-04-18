@@ -113,7 +113,6 @@ def _interest_remove_handler(client_id, payload):
 
 
 def _tablequery_handler(client_id, payload):
-    querySname = payload.get("sname")
     serviceName = payload.get("sname")
     sip = payload.get("sip")
 
@@ -135,7 +134,8 @@ def _tablequery_handler(client_id, payload):
         instances = []
         siplist = []
 
-    interests.add_interest(serviceName, client_id)
+    interests.add_interest(serviceName, client_id, sip)
+    
     result = {
         "app_name": serviceName,
         "instance_list": resolution.format_instance_response(instances, siplist),
