@@ -52,8 +52,14 @@ func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCac
 	for _, instance := range responseStruct.InstanceList {
 		sipList := make([]TableEntryCache.ServiceIP, 0)
 
+		priorityMap := make(map[TableEntryCache.ServiceIpType]float64)
+
 		for _, ip := range instance.ServiceIp {
 			sipList = append(sipList, toServiceIP(ip.Type, ip.Address, ip.Address_v6))
+		}
+
+		for _, priority := range instance.Routing {
+			priorityMap[TableEntryCache.ServiceIpTypeFromString(priority.IpType)] = priority.Priority
 		}
 
 		entry := TableEntryCache.TableEntry{
@@ -69,6 +75,7 @@ func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCac
 			Nsip:             net.ParseIP(instance.NamespaceIp),
 			Nsipv6:           net.ParseIP(instance.NamespaceIpv6),
 			ServiceIP:        sipList,
+			Routing:          priorityMap,
 		}
 
 		result = append(result, entry)
@@ -79,6 +86,7 @@ func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCac
 
 func toServiceIP(Type string, Addr string, Addr_v6 string) TableEntryCache.ServiceIP {
 	ip := TableEntryCache.ServiceIP{
+		// TODO: check, if we can set this to invalid, without breaking anything
 		IpType:     0,
 		Address:    net.ParseIP(Addr),
 		Address_v6: net.ParseIP(Addr_v6),

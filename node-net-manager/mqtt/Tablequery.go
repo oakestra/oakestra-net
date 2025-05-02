@@ -41,18 +41,24 @@ type TableQueryResponse struct {
 }
 
 type ServiceInstance struct {
-	InstanceNumber int    `json:"instance_number"`
-	NamespaceIp    string `json:"namespace_ip"`
-	NamespaceIpv6  string `json:"namespace_ip_v6"`
-	HostIp         string `json:"host_ip"`
-	HostPort       int    `json:"host_port"`
-	ServiceIp      []Sip  `json:"service_ip"`
+	InstanceNumber int            `json:"instance_number"`
+	NamespaceIp    string         `json:"namespace_ip"`
+	NamespaceIpv6  string         `json:"namespace_ip_v6"`
+	HostIp         string         `json:"host_ip"`
+	HostPort       int            `json:"host_port"`
+	ServiceIp      []Sip          `json:"service_ip"`
+	Routing        []RoutingEntry `json:"routing"`
 }
 
 type Sip struct {
 	Type       string `json:"IpType"`
 	Address    string `json:"Address"`
 	Address_v6 string `json:"Address_v6"`
+}
+
+type RoutingEntry struct {
+	Priority float64 `json:"priority"`
+	IpType   string  `json:"IpType"`
 }
 
 type tableQueryRequest struct {

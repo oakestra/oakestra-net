@@ -10,27 +10,51 @@ import (
 )
 
 type TableEntry struct {
-	JobName          string      `json:"job_name"`
-	Appname          string      `json:"appname"`
-	Appns            string      `json:"appns"`
-	Servicename      string      `json:"servicename"`
-	Servicenamespace string      `json:"servicenamespace"`
-	Instancenumber   int         `json:"instancenumber"`
-	Cluster          int         `json:"cluster"`
-	Nodeip           net.IP      `json:"nodeip"`
-	Nodeport         int         `json:"nodeport"`
-	Nsip             net.IP      `json:"nsip"`
-	Nsipv6           net.IP      `json:"nsipv6"`
-	ServiceIP        []ServiceIP `json:"serviceIP"`
+	JobName          string                    `json:"job_name"`
+	Appname          string                    `json:"appname"`
+	Appns            string                    `json:"appns"`
+	Servicename      string                    `json:"servicename"`
+	Servicenamespace string                    `json:"servicenamespace"`
+	Instancenumber   int                       `json:"instancenumber"`
+	Cluster          int                       `json:"cluster"`
+	Nodeip           net.IP                    `json:"nodeip"`
+	Nodeport         int                       `json:"nodeport"`
+	Nsip             net.IP                    `json:"nsip"`
+	Nsipv6           net.IP                    `json:"nsipv6"`
+	ServiceIP        []ServiceIP               `json:"serviceIP"`
+	Routing          map[ServiceIpType]float64 `json:"routing"`
 }
 
 type ServiceIpType int
 
 const (
-	InstanceNumber ServiceIpType = iota
-	Closest        ServiceIpType = iota
-	RoundRobin     ServiceIpType = iota
+	Invalid        ServiceIpType = -1 // Special value to indicate invalid/unknown type
+	InstanceNumber ServiceIpType = 0
+	Closest        ServiceIpType = 1
+	RoundRobin     ServiceIpType = 2
 )
+
+// Implement Stringer interface
+func (s ServiceIpType) String() string {
+	if s == Invalid {
+		return "Invalid"
+	}
+	return []string{"InstanceNumber", "Closest", "RR"}[s]
+}
+
+// ServiceIpTypeFromString converts string representation back to ServiceIpType
+func ServiceIpTypeFromString(s string) ServiceIpType {
+	switch s {
+	case "InstanceNumber":
+		return InstanceNumber
+	case "Closest":
+		return Closest
+	case "RR":
+		return RoundRobin
+	default:
+		return Invalid // Return invalid value instead of defaulting to an existing one
+	}
+}
 
 type ServiceIP struct {
 	IpType     ServiceIpType `json:"ip_type"`
