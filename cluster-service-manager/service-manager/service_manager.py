@@ -8,7 +8,7 @@ from net_logging import configure_logging
 from interfaces.mongodb_requests import mongo_init
 from operations.instances_management import instance_updates
 from operations.service_management import create_service, remove_service
-
+from operations.routing_management import update_job_routing, update_job_routing_alert
 MY_PORT = os.environ.get('MY_PORT') or 10200
 
 my_logger = configure_logging()
@@ -70,6 +70,26 @@ def task_update():
         type=req_json.get('type')
     )
 
+@app.route('/api/net/routing/alert', methods=['POST'])
+def routing_alert():
+    """
+       Alert regarding a routing change
+    """
+    app.logger.info('Incoming Request /api/net/routing/alert')
+    req_json = request.json
+    app.logger.debug(req_json)
+
+    return update_job_routing_alert(req_json['notification'])
+
+@app.route('/api/net/routing/update', methods=['POST'])
+def update_routing() -> None:
+    """
+       Update the routing priority table of a job
+    """
+    app.logger.info('Incoming Request /api/net/routing/update')
+    req_json = request.json
+    app.logger.debug(req_json)
+    return update_job_routing(req_json['notification'])
 
 # TODO: job migration
 

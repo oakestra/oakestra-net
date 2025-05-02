@@ -1,7 +1,7 @@
 import os
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
-
+from domain.evaluation import EvaluationResult
 MONGO_URL = os.environ.get('CLUSTER_MONGO_URL')
 MONGO_PORT = os.environ.get('CLUSTER_MONGO_PORT')
 
@@ -177,6 +177,7 @@ def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instanc
     if job is None:
         return None
     instance_list = job.get('instance_list',[])
+    service_ip_list = job.get('service_ip_list',[])
     for instance in instance_list:
         if int(instance["instance_number"]) == int(instance_number):
             instance['worker_id'] = node_id
@@ -184,6 +185,8 @@ def mongo_update_job_deployed(job_name, status, ns_ip, ns_ipv6, node_id, instanc
             instance['namespace_ip_v6'] = ns_ipv6
             instance['host_ip'] = host_ip
             instance['host_port'] = int(host_port)
+            # Set default routing for the instance's service ips until update from monitoring component is available
+            instance['routing'] = [{'priority': 0.5, 'IpType': entry['IpType']} for entry in service_ip_list]
             break
     return mongo_jobs.db.jobs.find_one_and_update({'job_name': job_name},
                                          {'$set': {'status': status, 'instance_list': instance_list}},
@@ -232,3 +235,53 @@ def mongo_remove_interest(job_name, clientid):
                     "interested_nodes": interested_nodes
                 }}
             )
+
+# ........... Job Routing Operations ...........#
+#################################################
+
+def mongo_update_job_routing(evaluation_result: EvaluationResult) -> None:
+    """
+       Update the routing priority table of a job
+    """
+    global mongo_jobs
+    app.logger.info(f"MONGODB - update job routing for {evaluation_result.job_name} - {evaluation_result}")
+    for instance in evaluation_result.results:
+        
+        # First, find the job and get current routing information
+        job = mongo_jobs.db.jobs.find_one(
+            {'job_name': evaluation_result.job_name, 'instance_list.instance_number': instance.instance_number},
+            {'instance_list.$': 1}
+        )
+        
+        # Check if routing array exists, initialize if not
+        current_routing = job.get('instance_list', [{}])[0].get('routing', [])
+        if not isinstance(current_routing, list):
+            current_routing = []
+        
+        # Find if there's an entry with matching IpType
+        entry_found = False
+        for i, route in enumerate(current_routing):
+            if route.get('IpType') == instance.ip_type:
+                # Update priority for the matching IpType
+                mongo_jobs.db.jobs.update_one(
+                    {'job_name': evaluation_result.job_name, 
+                     'instance_list.instance_number': instance.instance_number,
+                     'instance_list.routing.IpType': instance.ip_type},
+                    {'$set': {'instance_list.$.routing.$[elem].priority': instance.priority}},
+                    array_filters=[{'elem.IpType': instance.ip_type}]
+                )
+                
+                entry_found = True
+                break
+                
+        # If no matching IpType found, add a new entry to the routing array
+        if not entry_found:
+            mongo_jobs.db.jobs.update_one(
+                {'job_name': evaluation_result.job_name, 'instance_list.instance_number': instance.instance_number},
+                {'$push': {'instance_list.$.routing': {
+                    'priority': instance.priority,
+                    'IpType': instance.ip_type
+                }}}
+            )
+
+            
