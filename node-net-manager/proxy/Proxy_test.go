@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"NetManager/TableEntryCache"
+	"NetManager/env"
 	"NetManager/proxy/iputils"
 	"encoding/hex"
 	"math/rand"
@@ -13,6 +14,7 @@ import (
 )
 
 type FakeEnv struct {
+	environment env.EnvironmentManager
 }
 
 // used as example packets for testing
@@ -46,6 +48,22 @@ func (fakeenv *FakeEnv) GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.Ta
 	}
 	entrytable = append(entrytable, entry)
 	return entrytable
+}
+
+func (fakeenv *FakeEnv) GetTableEntryByServiceIPWithType(ip net.IP) ([]TableEntryCache.TableEntry, TableEntryCache.ServiceIpType) {
+	return []TableEntryCache.TableEntry{
+		{
+			Appname:          "a",
+			Appns:            "a",
+			Servicename:      "c",
+			Servicenamespace: "b",
+			Instancenumber:   0,
+			Cluster:          0,
+			Nodeip:           net.ParseIP("10.0.0.1"),
+			Nsip:             net.ParseIP("10.19.1.1"),
+			Nsipv6:           net.ParseIP("fc00::1"),
+		},
+	}, TableEntryCache.Closest
 }
 
 func (fakeenv *FakeEnv) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool) {
