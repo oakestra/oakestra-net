@@ -24,6 +24,7 @@ const NamespaceAlreadyDeclared string = "namespace already declared"
 
 type EnvironmentManager interface {
 	GetTableEntryByServiceIP(ip net.IP) []TableEntryCache.TableEntry
+	GetTableEntryByServiceIPWithType(ip net.IP) ([]TableEntryCache.TableEntry, TableEntryCache.ServiceIpType)
 	GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEntry, bool)
 	GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.TableEntry, bool)
 }
@@ -38,6 +39,9 @@ type Configuration struct {
 	ConnectedInternetInterface string
 	Mtusize                    int
 }
+
+// Verify that Environment implements EnvironmentManager
+var _ EnvironmentManager = &Environment{}
 
 type Environment struct {
 	//### Environment management variables
@@ -489,6 +493,28 @@ func (env *Environment) GetTableEntryByServiceIP(sip net.IP) []TableEntryCache.T
 	}
 
 	return table
+}
+
+// GetTableEntryByServiceIPWithType Given a ServiceIP this method performs a search in the local ServiceCache
+// If the entry is not present a TableQuery is performed and the interest registered
+// Returns the table entry and the type of ServiceIP used to retrieve it
+func (env *Environment) GetTableEntryByServiceIPWithType(ip net.IP) ([]TableEntryCache.TableEntry, TableEntryCache.ServiceIpType) {
+	table := env.GetTableEntryByServiceIP(ip)
+	if len(table) > 0 {
+		for _, elem := range table {
+			for _, elemIp := range elem.ServiceIP {
+				if elemIp.Address.Equal(ip) || elemIp.Address_v6.Equal(ip) {
+					// OPTIMIZE: Doesn't this always match against the first elemIp in the whole table list,
+					// because the serviceIPs are always the same for all service instances?
+					// Couldn't we simply this down to accessing just the first element?
+					// This is probably already the case, that the function effectively does not loop,
+					// but for cleaner code we probably should check this.
+					return table, elemIp.IpType
+				}
+			}
+		}
+	}
+	return nil, TableEntryCache.Invalid
 }
 
 // GetTableEntryByInstanceIP Given a ServiceIP this method performs a search in the local ServiceCache
