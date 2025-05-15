@@ -1,4 +1,4 @@
-from interfaces import mongodb_requests
+from interfaces.mongodb import requests as mongodb_requests
 from interfaces import clusters_interface
 from operations import cluster_management
 

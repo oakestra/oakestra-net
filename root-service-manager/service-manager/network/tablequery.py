@@ -1,4 +1,4 @@
-from interfaces import mongodb_requests
+from interfaces.mongodb import requests as mongodb_requests
 
 
 def service_resolution(name=None, ip=None):

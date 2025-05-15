@@ -1,6 +1,6 @@
 from network.routes_interests import notify_job_instance_deployment
-from network.subnetwork_management import *
-from interfaces import mongodb_requests
+from network.management.manager import ip_manager, STRATEGY_IPV4_SERVICE, STRATEGY_IPV6_INSTANCE
+from interfaces.mongodb import requests as mongodb_requests
 from network import tablequery, routes_interests
 from network.utils import sanitize
 
@@ -81,7 +81,7 @@ def get_service_instances(name=None, ip=None, cluster_ip=None):
 def _prepare_instance_dict(instance_number, cluster_id):
     return {
         "instance_number": instance_number,
-        "instance_ip": new_instance_ip(),
-        "instance_ip_v6": new_instance_ip_v6(),
+        "instance_ip": ip_manager.new_address(STRATEGY_IPV4_SERVICE),
+        "instance_ip_v6": ip_manager.new_address(STRATEGY_IPV6_INSTANCE),
         "cluster_id": str(cluster_id),
     }

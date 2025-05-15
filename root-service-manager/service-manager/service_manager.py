@@ -1,18 +1,14 @@
 from flask import Flask, request
 from flask_socketio import SocketIO
-from interfaces.mongodb_requests import mongo_init
+from interfaces.mongodb.requests import mongo_init
 from network.tablequery import *
-from network import subnetwork_management, routes_interests
 from network.utils import sanitize
-from operations import instances_management, cluster_management
-from operations import service_management
+from operations import instances_management, cluster_management, service_management
 from net_logging import configure_logging
-from network import routes_interests, subnetwork_management
-from network.tablequery import *
-from network import subnetwork_management, routes_interests
-from operations import instances_management, cluster_management
-from operations import service_management
-from net_logging import configure_logging
+from network import routes_interests
+from network.management.manager import ip_manager
+from network.management.manager import STRATEGY_IPV4_SUBNET, STRATEGY_IPV6_SUBNET
+
 import os
 import socket
 
@@ -220,8 +216,8 @@ def subnet_request():
     """
     Returns a new subnetwork address
     """
-    addr = subnetwork_management.new_subnetwork_addr()
-    addrv6 = subnetwork_management.new_subnetwork_addr_v6()
+    addr = ip_manager.new_address(STRATEGY_IPV4_SUBNET)
+    addrv6 = ip_manager.new_address(STRATEGY_IPV6_SUBNET)
     return {'subnet_addr': addr, 'subnet_addr_v6': addrv6}
 
 

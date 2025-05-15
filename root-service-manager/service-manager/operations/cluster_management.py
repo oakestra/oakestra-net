@@ -1,4 +1,4 @@
-from interfaces import mongodb_requests
+from interfaces.mongodb import requests as mongodb_requests
 
 CLUSTER_STATUS_ACTIVE = "ACTIVE"
 CLUSTER_STATUS_ERROR = "ERROR"
