@@ -32,6 +32,7 @@ const (
 	InstanceNumber ServiceIpType = 0
 	Closest        ServiceIpType = 1
 	RoundRobin     ServiceIpType = 2
+	Underutilized  ServiceIpType = 3
 )
 
 // Implement Stringer interface
@@ -39,7 +40,7 @@ func (s ServiceIpType) String() string {
 	if s == Invalid {
 		return "Invalid"
 	}
-	return []string{"InstanceNumber", "Closest", "RR"}[s]
+	return []string{"InstanceNumber", "closest", "RR", "underutilized"}[s]
 }
 
 // ServiceIpTypeFromString converts string representation back to ServiceIpType
@@ -47,19 +48,21 @@ func ServiceIpTypeFromString(s string) ServiceIpType {
 	switch s {
 	case "InstanceNumber":
 		return InstanceNumber
-	case "Closest":
+	case "closest":
 		return Closest
 	case "RR":
 		return RoundRobin
+	case "underutilized":
+		return Underutilized
 	default:
 		return Invalid // Return invalid value instead of defaulting to an existing one
 	}
 }
 
 type ServiceIP struct {
-	IpType     ServiceIpType `json:"ip_type"`
-	Address    net.IP        `json:"address"`
-	Address_v6 net.IP        `json:"address_v6"`
+	IpType     ServiceIpType
+	Address    net.IP
+	Address_v6 net.IP
 }
 
 type TableManager struct {

@@ -95,8 +95,11 @@ func toServiceIP(Type string, Addr string, Addr_v6 string) TableEntryCache.Servi
 	if Type == "RR" {
 		ip.IpType = TableEntryCache.RoundRobin
 	}
-	if Type == "Closest" {
+	if Type == "closest" {
 		ip.IpType = TableEntryCache.Closest
+	}
+	if Type == "underutilized" {
+		ip.IpType = TableEntryCache.Underutilized
 	}
 	if Type == "InstanceNumber" {
 		ip.IpType = TableEntryCache.InstanceNumber
