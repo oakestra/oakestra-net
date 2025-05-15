@@ -33,6 +33,7 @@ type Configuration struct {
 
 type GoProxyTunnel struct {
 	environment         env.EnvironmentManager
+	manager             *serviceIpManager
 	listenConnection    *net.UDPConn
 	incomingChannel     chan incomingMessage
 	connectionBuffer    map[string]*net.UDPConn
@@ -168,16 +169,19 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip iputils.NetworkLayerPacket, prot ip
 		// Check if the destination ServiceIP is known
 		tableEntryList, ipType := proxy.environment.GetTableEntryByServiceIPWithType(dstIP)
 		if len(tableEntryList) < 1 {
+			logger.ErrorLogger().Println("No table entry found for destination service IP: ", dstIP.String())
 			return nil
 		}
 
 		if ipType < 0 {
+			logger.ErrorLogger().Println("Invalid ipType: ", ipType)
 			return nil
 		}
 
 		// Find the instanceIP of the current sending service
 		instanceIP, err := proxy.convertToInstanceIp(ip)
 		if err != nil {
+			logger.ErrorLogger().Println("Unable to convert to instance IP: ", err)
 			return nil
 		}
 
@@ -189,7 +193,7 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip iputils.NetworkLayerPacket, prot ip
 			// Use the prioritized element from tableEntryList based on ipType
 
 			// Get prioritized table entry based on the ipType
-			tableEntry := getPrioritizedTableEntry(tableEntryList, ipType)
+			tableEntry := proxy.manager.getPrioritizedTableEntry(tableEntryList, ipType)
 
 			entryDstIP := tableEntry.Nsipv6
 			if ip.GetProtocolVersion() == 4 {
@@ -524,28 +528,49 @@ func decodePacket(msg []byte) (iputils.NetworkLayerPacket, iputils.TransportLaye
 	return res, res.GetTransportLayer()
 }
 
+// The serviceIpManager is the state machine for special Service IP types
+type serviceIpManager struct {
+	rrPointer int // round robin counter, points to the next table entry to use
+}
+
 // Returns table entry element with highest priority based on the Service IP type
-func getPrioritizedTableEntry(tableEntryList []TableEntryCache.TableEntry, ipType TableEntryCache.ServiceIpType) TableEntryCache.TableEntry {
-	var highestPriorityEntry TableEntryCache.TableEntry
+func (manager *serviceIpManager) getPrioritizedTableEntry(tableEntryList []TableEntryCache.TableEntry, ipType TableEntryCache.ServiceIpType) (result TableEntryCache.TableEntry) {
 	var highestPriority float64 = -1
 
-	for _, entry := range tableEntryList {
-		// Get the priority for the specified ipType from the routing map
-		priority, exists := entry.Routing[ipType]
+	// switch-case to handle special Service IP types, that have a custom priority order
+	switch ipType {
+	case TableEntryCache.InstanceNumber:
+		// Instance Number: return the first entry per default
+		// This IP Type is not part of the routing map
+		result = tableEntryList[0]
+	case TableEntryCache.RoundRobin:
+		// Round Robin: requires local handling, as the priority order is not stored in the routing map
+		// The next entry needs to be selected based on how many times the service IP is used
 
-		// If this entry has a higher priority than the current highest, or no highest found yet
-		if exists && (priority > highestPriority || highestPriority == -1) {
-			highestPriority = priority
-			highestPriorityEntry = entry
+		// Prevent out of bounds access
+		if manager.rrPointer >= len(tableEntryList) {
+			manager.rrPointer = 0
+		}
+
+		// Select the next entry in the round robin order
+		result = tableEntryList[manager.rrPointer]
+		manager.rrPointer = (manager.rrPointer + 1) % len(tableEntryList)
+	default:
+		for _, entry := range tableEntryList {
+			// Get the priority for the specified ipType from the routing map
+			priority, exists := entry.Routing[ipType]
+
+			// If this entry has a higher priority than the current highest, or no highest found yet
+			if exists && (priority > highestPriority || highestPriority == -1) {
+				highestPriority = priority
+				result = entry
+			}
+
+			// If no entry found with the specified ipType in its routing map, return the first entry
+			if !exists && highestPriority == -1 {
+				result = tableEntryList[0]
+			}
 		}
 	}
-
-	// If no entry found with the specified ipType in its routing map, return the first entry
-	if highestPriority == -1 && len(tableEntryList) > 0 {
-		logger.DebugLogger().Printf("No entry found with ipType %v in routing map, returning first entry", ipType)
-		return tableEntryList[0]
-	}
-
-	logger.DebugLogger().Printf("Highest priority entry: %v", highestPriorityEntry)
-	return highestPriorityEntry
+	return result
 }
