@@ -6,6 +6,7 @@ from .service.v6.instance import IPv6InstanceStrategy
 from .service.v6.closest import IPv6ClosestStrategy
 from .service.v6.rr import IPv6RRStrategy
 from .service.v6.underutilized import IPv6UnderutilizedStrategy
+from .service.v6.fps import IPv6FPSStrategy
 from .subnet.subnet_v4 import IPv4SubnetStrategy
 from .subnet.subnet_v6 import IPv6SubnetStrategy
 
@@ -20,6 +21,7 @@ STRATEGY_IPV6_INSTANCE = 'ipv6_instance'
 STRATEGY_IPV6_CLOSEST = 'ipv6_closest'
 STRATEGY_IPV6_RR = 'ipv6_rr'
 STRATEGY_IPV6_UNDERUTILIZED = 'ipv6_underutilized'
+STRATEGY_IPV6_FPS = 'ipv6_fps'
 
 class IPAddressManager:
     """Manager for IP address allocation using different strategies"""
@@ -31,6 +33,7 @@ class IPAddressManager:
             STRATEGY_IPV6_CLOSEST: IPv6ClosestStrategy(),
             STRATEGY_IPV6_RR: IPv6RRStrategy(),
             STRATEGY_IPV6_UNDERUTILIZED: IPv6UnderutilizedStrategy(),
+            STRATEGY_IPV6_FPS: IPv6FPSStrategy(),
             STRATEGY_IPV4_SUBNET: IPv4SubnetStrategy(),
             STRATEGY_IPV6_SUBNET: IPv6SubnetStrategy(),
         }

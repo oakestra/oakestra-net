@@ -1,4 +1,4 @@
-from network.management.manager import ip_manager, STRATEGY_IPV4_SERVICE, STRATEGY_IPV6_RR, STRATEGY_IPV6_UNDERUTILIZED, STRATEGY_IPV6_CLOSEST
+from network.management.manager import ip_manager, STRATEGY_IPV4_SERVICE, STRATEGY_IPV6_RR, STRATEGY_IPV6_UNDERUTILIZED, STRATEGY_IPV6_CLOSEST, STRATEGY_IPV6_FPS
 from interfaces.mongodb.requests import *
 from utils.sla_validation import check_valid_sla
 
@@ -24,6 +24,13 @@ def deploy_request(deployment_descriptor=None, system_job_id=None):
         "Address": ip_manager.new_address(STRATEGY_IPV4_SERVICE, deployment_descriptor.get('closest_ip'), job_name),
         "Address_v6": ip_manager.new_address(STRATEGY_IPV6_CLOSEST, deployment_descriptor.get('closest_ip_v6'), job_name)
     }]
+    monitoring_class = deployment_descriptor.get('monitoring_class')
+    if monitoring_class is not None and monitoring_class == 'fps':
+        s_ip.append({
+            "IpType": 'fps',
+            "Address": ip_manager.new_address(STRATEGY_IPV4_SERVICE, deployment_descriptor.get('fps_ip'), job_name),
+            "Address_v6": ip_manager.new_address(STRATEGY_IPV6_FPS, deployment_descriptor.get('fps_ip_v6'), job_name)
+        })
     job_id = mongo_insert_job(
         {
             'system_job_id': system_job_id,
