@@ -65,6 +65,16 @@ def validate_rr_ipv6(address):
     assert address[2] == 32
     assert 0 <= address[3] < 8
 
+# ........ FPS IPv6 ........#
+#############################
+
+def validate_fps_ipv6(address):
+    validate_ipv6_length(address)
+    assert address[0] == 253
+    assert address[1] == 255
+    assert address[2] == 64
+    assert 0 <= address[3] < 8
+
 # ....... Subnet ........#
 ################################
 

@@ -31,6 +31,7 @@ ADDR_SUBNET = "subnet"
 ADDR_CLOSEST = "closest" # reserved, not implemented
 ADDR_RR = "rr"
 ADDR_UNDERUTILIZED = "underutilized"
+ADDR_FPS = "fps"
 
 # IP versions
 IP_V4 = "v4"
@@ -335,6 +336,7 @@ def _mongo_ip_operation(operation_type, address_type, address_version, address=N
                     ADDR_CLOSEST: [253, 255, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     ADDR_RR: [253, 255, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     ADDR_UNDERUTILIZED: [253, 255, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    ADDR_FPS: [253, 255, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     # Add other address types as needed:
                     # ADDR_NEW_TYPE: [x, y, z, ...],
                 }
