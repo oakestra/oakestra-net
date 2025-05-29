@@ -55,7 +55,7 @@ func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCac
 		priorityMap := make(map[TableEntryCache.ServiceIpType]float64)
 
 		for _, ip := range instance.ServiceIp {
-			sipList = append(sipList, toServiceIP(ip.Type, ip.Address, ip.Address_v6))
+			sipList = append(sipList, TableEntryCache.ToServiceIP(ip.Type, ip.Address, ip.Address_v6))
 		}
 
 		for _, priority := range instance.Routing {
@@ -82,28 +82,4 @@ func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCac
 	}
 
 	return result, nil
-}
-
-func toServiceIP(Type string, Addr string, Addr_v6 string) TableEntryCache.ServiceIP {
-	ip := TableEntryCache.ServiceIP{
-		// TODO: check, if we can set this to invalid, without breaking anything
-		IpType:     0,
-		Address:    net.ParseIP(Addr),
-		Address_v6: net.ParseIP(Addr_v6),
-	}
-
-	if Type == "RR" {
-		ip.IpType = TableEntryCache.RoundRobin
-	}
-	if Type == "closest" {
-		ip.IpType = TableEntryCache.Closest
-	}
-	if Type == "underutilized" {
-		ip.IpType = TableEntryCache.Underutilized
-	}
-	if Type == "InstanceNumber" {
-		ip.IpType = TableEntryCache.InstanceNumber
-	}
-
-	return ip
 }

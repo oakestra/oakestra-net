@@ -499,11 +499,13 @@ func (env *Environment) GetTableEntryByServiceIP(sip net.IP) []TableEntryCache.T
 // If the entry is not present a TableQuery is performed and the interest registered
 // Returns the table entry and the type of ServiceIP used to retrieve it
 func (env *Environment) GetTableEntryByServiceIPWithType(ip net.IP) ([]TableEntryCache.TableEntry, TableEntryCache.ServiceIpType) {
+	logger.DebugLogger().Printf("Getting table entry by service IP with type: %v", ip)
 	table := env.GetTableEntryByServiceIP(ip)
 	if len(table) > 0 {
 		for _, elem := range table {
 			for _, elemIp := range elem.ServiceIP {
 				if elemIp.Address.Equal(ip) || elemIp.Address_v6.Equal(ip) {
+					logger.DebugLogger().Printf("Found table entry: %v", elem)
 					// OPTIMIZE: Doesn't this always match against the first elemIp in the whole table list,
 					// because the serviceIPs are always the same for all service instances?
 					// Couldn't we simply this down to accessing just the first element?
