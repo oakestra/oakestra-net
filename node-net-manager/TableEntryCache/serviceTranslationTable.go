@@ -33,6 +33,7 @@ const (
 	Closest        ServiceIpType = 1
 	RoundRobin     ServiceIpType = 2
 	Underutilized  ServiceIpType = 3
+	FPS            ServiceIpType = 4
 )
 
 // Implement Stringer interface
@@ -40,7 +41,34 @@ func (s ServiceIpType) String() string {
 	if s == Invalid {
 		return "Invalid"
 	}
-	return []string{"InstanceNumber", "closest", "RR", "underutilized"}[s]
+	return []string{"InstanceNumber", "closest", "RR", "underutilized", "fps"}[s]
+}
+
+func ToServiceIP(Type string, Addr string, Addr_v6 string) ServiceIP {
+	ip := ServiceIP{
+		// TODO: check, if we can set this to invalid, without breaking anything
+		IpType:     0,
+		Address:    net.ParseIP(Addr),
+		Address_v6: net.ParseIP(Addr_v6),
+	}
+
+	if Type == "RR" {
+		ip.IpType = RoundRobin
+	}
+	if Type == "closest" {
+		ip.IpType = Closest
+	}
+	if Type == "underutilized" {
+		ip.IpType = Underutilized
+	}
+	if Type == "InstanceNumber" {
+		ip.IpType = InstanceNumber
+	}
+	if Type == "fps" {
+		ip.IpType = FPS
+	}
+
+	return ip
 }
 
 // ServiceIpTypeFromString converts string representation back to ServiceIpType
@@ -54,6 +82,8 @@ func ServiceIpTypeFromString(s string) ServiceIpType {
 		return RoundRobin
 	case "underutilized":
 		return Underutilized
+	case "fps":
+		return FPS
 	default:
 		return Invalid // Return invalid value instead of defaulting to an existing one
 	}
