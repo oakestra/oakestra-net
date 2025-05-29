@@ -246,23 +246,22 @@ def mongo_update_job_routing(evaluation_result: EvaluationResult) -> None:
     global mongo_jobs
     app.logger.info(f"MONGODB - update job routing for {evaluation_result.job_name} - {evaluation_result}")
     for instance in evaluation_result.results:
-        
+
         # First, find the job and get current routing information
         job = mongo_jobs.db.jobs.find_one(
             {'job_name': evaluation_result.job_name, 'instance_list.instance_number': instance.instance_number},
             {'instance_list.$': 1}
         )
-        
-        # Check if routing array exists, initialize if not
+
+        app.logger.info(f"MONGODB - job found in routing update: {job}")
         current_routing = job.get('instance_list', [{}])[0].get('routing', [])
-        if not isinstance(current_routing, list):
-            current_routing = []
-        
+        app.logger.debug(f"MONGODB - current job routing: {current_routing}")
         # Find if there's an entry with matching IpType
-        entry_found = False
-        for i, route in enumerate(current_routing):
+        for _, route in enumerate(current_routing):
             if route.get('IpType') == instance.ip_type:
                 # Update priority for the matching IpType
+                app.logger.info(f"MONGODB - update job routing for {evaluation_result.job_name}.instance.{instance.instance_number} - {instance.ip_type} - {instance.priority}")
+                """
                 mongo_jobs.db.jobs.update_one(
                     {'job_name': evaluation_result.job_name, 
                      'instance_list.instance_number': instance.instance_number,
@@ -270,11 +269,19 @@ def mongo_update_job_routing(evaluation_result: EvaluationResult) -> None:
                     {'$set': {'instance_list.$.routing.$[elem].priority': instance.priority}},
                     array_filters=[{'elem.IpType': instance.ip_type}]
                 )
-                
-                entry_found = True
+                """
+                mongo_jobs.db.jobs.update_one(
+                    {'job_name': evaluation_result.job_name},
+                    {'$set': {'instance_list.$[inst].routing.$[route].priority': instance.priority}},
+                    array_filters=[
+                        {'inst.instance_number': instance.instance_number},
+                        {'route.IpType': instance.ip_type}
+                    ]
+                )
                 break
                 
         # If no matching IpType found, add a new entry to the routing array
+        """
         if not entry_found:
             mongo_jobs.db.jobs.update_one(
                 {'job_name': evaluation_result.job_name, 'instance_list.instance_number': instance.instance_number},
@@ -283,5 +290,5 @@ def mongo_update_job_routing(evaluation_result: EvaluationResult) -> None:
                     'IpType': instance.ip_type
                 }}}
             )
-
+        """
             
