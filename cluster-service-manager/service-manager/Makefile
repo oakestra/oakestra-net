@@ -1,9 +1,8 @@
-# Makefile for routing-manager
+# Makefile for cluster service manager
 
 # Docker image and container variables
-IMAGE_NAME := service-manager
+IMAGE_NAME := cluster-service-manager
 IMAGE_TAG := latest
-CONTAINER_NAME := service-manager
 
 # Default target
 .PHONY: help
