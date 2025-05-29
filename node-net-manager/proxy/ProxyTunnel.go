@@ -33,7 +33,7 @@ type Configuration struct {
 
 type GoProxyTunnel struct {
 	environment         env.EnvironmentManager
-	manager             *serviceIpManager
+	manager             ServiceIPManager
 	listenConnection    *net.UDPConn
 	incomingChannel     chan incomingMessage
 	connectionBuffer    map[string]*net.UDPConn
@@ -56,6 +56,11 @@ type GoProxyTunnel struct {
 	udpwrite            sync.RWMutex
 	tunwrite            sync.RWMutex
 	isListening         bool
+}
+
+type ServiceIPManager interface {
+	GetPrioritizedTableEntry(tableEntryList []TableEntryCache.TableEntry, ipType TableEntryCache.ServiceIpType) (result TableEntryCache.TableEntry)
+	CurrentRRPointer() int
 }
 
 // incoming message from UDP channel
@@ -193,7 +198,7 @@ func (proxy *GoProxyTunnel) outgoingProxy(ip iputils.NetworkLayerPacket, prot ip
 			// Use the prioritized element from tableEntryList based on ipType
 
 			// Get prioritized table entry based on the ipType
-			tableEntry := proxy.manager.getPrioritizedTableEntry(tableEntryList, ipType)
+			tableEntry := proxy.manager.GetPrioritizedTableEntry(tableEntryList, ipType)
 
 			entryDstIP := tableEntry.Nsipv6
 			if ip.GetProtocolVersion() == 4 {
@@ -533,10 +538,21 @@ type serviceIpManager struct {
 	rrPointer int // round robin counter, points to the next table entry to use
 }
 
+var _ ServiceIPManager = &serviceIpManager{}
+
+func NewServiceIpManager() ServiceIPManager {
+	return &serviceIpManager{
+		rrPointer: 0,
+	}
+}
+
 // Returns table entry element with highest priority based on the Service IP type
-func (manager *serviceIpManager) getPrioritizedTableEntry(tableEntryList []TableEntryCache.TableEntry, ipType TableEntryCache.ServiceIpType) (result TableEntryCache.TableEntry) {
+func (manager *serviceIpManager) GetPrioritizedTableEntry(tableEntryList []TableEntryCache.TableEntry, ipType TableEntryCache.ServiceIpType) (result TableEntryCache.TableEntry) {
 	var highestPriority float64 = -1
 
+	fmt.Println("ipType: ", ipType)
+	fmt.Println("tableEntryList: ", tableEntryList)
+	fmt.Println("manager.rrPointer: ", manager.rrPointer)
 	// switch-case to handle special Service IP types, that have a custom priority order
 	switch ipType {
 	case TableEntryCache.InstanceNumber:
@@ -573,4 +589,8 @@ func (manager *serviceIpManager) getPrioritizedTableEntry(tableEntryList []Table
 		}
 	}
 	return result
+}
+
+func (manager *serviceIpManager) CurrentRRPointer() int {
+	return manager.rrPointer
 }

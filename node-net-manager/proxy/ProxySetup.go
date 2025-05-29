@@ -62,6 +62,7 @@ func NewCustom(configuration Configuration) GoProxyTunnel {
 		outgoingChannel:  make(chan outgoingMessage, 1000),
 		mtusize:          strconv.Itoa(configuration.Mtusize),
 		randseed:         rand.New(rand.NewSource(42)),
+		manager:          NewServiceIpManager(),
 	}
 
 	// parse configuration file
