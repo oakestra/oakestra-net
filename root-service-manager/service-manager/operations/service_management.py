@@ -14,11 +14,11 @@ def deploy_request(deployment_descriptor=None, system_job_id=None):
         "Address": ip_manager.new_address(STRATEGY_IPV4_SERVICE, deployment_descriptor.get('RR_ip'), job_name),
         "Address_v6": ip_manager.new_address(STRATEGY_IPV6_RR, deployment_descriptor.get('RR_ip_v6'), job_name)
     },
-    {
-        "IpType": 'underutilized',
-        "Address": ip_manager.new_address(STRATEGY_IPV4_SERVICE, deployment_descriptor.get('underutilized_ip'), job_name),
-        "Address_v6": ip_manager.new_address(STRATEGY_IPV6_UNDERUTILIZED, deployment_descriptor.get('underutilized_ip_v6'), job_name)
-    },
+    #{
+    #    "IpType": 'underutilized',
+    #    "Address": ip_manager.new_address(STRATEGY_IPV4_SERVICE, deployment_descriptor.get('underutilized_ip'), job_name),
+    #    "Address_v6": ip_manager.new_address(STRATEGY_IPV6_UNDERUTILIZED, deployment_descriptor.get('underutilized_ip_v6'), job_name)
+    #},
     {
         "IpType": 'closest',
         "Address": ip_manager.new_address(STRATEGY_IPV4_SERVICE, deployment_descriptor.get('closest_ip'), job_name),
