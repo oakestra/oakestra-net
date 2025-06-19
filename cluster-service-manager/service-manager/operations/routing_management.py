@@ -1,6 +1,7 @@
 from domain.evaluation import EvaluationResult
 from interfaces.mongodb_requests import mongo_update_job_routing
 from operations.instances_management import _update_cache_and_workers
+from timing import timed
 
 def update_job_routing(req_json: dict):
     """
@@ -10,7 +11,7 @@ def update_job_routing(req_json: dict):
     mongo_update_job_routing(evaluation_result)
     return "Routing updated", 200
 
-
+@timed()
 def update_job_routing_alert(req_json: dict):
     """
        Alert regarding a routing change

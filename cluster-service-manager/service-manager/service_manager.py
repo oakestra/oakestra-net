@@ -9,6 +9,7 @@ from interfaces.mongodb_requests import mongo_init
 from operations.instances_management import instance_updates
 from operations.service_management import create_service, remove_service
 from operations.routing_management import update_job_routing, update_job_routing_alert
+from timing import timed
 MY_PORT = os.environ.get('MY_PORT') or 10200
 
 my_logger = configure_logging()
@@ -71,6 +72,7 @@ def task_update():
     )
 
 @app.route('/api/net/routing/alert', methods=['POST'])
+@timed()
 def routing_alert():
     """
        Alert regarding a routing change

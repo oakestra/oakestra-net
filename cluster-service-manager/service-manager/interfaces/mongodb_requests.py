@@ -2,6 +2,7 @@ import os
 from flask_pymongo import PyMongo
 from bson.objectid import ObjectId
 from domain.evaluation import EvaluationResult
+from timing import timed
 MONGO_URL = os.environ.get('CLUSTER_MONGO_URL')
 MONGO_PORT = os.environ.get('CLUSTER_MONGO_PORT')
 
@@ -239,6 +240,7 @@ def mongo_remove_interest(job_name, clientid):
 # ........... Job Routing Operations ...........#
 #################################################
 
+@timed()
 def mongo_update_job_routing(evaluation_result: EvaluationResult) -> None:
     """
        Update the routing priority table of a job
