@@ -247,50 +247,44 @@ def mongo_update_job_routing(evaluation_result: EvaluationResult) -> None:
     """
     global mongo_jobs
     app.logger.info(f"MONGODB - update job routing for {evaluation_result.job_name} - {evaluation_result}")
-    for instance in evaluation_result.results:
-
-        # First, find the job and get current routing information
-        job = mongo_jobs.db.jobs.find_one(
-            {'job_name': evaluation_result.job_name, 'instance_list.instance_number': instance.instance_number},
-            {'instance_list.$': 1}
-        )
-
-        app.logger.info(f"MONGODB - job found in routing update: {job}")
-        current_routing = job.get('instance_list', [{}])[0].get('routing', [])
-        app.logger.debug(f"MONGODB - current job routing: {current_routing}")
-        # Find if there's an entry with matching IpType
-        for _, route in enumerate(current_routing):
-            if route.get('IpType') == instance.ip_type:
-                # Update priority for the matching IpType
-                app.logger.info(f"MONGODB - update job routing for {evaluation_result.job_name}.instance.{instance.instance_number} - {instance.ip_type} - {instance.priority}")
-                """
-                mongo_jobs.db.jobs.update_one(
-                    {'job_name': evaluation_result.job_name, 
-                     'instance_list.instance_number': instance.instance_number,
-                     'instance_list.routing.IpType': instance.ip_type},
-                    {'$set': {'instance_list.$.routing.$[elem].priority': instance.priority}},
-                    array_filters=[{'elem.IpType': instance.ip_type}]
-                )
-                """
-                mongo_jobs.db.jobs.update_one(
-                    {'job_name': evaluation_result.job_name},
-                    {'$set': {'instance_list.$[inst].routing.$[route].priority': instance.priority}},
-                    array_filters=[
-                        {'inst.instance_number': instance.instance_number},
-                        {'route.IpType': instance.ip_type}
-                    ]
-                )
-                break
+    
+    # Fetch the complete job document once
+    job = mongo_jobs.db.jobs.find_one({'job_name': evaluation_result.job_name})
+    
+    if not job:
+        app.logger.warning(f"MONGODB - job {evaluation_result.job_name} not found for routing update")
+        return
+    
+    app.logger.info(f"MONGODB - job found in routing update: {job.get('job_name')}")
+    
+    # Update routing information in memory
+    instance_list = job.get('instance_list', [])
+    routing_updated = False
+    
+    for instance_result in evaluation_result.results:
+        # Find the matching instance in the instance_list
+        for instance in instance_list:
+            if instance.get('instance_number') == instance_result.instance_number:
+                current_routing = instance.get('routing', [])
+                app.logger.debug(f"MONGODB - current job routing for instance {instance_result.instance_number}: {current_routing}")
                 
-        # If no matching IpType found, add a new entry to the routing array
-        """
-        if not entry_found:
-            mongo_jobs.db.jobs.update_one(
-                {'job_name': evaluation_result.job_name, 'instance_list.instance_number': instance.instance_number},
-                {'$push': {'instance_list.$.routing': {
-                    'priority': instance.priority,
-                    'IpType': instance.ip_type
-                }}}
-            )
-        """
+                # Find and update the matching IpType in routing
+                for route in current_routing:
+                    if route.get('IpType') == instance_result.ip_type:
+                        app.logger.info(f"MONGODB - update job routing for {evaluation_result.job_name}.instance.{instance_result.instance_number} - {instance_result.ip_type} - {instance_result.priority}")
+                        route['priority'] = instance_result.priority
+                        routing_updated = True
+                        break
+                break
+    
+    # Write back the updated document if any routing was modified
+    if routing_updated:
+        mongo_jobs.db.jobs.update_one(
+            {'job_name': evaluation_result.job_name},
+            {'$set': {'instance_list': instance_list}}
+        )
+        app.logger.info(f"MONGODB - routing updated for job {evaluation_result.job_name}")
+    else:
+        app.logger.debug(f"MONGODB - no routing updates needed for job {evaluation_result.job_name}")
+                
             
