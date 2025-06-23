@@ -478,7 +478,7 @@ func (env *Environment) GetTableEntryByServiceIP(sip net.IP) []TableEntryCache.T
 	// if no entry available -> TableQuery
 	entryList, err := tableQueryByIP(sip)
 
-	logger.InfoLogger().Println("GetTableEntryByServiceIP entryList", entryList)
+	logger.DebugLogger().Println("GetTableEntryByServiceIP entryList", entryList)
 
 	if err == nil {
 		var once sync.Once
@@ -529,7 +529,7 @@ func (env *Environment) GetTableEntryByInstanceIP(ip net.IP) (TableEntryCache.Ta
 			for _, elemIp := range elem.ServiceIP {
 				if elemIp.IpType == TableEntryCache.InstanceNumber &&
 					(elemIp.Address.Equal(ip) || elemIp.Address_v6.Equal(ip)) {
-					logger.InfoLogger().Println("GetTableEntryByInstanceIP table[elemindex]", table[elemindex])
+					logger.DebugLogger().Println("GetTableEntryByInstanceIP table[elemindex]", table[elemindex])
 					return table[elemindex], true
 				}
 			}
@@ -544,10 +544,9 @@ func (env *Environment) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEnt
 	// If entry already available
 	entry, exist := env.translationTable.SearchByNsIP(ip)
 	if exist {
-		logger.InfoLogger().Println("GetTableEntryByNsIP entry", entry)
+		logger.DebugLogger().Println("GetTableEntryByNsIP entry", entry)
 		return entry, true
 	}
-	logger.InfoLogger().Println("GetTableEntryByNsIP entry", entry)
 	return entry, false
 }
 
@@ -555,7 +554,7 @@ func (env *Environment) GetTableEntryByNsIP(ip net.IP) (TableEntryCache.TableEnt
 func (env *Environment) AddTableQueryEntry(entry TableEntryCache.TableEntry) {
 	_ = env.translationTable.RemoveByNsip(entry.Nsip)
 	err := env.translationTable.Add(entry)
-	logger.InfoLogger().Println("AddTableQueryEntry entry", entry)
+	logger.DebugLogger().Println("AddTableQueryEntry entry", entry)
 	if err != nil {
 		logger.ErrorLogger().Println(err)
 	}
