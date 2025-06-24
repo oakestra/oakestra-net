@@ -550,9 +550,6 @@ func NewServiceIpManager() ServiceIPManager {
 func (manager *serviceIpManager) GetPrioritizedTableEntry(tableEntryList []TableEntryCache.TableEntry, ipType TableEntryCache.ServiceIpType) (result TableEntryCache.TableEntry) {
 	var highestPriority float64 = -1
 
-	fmt.Println("ipType: ", ipType)
-	fmt.Println("tableEntryList: ", tableEntryList)
-	fmt.Println("manager.rrPointer: ", manager.rrPointer)
 	// switch-case to handle special Service IP types, that have a custom priority order
 	switch ipType {
 	case TableEntryCache.InstanceNumber:
@@ -565,6 +562,7 @@ func (manager *serviceIpManager) GetPrioritizedTableEntry(tableEntryList []Table
 
 		// Prevent out of bounds access
 		if manager.rrPointer >= len(tableEntryList) {
+			// reset the round robin pointer
 			manager.rrPointer = 0
 		}
 

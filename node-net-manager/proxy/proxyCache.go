@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"NetManager/logger"
 	"net"
 	"sync"
 	"time"
@@ -49,6 +50,7 @@ func (cache *ProxyCache) RetrieveByServiceIP(srcip net.IP, instanceIP net.IP, sr
 				cacheEntry.dstServiceIp.Equal(dstServiceIp) &&
 				cacheEntry.srcip.Equal(srcip) &&
 				cacheEntry.srcInstanceIp.Equal(instanceIP) {
+				logger.InfoLogger().Printf("Found cached flow: %v\nCurrent length of cacheList: %d", cacheEntry, len(elem.conversionList))
 				return cacheEntry, true
 			}
 		}
@@ -98,6 +100,7 @@ func (cache *ProxyCache) addToConversionList(entry ConversionEntry) {
 		if elementry.dstport == entry.dstport {
 			alreadyExistPosition = i
 			alreadyExist = true
+			logger.InfoLogger().Printf("Destination port already exist: %d, replacing entry", entry.dstport)
 			break
 		}
 	}
@@ -109,5 +112,6 @@ func (cache *ProxyCache) addToConversionList(entry ConversionEntry) {
 		//otherwise add a new proxycache entry in the next slot available
 		elem.conversionList[elem.nextEntry] = entry
 		elem.nextEntry = (elem.nextEntry + 1) % cache.conversionListMaxSize
+		logger.InfoLogger().Printf("Added new entry to proxycache: %v\nCurrent length of cacheList: %d", entry, len(elem.conversionList))
 	}
 }
