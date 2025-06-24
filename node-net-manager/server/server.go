@@ -13,7 +13,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 
 	"github.com/gorilla/mux"
@@ -47,11 +46,6 @@ type netConfiguration struct {
 func HandleRequests(port int) {
 	netRouter := mux.NewRouter().StrictSlash(true)
 	netRouter.HandleFunc("/register", register).Methods("POST")
-	netRouter.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	netRouter.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	netRouter.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	netRouter.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	netRouter.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 
 	//If default route, fetch default gateway address and use that.
 	if Configuration.NodePublicAddress == "0.0.0.0" {
