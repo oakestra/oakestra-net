@@ -157,6 +157,7 @@ def mongo_find_job_by_name(job_name):
     return mongo_jobs.db.jobs.find_one({'job_name': job_name})
 
 
+@timed()
 def mongo_find_job_by_ip(ip):
     global mongo_jobs
     # Search by Service IP

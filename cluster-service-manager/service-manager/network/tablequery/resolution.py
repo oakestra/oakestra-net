@@ -3,7 +3,7 @@ from interfaces import root_service_manager_requests
 import copy
 
 from interfaces.mongodb_requests import mongo_update_job_instance
-
+from timing import timed
 
 def service_resolution(service_name):
     """
@@ -45,7 +45,7 @@ def service_resolution(service_name):
 
     return instances, siplist
 
-
+@timed()
 def service_resolution_ip(ip_string):
     """
     Resolves the service instance list by service ServiceIP with the local DB,

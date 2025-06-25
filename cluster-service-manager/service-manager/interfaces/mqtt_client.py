@@ -5,6 +5,7 @@ from network.deployment import *
 from network.tablequery import resolution, interests
 import paho.mqtt.client as paho_mqtt
 import logging
+from timing import timed
 
 mqtt = None
 app = None
@@ -111,7 +112,7 @@ def _interest_remove_handler(client_id, payload):
     appname = payload.get("appname")
     interests.remove_interest(appname, client_id)
 
-
+@timed()
 def _tablequery_handler(client_id, payload):
     serviceName = payload.get("sname")
     sip = payload.get("sip")
@@ -155,7 +156,7 @@ def _subnet_handler(client_id, payload):
         # remove subnetwork from node
         pass
 
-
+@timed()
 def mqtt_publish_tablequery_result(client_id, result):
     topic = "nodes/" + client_id + "/net/tablequery/result"
     mqtt.publish(topic, json.dumps(result), qos=1)
