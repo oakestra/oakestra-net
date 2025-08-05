@@ -151,7 +151,7 @@ func GetOutboundIP() net.IP {
 
 		body, err := io.ReadAll(req.Body)
 		if err == nil {
-			logger.InfoLogger().Println("Using public IP address: ", string(body))
+			logger.DebugLogger().Printf("Using public IP address: %s", string(body))
 			return net.ParseIP(string(body[:len(body)-1]))
 		}
 		logger.ErrorLogger().Printf("%v", err.Error())

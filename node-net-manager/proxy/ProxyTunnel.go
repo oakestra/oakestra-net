@@ -395,7 +395,7 @@ func (proxy *GoProxyTunnel) createUDPChannel(hoststring string) (*net.UDPConn, e
 		return nil, err
 	}
 	connection, err := net.DialUDP("udp", nil, raddr)
-	if nil != err {
+	if err != nil {
 		logger.ErrorLogger().Println("Unable to connect to remote addr:", err)
 		// remote destination could be behind NAT
 		connection, err = proxy.initiateNatTraversal(raddr)
