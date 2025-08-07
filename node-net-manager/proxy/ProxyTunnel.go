@@ -351,7 +351,15 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 
 	// Check udp channel buffer to avoid creating a new channel
 	proxy.udpwrite.Lock()
-	hoststring := fmt.Sprintf("%s:%v", dstHost, dstPort)
+
+	// Format hoststring with [] if ipv6
+	var hoststring string
+	if dstHost.To4() != nil {
+		hoststring = fmt.Sprintf("%s:%v", dstHost, dstPort)
+	} else {
+		hoststring = fmt.Sprintf("[%s]:%v", dstHost, dstPort)
+	}
+
 	con, exist := proxy.connectionBuffer[hoststring]
 	proxy.udpwrite.Unlock()
 	// TODO: flush connection buffer by time to time
