@@ -379,7 +379,6 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	// send via UDP channel
 	proxy.udpwrite.Lock()
 	_, _, err := (*con).WriteMsgUDP(packetBytes, nil, nil)
-	logger.DebugLogger().Printf("Sent packet {%s} via UDP", string(packetBytes))
 	proxy.udpwrite.Unlock()
 	if err != nil {
 		_ = (*con).Close()
@@ -395,6 +394,7 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 		attemptNumber++
 		proxy.forward(dstHost, dstPort, packet, attemptNumber)
 	}
+	logger.DebugLogger().Println("Successfully sent packet via UDP to %s", con.RemoteAddr().String())
 }
 
 func (proxy *GoProxyTunnel) createUDPChannel(hoststring string) (*net.UDPConn, error) {
