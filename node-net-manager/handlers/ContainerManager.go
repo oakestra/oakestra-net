@@ -60,16 +60,16 @@ Response Json:
 	}
 */
 func (m *ContainerManager) containerDeploy(writer http.ResponseWriter, request *http.Request) {
-	log.Println("Received HTTP request - /container/deploy ")
+	logger.InfoLogger().Println("Received HTTP request - /container/deploy ")
 
 	if *m.WorkerID == "" {
-		log.Printf("[ERROR] Node not initialized")
+		logger.InfoLogger().Println("[ERROR] Node not initialized")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	reqBody, _ := io.ReadAll(request.Body)
-	log.Println("ReqBody received :", reqBody)
+	logger.InfoLogger().Printf("ReqBody received %s:", string(reqBody))
 	var deployTask ContainerDeployTask
 	err := json.Unmarshal(reqBody, &deployTask)
 	if err != nil {

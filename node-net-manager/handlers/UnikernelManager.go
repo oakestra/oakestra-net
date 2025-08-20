@@ -53,16 +53,16 @@ Request Json:
 Response: 200 or Failure code
 */
 func (m *UnikernelManager) CreateUnikernelNamesapce(writer http.ResponseWriter, request *http.Request) {
-	log.Println("Received HTTP request - /unikernel/deploy")
+	logger.InfoLogger().Println("Received HTTP request - /unikernel/deploy")
 
 	if *m.WorkerID == "" {
-		log.Printf("[ERROR] Node not initialized")
+		logger.InfoLogger().Println("[ERROR] Node not initialized")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	reqBody, _ := io.ReadAll(request.Body)
-	log.Printf("ReqBody received :%s", reqBody)
+	logger.InfoLogger().Println("ReqBody received :%s", string(reqBody))
 	var requestStruct ContainerDeployTask
 	err := json.Unmarshal(reqBody, &requestStruct)
 	if err != nil {
