@@ -7,14 +7,15 @@ import (
 	"NetManager/mqtt"
 	"NetManager/proxy/iputils"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/songgao/water"
 	"math/rand"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/songgao/water"
 )
 
 // const
@@ -378,6 +379,10 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 
 	// send via UDP channel
 	proxy.udpwrite.Lock()
+	logger.DebugLogger().Printf("Write UDP: Local=%s Remote=%s",
+		(*con).LocalAddr().String(),
+		(*con).RemoteAddr().String(),
+	)
 	_, _, err := (*con).WriteMsgUDP(packetBytes, nil, nil)
 	proxy.udpwrite.Unlock()
 	if err != nil {
