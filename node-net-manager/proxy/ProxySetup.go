@@ -192,10 +192,7 @@ func (proxy *GoProxyTunnel) createTun() {
 		NextProtos:         []string{"quic-proxy"},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	lstnConn, err := quic.DialAddr(ctx, fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
+	lstnConn, err := quic.ListenAddr(fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
 		HandshakeIdleTimeout: 5 * time.Minute,
 		MaxIdleTimeout:       5 * time.Minute,
 		EnableDatagrams:      true,
@@ -206,7 +203,11 @@ func (proxy *GoProxyTunnel) createTun() {
 
 	proxy.HostTUNDeviceName = ifce.Name()
 	proxy.ifce = ifce
-	proxy.listenConnection = lstnConn
+	proxy.listenConnection, err = lstnConn.Accept(context.Background())
+
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // Configuration implements Stringer interface
