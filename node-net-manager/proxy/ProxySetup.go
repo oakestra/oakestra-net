@@ -193,7 +193,7 @@ func (proxy *GoProxyTunnel) createTun() {
 	}
 
 	lstnConn, err := quic.ListenAddr(fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
-		HandshakeIdleTimeout: 10 * time.Second,
+		HandshakeIdleTimeout: 30 * time.Second,
 		MaxIdleTimeout:       2 * time.Minute,
 		EnableDatagrams:      true,
 	})
