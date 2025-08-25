@@ -193,8 +193,8 @@ func (proxy *GoProxyTunnel) createTun() {
 	}
 
 	lstnConn, err := quic.ListenAddr(fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
-		HandshakeIdleTimeout: 5 * time.Minute,
-		MaxIdleTimeout:       5 * time.Minute,
+		HandshakeIdleTimeout: 10 * time.Second,
+		MaxIdleTimeout:       2 * time.Minute,
 		EnableDatagrams:      true,
 	})
 	if nil != err {
@@ -205,9 +205,16 @@ func (proxy *GoProxyTunnel) createTun() {
 	proxy.ifce = ifce
 	proxy.listenConnection, err = lstnConn.Accept(context.Background())
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		for {
+			sess, err := lstnConn.Accept(context.Background())
+			if err != nil {
+				log.Println("Accept failed:", err)
+				continue
+			}
+			log.Printf("Accepted new QUIC session from %s", sess.RemoteAddr())
+		}
+	}()
 }
 
 // Configuration implements Stringer interface
