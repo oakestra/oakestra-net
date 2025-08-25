@@ -210,6 +210,7 @@ func (proxy *GoProxyTunnel) createTun() {
 				log.Println("Accept failed:", err)
 				continue
 			}
+			break
 		}
 	}()
 }
