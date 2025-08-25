@@ -192,16 +192,16 @@ func (proxy *GoProxyTunnel) createTun() {
 		NextProtos:         []string{"quic-proxy"},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	lstnConn, err := quic.DialAddr(ctx, fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
-		HandshakeIdleTimeout: 5 * time.Second,
-		MaxIdleTimeout:       15 * time.Second,
+		HandshakeIdleTimeout: 5 * time.Minute,
+		MaxIdleTimeout:       5 * time.Minute,
 		EnableDatagrams:      true,
 	})
 	if nil != err {
-		log.Fatal("Unable to listen on UDP socket:", err)
+		log.Fatal("Unable to listen on QUIC socket: ", err)
 	}
 
 	proxy.HostTUNDeviceName = ifce.Name()

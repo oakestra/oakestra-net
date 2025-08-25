@@ -406,18 +406,17 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 		NextProtos:         []string{"quic-proxy"},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	conn, err := quic.DialAddr(ctx, hoststring, tlsConf, &quic.Config{
-		HandshakeIdleTimeout: 5 * time.Second,
-		MaxIdleTimeout:       15 * time.Second,
+		HandshakeIdleTimeout: 2 * time.Minute,
+		MaxIdleTimeout:       2 * time.Minute,
 		EnableDatagrams:      true,
 	})
 
 	if err != nil {
 		logger.ErrorLogger().Println("Unable to connect to remote addr via QUIC:", err)
-		// Initiate NAT Traversal
 		return nil, err
 	}
 	return conn, nil
