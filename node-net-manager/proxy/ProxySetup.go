@@ -205,12 +205,13 @@ func (proxy *GoProxyTunnel) createTun() {
 	proxy.ifce = ifce
 	go func() {
 		for {
-			proxy.listenConnection, err = lstnConn.Accept(context.Background())
+			conn, err := lstnConn.Accept(context.Background())
 			if err != nil {
 				log.Println("Accept failed:", err)
 				continue
 			}
-			break
+			log.Printf("Accepted new QUIC session from %s", conn.RemoteAddr())
+			proxy.listenConnection = conn
 		}
 	}()
 }
