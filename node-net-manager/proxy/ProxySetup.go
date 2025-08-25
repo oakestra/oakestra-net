@@ -4,6 +4,8 @@ import (
 	"NetManager/env"
 	"NetManager/logger"
 	"NetManager/network"
+	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,7 +15,9 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"time"
 
+	"github.com/quic-go/quic-go"
 	"github.com/songgao/water"
 )
 
@@ -54,9 +58,9 @@ func NewCustom(configuration Configuration) GoProxyTunnel {
 		errorChannel:     make(chan error),
 		finishChannel:    make(chan bool),
 		stopChannel:      make(chan bool),
-		connectionBuffer: make(map[string]*net.UDPConn),
+		connectionBuffer: make(map[string]*quic.Conn),
 		proxycache:       NewProxyCache(),
-		udpwrite:         sync.RWMutex{},
+		quicwrite:        sync.RWMutex{},
 		tunwrite:         sync.RWMutex{},
 		incomingChannel:  make(chan incomingMessage, 1000),
 		outgoingChannel:  make(chan outgoingMessage, 1000),
@@ -183,17 +187,21 @@ func (proxy *GoProxyTunnel) createTun() {
 	}
 
 	// listen to local socket
-	lstnAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%v", proxy.TunnelPort))
-	if nil != err {
-		log.Fatal("Unable to get UDP socket:", err)
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"quic-proxy"},
 	}
-	lstnConn, err := net.ListenUDP("udp", lstnAddr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	lstnConn, err := quic.DialAddr(ctx, fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
+		HandshakeIdleTimeout: 5 * time.Second,
+		MaxIdleTimeout:       15 * time.Second,
+		EnableDatagrams:      true,
+	})
 	if nil != err {
 		log.Fatal("Unable to listen on UDP socket:", err)
-	}
-	err = lstnConn.SetReadBuffer(BUFFER_SIZE)
-	if nil != err {
-		log.Fatal("Unable to set Read Buffer:", err)
 	}
 
 	proxy.HostTUNDeviceName = ifce.Name()

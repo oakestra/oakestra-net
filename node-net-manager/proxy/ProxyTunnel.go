@@ -6,6 +6,8 @@ import (
 	"NetManager/logger"
 	"NetManager/mqtt"
 	"NetManager/proxy/iputils"
+	"context"
+	"crypto/tls"
 	"fmt"
 	"math/rand"
 	"net"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/quic-go/quic-go"
 	"github.com/songgao/water"
 )
 
@@ -36,9 +39,9 @@ type Configuration struct {
 
 type GoProxyTunnel struct {
 	environment         env.EnvironmentManager
-	listenConnection    *net.UDPConn
+	listenConnection    *quic.Conn
 	incomingChannel     chan incomingMessage
-	connectionBuffer    map[string]*net.UDPConn
+	connectionBuffer    map[string]*quic.Conn
 	randseed            *rand.Rand
 	ifce                *water.Interface
 	outgoingChannel     chan outgoingMessage
@@ -55,7 +58,7 @@ type GoProxyTunnel struct {
 	proxycache          ProxyCache
 	TunnelPort          int
 	bufferPort          int
-	udpwrite            sync.RWMutex
+	quicwrite           sync.RWMutex
 	tunwrite            sync.RWMutex
 	isListening         bool
 }
@@ -63,7 +66,7 @@ type GoProxyTunnel struct {
 // incoming message from UDP channel
 type incomingMessage struct {
 	content *[]byte
-	from    net.UDPAddr
+	from    string
 }
 
 // outgoing message from bridge
@@ -290,7 +293,7 @@ func (proxy *GoProxyTunnel) tunIngoingListen() {
 	readerror := make(chan error)
 
 	// async listener
-	go proxy.udpread(proxy.listenConnection, proxy.incomingChannel, readerror)
+	go proxy.quicRead(proxy.listenConnection, proxy.incomingChannel, readerror)
 
 	// async handler
 	go proxy.ingoingMessage()
@@ -302,14 +305,14 @@ func (proxy *GoProxyTunnel) tunIngoingListen() {
 		case stopmsg := <-proxy.stopChannel:
 			if stopmsg {
 				logger.DebugLogger().Println("Ingoing listener received stop message")
-				_ = proxy.listenConnection.Close()
+				_ = proxy.listenConnection.CloseWithError(0, "Listener received stop message")
 				proxy.isListening = false
 				proxy.finishChannel <- true
 				return
 			}
 		case errormsg := <-readerror:
 			proxy.errorChannel <- errormsg
-			// go udpread(proxy.listenConnection, readoutput, readerror)
+			// go quicRead(proxy.listenConnection, readoutput, readerror)
 		}
 	}
 }
@@ -339,11 +342,7 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	if dstHost.Equal(proxy.localIP) {
 		logger.InfoLogger().Println("Packet forwarded locally")
 		msg := incomingMessage{
-			from: net.UDPAddr{
-				IP:   proxy.localIP,
-				Port: 0,
-				Zone: "",
-			},
+			from:    proxy.localIP.String(),
 			content: &packetBytes,
 		}
 		proxy.incomingChannel <- msg
@@ -359,41 +358,41 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	}
 
 	// Check udp channel buffer to avoid creating a new channel
-	proxy.udpwrite.Lock()
+	proxy.quicwrite.Lock()
 	con, exist := proxy.connectionBuffer[hoststring]
-	proxy.udpwrite.Unlock()
+	proxy.quicwrite.Unlock()
 	// TODO: flush connection buffer by time to time
 	if !exist {
 		logger.DebugLogger().Println("Establishing a new connection to node ", hoststring)
-		connection, err := proxy.createUDPChannel(hoststring)
+		connection, err := proxy.createQUICChannel(hoststring)
 		if nil != err {
 			return
 		}
-		_ = connection.SetWriteBuffer(BUFFER_SIZE)
-		proxy.udpwrite.Lock()
+
+		proxy.quicwrite.Lock()
 		proxy.connectionBuffer[hoststring] = connection
-		proxy.udpwrite.Unlock()
+		proxy.quicwrite.Unlock()
 		con = connection
 	}
 
 	// send via UDP channel
-	proxy.udpwrite.Lock()
+	proxy.quicwrite.Lock()
 	logger.DebugLogger().Printf("Write UDP: Local=%s Remote=%s",
 		(*con).LocalAddr().String(),
 		(*con).RemoteAddr().String(),
 	)
-	_, _, err := (*con).WriteMsgUDP(packetBytes, nil, nil)
-	proxy.udpwrite.Unlock()
+	err := (*con).SendDatagram(packetBytes)
+	proxy.quicwrite.Unlock()
 	if err != nil {
-		_ = (*con).Close()
+		_ = (*con).CloseWithError(0, err.Error())
 		logger.ErrorLogger().Println("Could not write UDP message", err)
-		connection, err := proxy.createUDPChannel(hoststring)
+		connection, err := proxy.createQUICChannel(hoststring)
 		if nil != err {
 			return
 		}
-		proxy.udpwrite.Lock()
+		proxy.quicwrite.Lock()
 		proxy.connectionBuffer[hoststring] = connection
-		proxy.udpwrite.Unlock()
+		proxy.quicwrite.Unlock()
 		// Try again
 		attemptNumber++
 		proxy.forward(dstHost, dstPort, packet, attemptNumber)
@@ -401,27 +400,27 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	logger.DebugLogger().Printf("Successfully sent packet via UDP to %s", con.RemoteAddr().String())
 }
 
-func (proxy *GoProxyTunnel) createUDPChannel(hoststring string) (*net.UDPConn, error) {
-	raddr, err := net.ResolveUDPAddr("udp", hoststring)
+func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, error) {
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"quic-proxy"},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := quic.DialAddr(ctx, hoststring, tlsConf, &quic.Config{
+		HandshakeIdleTimeout: 5 * time.Second,
+		MaxIdleTimeout:       15 * time.Second,
+		EnableDatagrams:      true,
+	})
+
 	if err != nil {
-		logger.ErrorLogger().Println("Unable to resolve remote addr:", err)
+		logger.ErrorLogger().Println("Unable to connect to remote addr via QUIC:", err)
+		// Initiate NAT Traversal
 		return nil, err
 	}
-	connection, err := net.DialUDP("udp", nil, raddr)
-	if err != nil {
-		logger.ErrorLogger().Println("Unable to connect to remote addr:", err)
-		// remote destination could be behind NAT
-		connection, err = proxy.initiateNatTraversal(raddr)
-		if err != nil {
-			return nil, err
-		}
-	}
-	err = connection.SetWriteBuffer(BUFFER_SIZE)
-	if nil != err {
-		logger.ErrorLogger().Println("Buffer error:", err)
-		return nil, err
-	}
-	return connection, nil
+	return conn, nil
 }
 
 func (proxy *GoProxyTunnel) initiateNatTraversal(raddr *net.UDPAddr) (*net.UDPConn, error) {
@@ -469,24 +468,35 @@ func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- outgoing
 	}
 }
 
-// read output from an UDP connection and wrap the read operation with a channel
+// read output from QUIC connection and wrap the read operation with a channel
 // out channel gives back the byte array of the output
 // errchannel is the channel where in case of error the error is routed
-func (proxy *GoProxyTunnel) udpread(conn *net.UDPConn, out chan<- incomingMessage, errchannel chan<- error) {
-	buffer := make([]byte, BUFFER_SIZE)
+func (proxy *GoProxyTunnel) quicRead(conn *quic.Conn, out chan<- incomingMessage, errchannel chan<- error) {
 	for {
-		packet := buffer
-		n, from, err := conn.ReadFromUDP(packet)
+		stream, err := conn.AcceptStream(context.Background())
 		if err != nil {
 			errchannel <- err
-		} else {
-			res := make([]byte, n)
-			copy(res, buffer[:n])
-			out <- incomingMessage{
-				from:    *from,
-				content: &res,
-			}
+			continue
 		}
+
+		go func(s *quic.Stream) {
+			buffer := make([]byte, BUFFER_SIZE)
+			for {
+				n, err := s.Read(buffer)
+				if err != nil {
+					errchannel <- err
+					return
+				}
+
+				res := make([]byte, n)
+				copy(res, buffer[:n])
+
+				out <- incomingMessage{
+					from:    conn.RemoteAddr().String(),
+					content: &res,
+				}
+			}
+		}(stream)
 	}
 }
 
