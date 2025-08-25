@@ -472,30 +472,19 @@ func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- outgoing
 // errchannel is the channel where in case of error the error is routed
 func (proxy *GoProxyTunnel) quicRead(conn *quic.Conn, out chan<- incomingMessage, errchannel chan<- error) {
 	for {
-		stream, err := conn.AcceptStream(context.Background())
+		msg, err := conn.ReceiveDatagram(context.Background())
 		if err != nil {
 			errchannel <- err
 			continue
 		}
 
-		go func(s *quic.Stream) {
-			buffer := make([]byte, BUFFER_SIZE)
-			for {
-				n, err := s.Read(buffer)
-				if err != nil {
-					errchannel <- err
-					return
-				}
+		res := make([]byte, len(msg))
+		copy(res, msg)
 
-				res := make([]byte, n)
-				copy(res, buffer[:n])
-
-				out <- incomingMessage{
-					from:    conn.RemoteAddr().String(),
-					content: &res,
-				}
-			}
-		}(stream)
+		out <- incomingMessage{
+			from:    conn.RemoteAddr().String(),
+			content: &res,
+		}
 	}
 }
 
