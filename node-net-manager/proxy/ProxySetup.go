@@ -204,14 +204,6 @@ func (proxy *GoProxyTunnel) createTun() {
 	proxy.HostTUNDeviceName = ifce.Name()
 	proxy.ifce = ifce
 
-	// accept first connection synchronously
-	firstConn, err := lstnConn.Accept(context.Background())
-	if err != nil {
-		log.Fatal("First QUIC accept failed:", err)
-	}
-	proxy.listenConnection = firstConn
-
-	// launch background accept loop for future connections
 	go func() {
 		for {
 			sess, err := lstnConn.Accept(context.Background())
