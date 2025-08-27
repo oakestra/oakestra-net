@@ -457,6 +457,7 @@ func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- outgoing
 	buffer := make([]byte, BUFFER_SIZE)
 	for {
 		n, err := ifce.Read(buffer)
+		logger.DebugLogger().Printf("Read from iface: %s", string(buffer[:n]))
 		if err != nil {
 			errchannel <- err
 		} else {
