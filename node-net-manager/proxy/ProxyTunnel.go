@@ -407,7 +407,7 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 		NextProtos:         []string{"quic-proxy"},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	conn, err := quic.DialAddr(ctx, hoststring, tlsConf, &quic.Config{
