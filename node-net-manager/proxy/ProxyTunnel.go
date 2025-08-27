@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -411,23 +410,26 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 	defer cancel()
 
 	conn, err := quic.DialAddr(ctx, hoststring, tlsConf, &quic.Config{
-		HandshakeIdleTimeout: 2 * time.Minute,
+		HandshakeIdleTimeout: 5 * time.Second,
 		MaxIdleTimeout:       2 * time.Minute,
 		EnableDatagrams:      true,
 	})
 
 	if err != nil {
-		logger.ErrorLogger().Println("Unable to connect to remote addr via QUIC:", err)
-		return nil, err
+		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %s. Attempting NAT Traversal", err)
+		conn, err = proxy.initiateNatTraversal(hoststring)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	logger.DebugLogger().Println("Successfully connected to remote addr via QUIC")
 	return conn, nil
 }
 
-func (proxy *GoProxyTunnel) initiateNatTraversal(raddr *net.UDPAddr) (*net.UDPConn, error) {
+func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn, error) {
 	// send to cluster service manager
-	err := mqtt.RequestNATTraversal(raddr.IP.String(), strconv.Itoa(raddr.Port))
+	err := mqtt.RequestNATTraversal(hoststring)
 	if err != nil {
 		logger.ErrorLogger().Println("Unable to request nat traversal:", err)
 		return nil, err
@@ -438,16 +440,27 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(raddr *net.UDPAddr) (*net.UDPCo
 	// ToDo: Let's try without this
 
 	// repeat up to 5 times with slight delay between each attempt
-	for i := 0; i < 5; i++ {
-		connection, err := net.DialUDP("udp", nil, raddr)
-		if err != nil {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		return connection, nil
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"quic-proxy"},
 	}
 
-	return nil, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	var conn *quic.Conn
+	for i := 0; i < 5; i++ {
+		conn, err = quic.DialAddr(ctx, hoststring, tlsConf, &quic.Config{
+			HandshakeIdleTimeout: 5 * time.Second,
+			MaxIdleTimeout:       2 * time.Minute,
+			EnableDatagrams:      true,
+		})
+		if err == nil {
+			return conn, nil
+		}
+	}
+
+	return nil, err
 }
 
 // read output from an interface and wrap the read operation with a channel
@@ -457,7 +470,6 @@ func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- outgoing
 	buffer := make([]byte, BUFFER_SIZE)
 	for {
 		n, err := ifce.Read(buffer)
-		logger.DebugLogger().Printf("Read from iface: %16b", buffer[:n])
 		if err != nil {
 			errchannel <- err
 		} else {

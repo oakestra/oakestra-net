@@ -1,13 +1,15 @@
 package mqtt
 
 import (
+	"context"
+	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/quic-go/quic-go"
 )
 
 var subnetworkResponseChannel chan mqttSubnetworkResponse
@@ -30,10 +32,8 @@ type mqttDeployNotification struct {
 }
 
 type natTraversalPayload struct {
-	SrcIp   string `json:"src_ip"`
-	SrcPort string `json:"src_port"`
-	DstIp   string `json:"dst_ip"`
-	DstPort string `json:"dst_port"`
+	Src string `json:"src"`
+	Dst string `json:"dst"`
 }
 
 func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
@@ -48,8 +48,8 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 }
 
 // RequestNATTraversal sends request to the cluster to facilitate NAT traversal
-func RequestNATTraversal(dstIp string, dstPort string) error {
-	payload := natTraversalPayload{DstIp: dstIp, DstPort: dstPort}
+func RequestNATTraversal(hoststring string) error {
+	payload := natTraversalPayload{Src: hoststring}
 	req, err := json.Marshal(&payload)
 	if err != nil {
 		return err
@@ -70,17 +70,24 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		return
 	}
 
-	// create udp channel
-	hoststring := fmt.Sprintf("%s:%s", responseStruct.DstIp, responseStruct.DstPort)
-	raddr, err := net.ResolveUDPAddr("udp", hoststring)
-
 	go func() {
 		// repeat up to 5 times with slight delay between each attempt
+		tlsConf := &tls.Config{
+			InsecureSkipVerify: true,
+			NextProtos:         []string{"quic-proxy"},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
 		for i := 0; i < 5; i++ {
-			_, err := net.DialUDP("udp", nil, raddr)
-			if err != nil {
-				time.Sleep(10 * time.Millisecond)
-				continue
+			_, err = quic.DialAddr(ctx, responseStruct.Dst, tlsConf, &quic.Config{
+				HandshakeIdleTimeout: 5 * time.Second,
+				MaxIdleTimeout:       2 * time.Minute,
+				EnableDatagrams:      true,
+			})
+			if err == nil {
+				return
 			}
 		}
 	}()
