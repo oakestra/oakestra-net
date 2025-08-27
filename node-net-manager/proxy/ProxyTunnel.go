@@ -418,6 +418,8 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 		logger.ErrorLogger().Println("Unable to connect to remote addr via QUIC:", err)
 		return nil, err
 	}
+
+	logger.DebugLogger().Println("Successfully connected to remote addr via QUIC")
 	return conn, nil
 }
 
