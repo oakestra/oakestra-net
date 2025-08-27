@@ -87,9 +87,8 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 			}
 			logger.DebugLogger().Printf("Outgoing packet:\t\t\t%s ---> %s\n", ip.GetSrcIP().String(), ip.GetDestIP().String())
 
-			// continue only if the packet is udp or tcp, otherwise just drop it
 			if prot == nil {
-				logger.DebugLogger().Println("Neither TCP, nor UDP packet received. Dropping it.")
+				logger.DebugLogger().Println("Packet without protocol header received. Dropping it.")
 				continue
 			}
 			// proxyConversion
@@ -397,7 +396,7 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 		attemptNumber++
 		proxy.forward(dstHost, dstPort, packet, attemptNumber)
 	}
-	logger.DebugLogger().Printf("Successfully sent packet via UDP to %s", con.RemoteAddr().String())
+	logger.DebugLogger().Printf("Successfully sent packet via QUIC to %s", con.RemoteAddr().String())
 }
 
 func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, error) {
@@ -475,11 +474,15 @@ func (proxy *GoProxyTunnel) quicRead(conn *quic.Conn, out chan<- incomingMessage
 		if conn == nil {
 			continue
 		}
+
 		msg, err := conn.ReceiveDatagram(context.Background())
 		if err != nil {
+			logger.ErrorLogger().Println("Unable to receive datagram:", err)
 			errchannel <- err
 			continue
 		}
+
+		logger.DebugLogger().Println("Received Datagram: %s", string(msg))
 
 		res := make([]byte, len(msg))
 		copy(res, msg)
