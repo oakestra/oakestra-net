@@ -80,7 +80,7 @@ func (proxy *GoProxyTunnel) outgoingMessage() {
 		select {
 		case msg := <-proxy.outgoingChannel:
 			// logger.DebugLogger().Println("outgoingChannelSize: ", len(proxy.outgoingChannel))
-			// logger.DebugLogger().Printf("Msg outgoingChannel: %x\n", (*msg.content))
+			logger.DebugLogger().Printf("Msg outgoingChannel: %x\n", (*msg.content))
 			ip, prot := decodePacket(*msg.content)
 			if ip == nil {
 				continue
@@ -334,6 +334,8 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 	if attemptNumber > 10 {
 		return
 	}
+
+	logger.DebugLogger().Printf("Forwarding packet received from %v to %v", dstHost, dstPort)
 
 	packetBytes := packetToByte(packet)
 
