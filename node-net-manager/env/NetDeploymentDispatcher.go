@@ -5,6 +5,7 @@ import "net"
 const (
 	CONTAINER_RUNTIME = "container"
 	UNIKERNEL_RUNTIME = "unikernel"
+	WASM_RUNTIME      = "wasm"
 )
 
 type NetDeploymentInterface interface {
@@ -17,6 +18,8 @@ func GetNetDeployment(handler string) NetDeploymentInterface {
 		return GetContainerNetDeployment()
 	case UNIKERNEL_RUNTIME:
 		return GetUnikernelNetDeployment()
+	case WASM_RUNTIME:
+		return GetWasmNetDeployment()
 	}
 	return nil
 }
