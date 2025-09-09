@@ -56,7 +56,7 @@ func RequestNATTraversal(hoststring string) error {
 		return err
 	}
 	go func() {
-		_ = GetNetMqttClient().PublishToBroker("nattraversal", string(req))
+		_ = GetNetMqttClient().PublishToBroker("nattraversal/request", string(req))
 	}()
 	return nil
 }
