@@ -150,7 +150,7 @@ def _tablequery_handler(client_id, payload):
 def _nattraversal_handler(client_id, payload):
     app.logger.debug("Received nat traversal request with payload: %s", payload.get("dst"))
     # forward request to relevant nodes
-    dst = payload.get("dst").split(':')
+    dst = payload.get("dst").rsplit(':', 1)
     dstId = mongo_find_worker_id_by_host_ip_and_port(dst[0], dst[1])
 
     # find ip and port of src
