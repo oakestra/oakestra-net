@@ -20,8 +20,8 @@ def handle_connect(client, userdata, flags, rc):
 
 def handle_mqtt_message(client, userdata, message):
     data = dict(topic=message.topic, payload=message.payload.decode())
-    logging.debug("MQTT - Received from worker: ")
-    logging.debug(data)
+    app.logger.debug("MQTT - Received from worker: ")
+    app.logger.debug(data)
 
     topic = data["topic"]
 
@@ -41,22 +41,22 @@ def handle_mqtt_message(client, userdata, message):
     payload = json.loads(data["payload"])
 
     if re_job_deployment_topic is not None:
-        logging.debug("JOB-DEPLOYMENT-UPDATE")
+        app.logger.debug("JOB-DEPLOYMENT-UPDATE")
         _deployment_handler(client_id, payload)
     if re_job_undeployment_topic is not None:
-        logging.debug("JOB-UNDEPLOYMENT-UPDATE")
+        app.logger.debug("JOB-UNDEPLOYMENT-UPDATE")
         _undeployment_handler(client_id, payload)
     if re_job_tablequery_topic is not None:
-        logging.debug("JOB-TABLEQUERY-REQUEST")
+        app.logger.debug("JOB-TABLEQUERY-REQUEST")
         _tablequery_handler(client_id, payload)
     if re_job_nattraversal_topic is not None:
-        logging.debug("JOB-NATTRAVERSAL-REQUEST")
+        app.logger.debug("JOB-NATTRAVERSAL-REQUEST")
         _nattraversal_handler(client_id, payload)
     if re_job_subnet_topic is not None:
-        logging.debug("JOB-SUBNET-REQUEST")
+        app.logger.debug("JOB-SUBNET-REQUEST")
         _subnet_handler(client_id, payload)
     if re_job_interest_remove is not None:
-        logging.debug("JOB-INTEREST-REMOVE")
+        app.logger.debug("JOB-INTEREST-REMOVE")
         _interest_remove_handler(client_id, payload)
 
 
@@ -135,7 +135,7 @@ def _tablequery_handler(client_id, payload):
             query_key = str(serviceName)
             instances, siplist = resolution.service_resolution(serviceName)
     except Exception as e:
-        logging.error(e)
+        app.logger.error(e)
         instances = []
         siplist = []
 
@@ -148,8 +148,10 @@ def _tablequery_handler(client_id, payload):
     mqtt_publish_tablequery_result(client_id, result)
 
 def _nattraversal_handler(client_id, payload):
+    app.logger.debug("Received nat traversal request with payload: ", payload.get("dst"))
     # forward request to relevant nodes
-    dstId = mongo_find_worker_id_by_host_ip_and_port(payload.get("dst_ip"), payload.get("dst_port"))
+    dst = payload.get("dst").split(':')
+    dstId = mongo_find_worker_id_by_host_ip_and_port(dst[0], dst[1])
 
     # find ip and port of src
     ip, port = mongo_find_worker_ip_and_port_by_id(client_id)
@@ -176,7 +178,7 @@ def _subnet_handler(client_id, payload):
             # associate new subnetwork to the node
             addr = root_service_manager_get_subnet()
             if addr is None:
-                logging.error(
+                app.logger.error(
                     "Root service manager responded with an invalid subnetwork: "
                     + str(addr)
                 )
@@ -184,7 +186,7 @@ def _subnet_handler(client_id, payload):
             mongo_find_node_by_id_and_update_subnetwork(client_id, addr[0], addr[1])
             mqtt_publish_subnetwork_result(client_id, {"address": addr[0], "addressv6": addr[1]})
         except Exception as e:
-            logging.error(e)
+            app.logger.error(e)
     elif method == 'DELETE':
         # remove subnetwork from node
         pass
