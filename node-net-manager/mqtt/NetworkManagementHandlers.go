@@ -89,6 +89,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 				EnableDatagrams:      true,
 			})
 			if err == nil {
+				log.Println("NAT Traversal succeeded")
 				return
 			}
 		}

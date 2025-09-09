@@ -456,6 +456,7 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn,
 			EnableDatagrams:      true,
 		})
 		if err == nil {
+			logger.DebugLogger().Println("Nat traversal succeeded")
 			return conn, nil
 		}
 	}
