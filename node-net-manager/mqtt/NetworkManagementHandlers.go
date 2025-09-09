@@ -1,6 +1,7 @@
 package mqtt
 
 import (
+	"NetManager/logger"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -49,7 +50,7 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 // RequestNATTraversal sends request to the cluster to facilitate NAT traversal
 func RequestNATTraversal(hoststring string) error {
-	payload := natTraversalPayload{Src: hoststring}
+	payload := natTraversalPayload{Dst: hoststring}
 	req, err := json.Marshal(&payload)
 	if err != nil {
 		return err
@@ -62,6 +63,7 @@ func RequestNATTraversal(hoststring string) error {
 
 // natTraversalMqttHandler receives a nat traversal request from the cluster
 func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
+	logger.DebugLogger().Println("Received NAT Traversal request")
 	// msg is natTraversalPayload
 	responseStruct := natTraversalPayload{}
 	err := json.Unmarshal(msg.Payload(), &responseStruct)
