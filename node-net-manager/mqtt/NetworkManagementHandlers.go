@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -72,28 +74,55 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		return
 	}
 
-	go func() {
-		// repeat up to 5 times with slight delay between each attempt
-		tlsConf := &tls.Config{
-			InsecureSkipVerify: true,
-			NextProtos:         []string{"quic-proxy"},
-		}
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"quic-proxy"},
+	}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
+	quicConf := &quic.Config{
+		HandshakeIdleTimeout: 5 * time.Second,
+		MaxIdleTimeout:       2 * time.Minute,
+		EnableDatagrams:      true,
+	}
 
-		for i := 0; i < 5; i++ {
-			_, err = quic.DialAddr(ctx, responseStruct.Dst, tlsConf, &quic.Config{
-				HandshakeIdleTimeout: 5 * time.Second,
-				MaxIdleTimeout:       2 * time.Minute,
-				EnableDatagrams:      true,
-			})
-			if err == nil {
-				log.Println("NAT Traversal succeeded")
-				return
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	var _ *quic.Conn
+
+	// find port
+	idx := strings.LastIndex(responseStruct.Src, ":")
+	srcPort := responseStruct.Src[:idx]
+
+	// start a listener
+	listener, err := quic.ListenAddr(fmt.Sprintf(":%v", srcPort), tlsConf, quicConf)
+	if err != nil {
+		logger.ErrorLogger().Println("Unable to start listener for NAT traversal:", err)
+	} else {
+		go func() {
+			logger.DebugLogger().Println("Listening for inbound NAT traversal")
+			acceptConn, acceptErr := listener.Accept(ctx)
+			if acceptErr == nil {
+				logger.DebugLogger().Println("Inbound NAT traversal succeeded")
+				_ = acceptConn
+				cancel()
+			} else {
+				logger.ErrorLogger().Println("Listener accept error:", acceptErr)
 			}
+		}()
+	}
+
+	// repeat up to 5 times with small delay between attempts
+	for i := 0; i < 5; i++ {
+		_, err = quic.DialAddr(ctx, responseStruct.Dst, tlsConf, quicConf)
+		if err == nil {
+			logger.DebugLogger().Println("Nat traversal succeeded")
+			return //conn, nil
 		}
-	}()
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return //nil, err
 }
 
 /*Request a subnetwork to the cluster using the mqtt broker*/

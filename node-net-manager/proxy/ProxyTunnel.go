@@ -439,26 +439,52 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn,
 	// use response channel
 	// ToDo: Let's try without this
 
-	// repeat up to 5 times with slight delay between each attempt
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-proxy"},
+	}
+
+	quicConf := &quic.Config{
+		HandshakeIdleTimeout: 5 * time.Second,
+		MaxIdleTimeout:       2 * time.Minute,
+		EnableDatagrams:      true,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	var conn *quic.Conn
+
+	// Start a listener
+	listener, err := quic.ListenAddr(fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, quicConf)
+	if err != nil {
+		logger.ErrorLogger().Println("Unable to start listener for NAT traversal:", err)
+	} else {
+		go func() {
+			logger.DebugLogger().Println("Listening for inbound NAT traversal")
+			acceptConn, acceptErr := listener.Accept(ctx)
+			if acceptErr == nil {
+				logger.DebugLogger().Println("Inbound NAT traversal succeeded")
+				conn = acceptConn
+				cancel()
+			} else {
+				logger.ErrorLogger().Println("Listener accept error:", acceptErr)
+			}
+		}()
+	}
+
+	// repeat up to 5 times with small delay between attempts
 	for i := 0; i < 5; i++ {
-		conn, err = quic.DialAddr(ctx, hoststring, tlsConf, &quic.Config{
-			HandshakeIdleTimeout: 5 * time.Second,
-			MaxIdleTimeout:       2 * time.Minute,
-			EnableDatagrams:      true,
-		})
+		conn, err = quic.DialAddr(ctx, hoststring, tlsConf, quicConf)
 		if err == nil {
 			logger.DebugLogger().Println("Nat traversal succeeded")
 			return conn, nil
 		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	if conn != nil {
+		return conn, nil
 	}
 
 	return nil, err
