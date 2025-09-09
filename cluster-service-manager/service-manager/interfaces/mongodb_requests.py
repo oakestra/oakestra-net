@@ -105,12 +105,17 @@ def mongo_update_job(job):
 # finds worker id by host ip and port
 def mongo_find_worker_id_by_host_ip_and_port(host_ip, host_port):
     job = mongo_jobs.db.jobs.find_one({
-        'instance_list': {'$elem_match': {'host_ip': host_ip, 'host_port': host_port}}
+        'instance_list': {
+            '$elemMatch': {'host_ip': host_ip, 'host_port': host_port}
+        }
     })
 
-    for k, v in bson.loads(job)['instance_list'].items():
-        if k == 'worker_id':
-            return v
+    if not job:
+        return None
+
+    for inst in job.get("instance_list", []):
+        if "worker_id" in inst:
+            return inst["worker_id"]
 
     return None
 
