@@ -67,6 +67,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	// msg is natTraversalPayload
 	responseStruct := natTraversalPayload{}
 	err := json.Unmarshal(msg.Payload(), &responseStruct)
+	logger.DebugLogger().Printf("NAT Traversal request received: %v", responseStruct)
 	if err != nil {
 		log.Println("ERROR - Invalid nat traversal response")
 		return
