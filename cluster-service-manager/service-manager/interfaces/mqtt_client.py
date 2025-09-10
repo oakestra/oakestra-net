@@ -163,16 +163,12 @@ def _nattraversal_handler(client_id, payload):
 
     # tell src to connect to dst and tell dst to connect to src
     mqtt_publish_nat_traversal_result(dstId, {
-        "dst_ip": ip,
-        "dst_port": port,
-        "src_ip": payload.get("dst_ip"),
-        "src_port": payload.get("dst_port"),
+        "dst": ip + ":" + port,
+        "src": payload.get("dst"),
     })
     mqtt_publish_nat_traversal_result(client_id, {
-        "dst_ip": payload.get("dst_ip"),
-        "dst_port": payload.get("dst_port"),
-        "src_ip": ip,
-        "src_port": port,
+        "src": ip + ":" + port,
+        "dst": payload.get("dst"),
     })
 
 
