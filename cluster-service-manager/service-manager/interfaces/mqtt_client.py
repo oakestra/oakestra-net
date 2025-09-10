@@ -166,10 +166,6 @@ def _nattraversal_handler(client_id, payload):
         "dst": ip + ":" + str(port),
         "src": payload.get("dst"),
     })
-    mqtt_publish_nat_traversal_result(client_id, {
-        "src": ip + ":" + str(port),
-        "dst": payload.get("dst"),
-    })
 
 
 def _subnet_handler(client_id, payload):

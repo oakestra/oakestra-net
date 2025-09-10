@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -66,11 +68,24 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	logger.DebugLogger().Println("Received NAT Traversal request")
 	// msg is natTraversalPayload
 	responseStruct := natTraversalPayload{}
-	err := json.Unmarshal(msg.Payload(), &responseStruct)
 	logger.DebugLogger().Printf("NAT Traversal request received: %v", responseStruct)
+
+	err := json.Unmarshal(msg.Payload(), &responseStruct)
 	if err != nil {
 		log.Println("ERROR - Invalid nat traversal response")
 		return
+	}
+
+	idx := strings.LastIndex(responseStruct.Dst, ":")
+	dstHost := responseStruct.Dst[:idx]
+	dstPort := responseStruct.Dst[idx+1:]
+
+	// Format hoststring with [] if ipv6
+	var hoststring string
+	if strings.Contains(dstHost, ":") {
+		hoststring = fmt.Sprintf("[%s]:%s", dstHost, dstPort)
+	} else {
+		hoststring = fmt.Sprintf("%s:%s", dstHost, dstPort)
 	}
 
 	tlsConf := &tls.Config{
@@ -89,7 +104,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 	// repeat up to 5 times with small delay between attempts
 	for i := 0; i < 5; i++ {
-		_, err = quic.DialAddr(ctx, responseStruct.Dst, tlsConf, quicConf)
+		_, err = quic.DialAddr(ctx, hoststring, tlsConf, quicConf)
 		if err == nil {
 			logger.DebugLogger().Println("Nat traversal succeeded")
 			return
