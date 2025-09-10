@@ -69,13 +69,12 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	// msg is natTraversalPayload
 	responseStruct := natTraversalPayload{}
 
-	logger.DebugLogger().Printf("Raw payload bytes: %s", string(msg.Payload()))
+	logger.DebugLogger().Printf("NAT traversal request received: %s", string(msg.Payload()))
 	err := json.Unmarshal(msg.Payload(), &responseStruct)
 	if err != nil {
 		log.Println("ERROR - Invalid nat traversal response")
 		return
 	}
-	logger.DebugLogger().Printf("NAT Traversal request received: %v", responseStruct)
 
 	idx := strings.LastIndex(responseStruct.Dst, ":")
 	dstHost := responseStruct.Dst[:idx]
@@ -88,6 +87,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	} else {
 		hoststring = fmt.Sprintf("%s:%s", dstHost, dstPort)
 	}
+	logger.DebugLogger().Printf("Attempting NAT traversal with host address %s", hoststring)
 
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
