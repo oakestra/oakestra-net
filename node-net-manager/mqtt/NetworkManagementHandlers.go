@@ -66,6 +66,7 @@ func RequestNATTraversal(hoststring string) error {
 // natTraversalMqttHandler receives a nat traversal request from the cluster
 func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	logger.DebugLogger().Println("Received NAT Traversal request")
+	logger.DebugLogger().Printf("Raw payload bytes: %s", string(msg.Payload()))
 	// msg is natTraversalPayload
 	responseStruct := natTraversalPayload{}
 	logger.DebugLogger().Printf("NAT Traversal request received: %v", responseStruct)
