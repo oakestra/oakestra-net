@@ -38,7 +38,7 @@ type Configuration struct {
 
 type GoProxyTunnel struct {
 	environment         env.EnvironmentManager
-	listenConnection    *quic.Conn
+	listenConnections   map[string]*quic.Conn
 	incomingChannel     chan incomingMessage
 	connectionBuffer    map[string]*quic.Conn
 	randseed            *rand.Rand
@@ -59,6 +59,7 @@ type GoProxyTunnel struct {
 	bufferPort          int
 	quicwrite           sync.RWMutex
 	tunwrite            sync.RWMutex
+	connwrite           sync.RWMutex
 	isListening         bool
 }
 
@@ -288,10 +289,6 @@ func (proxy *GoProxyTunnel) tunOutgoingListen() {
 // when the channels finish listening a "true" is sent back to the finish channel
 // in case of fatal error they are routed back to the err channel
 func (proxy *GoProxyTunnel) tunIngoingListen() {
-	readerror := make(chan error)
-
-	// async listener
-	go proxy.quicRead(proxy.listenConnection, proxy.incomingChannel, readerror)
 
 	// async handler
 	go proxy.ingoingMessage()
@@ -303,14 +300,15 @@ func (proxy *GoProxyTunnel) tunIngoingListen() {
 		case stopmsg := <-proxy.stopChannel:
 			if stopmsg {
 				logger.DebugLogger().Println("Ingoing listener received stop message")
-				_ = proxy.listenConnection.CloseWithError(0, "Listener received stop message")
+				for _, conn := range proxy.listenConnections {
+					_ = conn.CloseWithError(0, "Listener received stop message")
+				}
 				proxy.isListening = false
 				proxy.finishChannel <- true
 				return
 			}
-		case errormsg := <-readerror:
-			proxy.errorChannel <- errormsg
-			// go quicRead(proxy.listenConnection, readoutput, readerror)
+		case _ = <-proxy.errorChannel:
+
 		}
 	}
 }
@@ -455,24 +453,6 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn,
 
 	var conn *quic.Conn
 
-	// Start a listener
-	listener, err := quic.ListenAddr(fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, quicConf)
-	if err != nil {
-		logger.ErrorLogger().Println("Unable to start listener for NAT traversal:", err)
-	} else {
-		go func() {
-			logger.DebugLogger().Println("Listening for inbound NAT traversal")
-			acceptConn, acceptErr := listener.Accept(ctx)
-			if acceptErr == nil {
-				logger.DebugLogger().Println("Inbound NAT traversal succeeded")
-				conn = acceptConn
-				cancel()
-			} else {
-				logger.ErrorLogger().Println("Listener accept error:", acceptErr)
-			}
-		}()
-	}
-
 	// repeat up to 5 times with small delay between attempts
 	for i := 0; i < 5; i++ {
 		conn, err = quic.DialAddr(ctx, hoststring, tlsConf, quicConf)
@@ -521,7 +501,11 @@ func (proxy *GoProxyTunnel) quicRead(conn *quic.Conn, out chan<- incomingMessage
 
 		msg, err := conn.ReceiveDatagram(context.Background())
 		if err != nil {
-			logger.ErrorLogger().Println("Unable to receive datagram:", err)
+			proxy.connwrite.Lock()
+			delete(proxy.listenConnections, conn.RemoteAddr().String())
+			proxy.connwrite.Unlock()
+
+			logger.ErrorLogger().Printf("Unable to receive datagram: %s. Closing connection", err)
 			errchannel <- err
 			continue
 		}
