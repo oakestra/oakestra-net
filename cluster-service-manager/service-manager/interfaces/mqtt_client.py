@@ -160,6 +160,9 @@ def _nattraversal_handler(client_id, payload):
 
     # find ip and port of src
     ip, port = mongo_find_worker_ip_and_port_by_id(client_id)
+    if ip is None:
+        app.logger.error("Could not find ip of worker %s", dstId)
+        return
     app.logger.debug("Found ip and port %s:%d", ip, port)
 
     # tell src to connect to dst and tell dst to connect to src
