@@ -444,11 +444,11 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn,
 
 	quicConf := &quic.Config{
 		HandshakeIdleTimeout: 5 * time.Second,
-		MaxIdleTimeout:       2 * time.Minute,
+		MaxIdleTimeout:       30 * time.Second,
 		EnableDatagrams:      true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var conn *quic.Conn
@@ -460,6 +460,7 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn,
 			logger.DebugLogger().Println("Nat traversal succeeded")
 			return conn, nil
 		}
+		logger.DebugLogger().Println("Nat traversal failed:", err)
 		time.Sleep(500 * time.Millisecond)
 	}
 

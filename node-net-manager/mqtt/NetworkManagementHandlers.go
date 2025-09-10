@@ -79,11 +79,11 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 	quicConf := &quic.Config{
 		HandshakeIdleTimeout: 5 * time.Second,
-		MaxIdleTimeout:       2 * time.Minute,
+		MaxIdleTimeout:       30 * time.Second,
 		EnableDatagrams:      true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// repeat up to 5 times with small delay between attempts
@@ -93,6 +93,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 			logger.DebugLogger().Println("Nat traversal succeeded")
 			return
 		}
+		logger.DebugLogger().Println("Nat traversal failed", err)
 		time.Sleep(500 * time.Millisecond)
 	}
 
