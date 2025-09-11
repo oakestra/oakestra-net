@@ -151,19 +151,16 @@ def _nattraversal_handler(client_id, payload):
     app.logger.debug("Received nat traversal request with payload: %s", payload.get("dst"))
     # forward request to relevant nodes
     dst = payload.get("dst").rsplit(':', 1)
-    app.logger.debug("Looking for worker with host %s and port %s", dst[0], dst[1])
     dstId = mongo_find_worker_id_by_host_ip_and_port(dst[0].strip("[]"), int(dst[1]))
     if dstId is None:
         app.logger.error("Could not find worker with ip %s and port %s", dst[0], dst[1])
         return
-    app.logger.debug("Found dst id: %s", dstId)
 
     # find ip and port of src
     ip, port = mongo_find_worker_ip_and_port_by_id(client_id)
     if ip is None:
         app.logger.error("Could not find ip of worker %s", dstId)
         return
-    app.logger.debug("Found ip and port %s:%d", ip, port)
 
     # tell src to connect to dst and tell dst to connect to src
     mqtt_publish_nat_traversal_result(dstId, {
