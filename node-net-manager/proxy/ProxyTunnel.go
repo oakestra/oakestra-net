@@ -8,6 +8,7 @@ import (
 	"NetManager/proxy/iputils"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -440,61 +441,48 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 
 // getPublicHoststring returns the public ip and port by querying a STUN server
 func getPublicHoststring() (string, error) {
-	var lastErr error
-
-	for _, server := range stunServers {
-		logger.DebugLogger().Printf("Attempting to connect to server %v", server)
-		if lastErr != nil {
-			logger.DebugLogger().Printf("Connecting to server failed %v", lastErr)
-		}
-		u, err := stun.ParseURI(server)
+	for _, stunServer := range stunServers {
+		// parse a STUN URI
+		uri, err := stun.ParseURI(stunServer)
 		if err != nil {
-			lastErr = err
+			logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
 			continue
 		}
 
-		c, err := stun.DialURI(u, &stun.DialConfig{})
+		// connect to STUN server
+		conn, err := stun.DialURI(uri, &stun.DialConfig{})
 		if err != nil {
-			lastErr = err
+			logger.DebugLogger().Printf("Unable to connect to stun server %v: %v", stunServer, err)
 			continue
 		}
+
+		// building binding request with random transaction id.
+		message := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
 
 		var ip net.IP
 		var port int
-		var stunErr error
-
-		msg := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
-		err = c.Do(msg, func(res stun.Event) {
+		// sending request to STUN server, waiting for response message
+		err = conn.Do(message, func(res stun.Event) {
 			if res.Error != nil {
-				stunErr = res.Error
+				logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, res.Error)
 				return
 			}
-
+			// Decoding XOR-MAPPED-ADDRESS attribute from message.
 			var xorAddr stun.XORMappedAddress
 			if err := xorAddr.GetFrom(res.Message); err != nil {
-				stunErr = err
+				logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
 				return
 			}
-
 			ip = xorAddr.IP
 			port = xorAddr.Port
 		})
-
-		if stunErr != nil {
-			lastErr = stunErr
-			continue
-		}
 		if err != nil {
-			lastErr = err
+			logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
 			continue
 		}
-
-		if ip != nil && port != 0 {
-			return fmt.Sprintf("%s:%d", ip, port), nil
-		}
+		return fmt.Sprintf("%s:%d", ip, port), nil
 	}
-
-	return "", fmt.Errorf("all STUN servers failed, last error: %v", lastErr)
+	return "", errors.New("unable to find public host")
 }
 
 func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn, error) {
