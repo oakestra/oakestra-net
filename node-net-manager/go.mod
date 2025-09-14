@@ -9,6 +9,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.5.0
 	github.com/google/gopacket v1.1.19
 	github.com/gorilla/mux v1.8.1
+	github.com/pion/stun v0.6.1
 	github.com/quic-go/quic-go v0.54.0
 	github.com/sipcapture/heplify v1.66.7
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
@@ -24,6 +25,9 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/pion/dtls/v2 v2.2.7 // indirect
+	github.com/pion/logging v0.2.2 // indirect
+	github.com/pion/transport/v2 v2.2.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect

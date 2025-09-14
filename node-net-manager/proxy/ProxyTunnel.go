@@ -16,12 +16,14 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/pion/stun"
 	"github.com/quic-go/quic-go"
 	"github.com/songgao/water"
 )
 
 // const
-var BUFFER_SIZE = 64 * 1024
+const BufferSize = 64 * 1024
+const StunUri = "stun:stun.l.google.com:19302"
 
 // Config
 type Configuration struct {
@@ -425,17 +427,61 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 	return conn, nil
 }
 
+// getPublicHoststring returns the public ip and port by querying a STUN server
+func getPublicHoststring() (string, error) {
+	// Parse a STUN URI
+	u, err := stun.ParseURI(StunUri)
+	if err != nil {
+		return "", err
+	}
+
+	// Creating a "connection" to STUN server.
+	c, err := stun.DialURI(u, &stun.DialConfig{})
+	if err != nil {
+		return "", err
+	}
+
+	var ip net.IP
+	var port int
+
+	// Building binding request with random transaction id.
+	message := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
+	// Sending request to STUN server, waiting for response message.
+	err = c.Do(message, func(res stun.Event) {
+		if res.Error != nil {
+			panic(res.Error)
+		}
+		// Decoding XOR-MAPPED-ADDRESS attribute from message.
+		var xorAddr stun.XORMappedAddress
+		if err := xorAddr.GetFrom(res.Message); err != nil {
+			panic(err)
+		}
+		ip = xorAddr.IP
+		port = xorAddr.Port
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s:%d", ip, port), nil
+}
+
 func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn, error) {
+	// find public address
+	src, err := getPublicHoststring()
+	if err != nil {
+		logger.ErrorLogger().Printf("Unable to determine public hoststring: %v", err)
+		return nil, err
+	}
+
+	logger.DebugLogger().Printf("Found public hoststring: %s", src)
+
 	// send to cluster service manager
-	err := mqtt.RequestNATTraversal(hoststring)
+	err = mqtt.RequestNATTraversal(src, hoststring)
 	if err != nil {
 		logger.ErrorLogger().Println("Unable to request nat traversal:", err)
 		return nil, err
 	}
-
-	// wait for response and then retry connection
-	// use response channel
-	// ToDo: Let's try without this
 
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
@@ -475,7 +521,7 @@ func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn,
 // out channel gives back the byte array of the output
 // errchannel is the channel where in case of error the error is routed
 func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- outgoingMessage, errchannel chan<- error) {
-	buffer := make([]byte, BUFFER_SIZE)
+	buffer := make([]byte, BufferSize)
 	for {
 		n, err := ifce.Read(buffer)
 		if err != nil {
