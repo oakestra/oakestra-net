@@ -442,6 +442,7 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 // getPublicHoststring returns the public ip and port by querying a STUN server
 func getPublicHoststring() (string, error) {
 	for _, stunServer := range stunServers {
+		logger.DebugLogger().Println("Getting public host string from STUN server", stunServer)
 		// parse a STUN URI
 		uri, err := stun.ParseURI(stunServer)
 		if err != nil {
