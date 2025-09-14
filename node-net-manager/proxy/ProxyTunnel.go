@@ -444,6 +444,9 @@ func getPublicHoststring() (string, error) {
 
 	for _, server := range stunServers {
 		logger.DebugLogger().Printf("Attempting to connect to server %v", server)
+		if lastErr != nil {
+			logger.DebugLogger().Printf("Connecting to server failed %v", lastErr)
+		}
 		u, err := stun.ParseURI(server)
 		if err != nil {
 			lastErr = err
