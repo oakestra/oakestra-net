@@ -443,6 +443,7 @@ func getPublicHoststring() (string, error) {
 	var lastErr error
 
 	for _, server := range stunServers {
+		logger.DebugLogger().Printf("Attempting to connect to server %v", server)
 		u, err := stun.ParseURI(server)
 		if err != nil {
 			lastErr = err
