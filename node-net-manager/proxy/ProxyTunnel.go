@@ -443,22 +443,28 @@ func getPublicHoststring() (string, error) {
 
 	var ip net.IP
 	var port int
+	var stunErr error
 
 	// Building binding request with random transaction id.
 	message := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
 	// Sending request to STUN server, waiting for response message.
 	err = c.Do(message, func(res stun.Event) {
 		if res.Error != nil {
-			panic(res.Error)
+			stunErr = res.Error
+			return
 		}
 		// Decoding XOR-MAPPED-ADDRESS attribute from message.
 		var xorAddr stun.XORMappedAddress
 		if err := xorAddr.GetFrom(res.Message); err != nil {
-			panic(err)
+			stunErr = err
+			return
 		}
 		ip = xorAddr.IP
 		port = xorAddr.Port
 	})
+	if stunErr != nil {
+		return "", stunErr
+	}
 	if err != nil {
 		return "", err
 	}
