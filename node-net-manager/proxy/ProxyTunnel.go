@@ -23,7 +23,18 @@ import (
 
 // const
 const BufferSize = 64 * 1024
-const StunUri = "stun:stun.l.google.com:19302"
+
+var stunServers = []string{
+	"stun.l.google.com:19302",
+	"stun:stun1.l.google.com:19302",
+	"stun:stun2.l.google.com:19302",
+	"stun:stun3.l.google.com:19302",
+	"stun:stun4.l.google.com:19302",
+	"stun:stun.cloudflare.com:3478",
+	"stun:global.stun.twilio.com:3478",
+	"stun:stun.services.mozilla.com:3478",
+	"stun:stun.stunprotocol.org:3478",
+}
 
 // Config
 type Configuration struct {
@@ -429,47 +440,57 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 
 // getPublicHoststring returns the public ip and port by querying a STUN server
 func getPublicHoststring() (string, error) {
-	// Parse a STUN URI
-	u, err := stun.ParseURI(StunUri)
-	if err != nil {
-		return "", err
-	}
+	var lastErr error
 
-	// Creating a "connection" to STUN server.
-	c, err := stun.DialURI(u, &stun.DialConfig{})
-	if err != nil {
-		return "", err
-	}
-
-	var ip net.IP
-	var port int
-	var stunErr error
-
-	// Building binding request with random transaction id.
-	message := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
-	// Sending request to STUN server, waiting for response message.
-	err = c.Do(message, func(res stun.Event) {
-		if res.Error != nil {
-			stunErr = res.Error
-			return
+	for _, server := range stunServers {
+		u, err := stun.ParseURI(server)
+		if err != nil {
+			lastErr = err
+			continue
 		}
-		// Decoding XOR-MAPPED-ADDRESS attribute from message.
-		var xorAddr stun.XORMappedAddress
-		if err := xorAddr.GetFrom(res.Message); err != nil {
-			stunErr = err
-			return
+
+		c, err := stun.DialURI(u, &stun.DialConfig{})
+		if err != nil {
+			lastErr = err
+			continue
 		}
-		ip = xorAddr.IP
-		port = xorAddr.Port
-	})
-	if stunErr != nil {
-		return "", stunErr
-	}
-	if err != nil {
-		return "", err
+
+		var ip net.IP
+		var port int
+		var stunErr error
+
+		msg := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
+		err = c.Do(msg, func(res stun.Event) {
+			if res.Error != nil {
+				stunErr = res.Error
+				return
+			}
+
+			var xorAddr stun.XORMappedAddress
+			if err := xorAddr.GetFrom(res.Message); err != nil {
+				stunErr = err
+				return
+			}
+
+			ip = xorAddr.IP
+			port = xorAddr.Port
+		})
+
+		if stunErr != nil {
+			lastErr = stunErr
+			continue
+		}
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if ip != nil && port != 0 {
+			return fmt.Sprintf("%s:%d", ip, port), nil
+		}
 	}
 
-	return fmt.Sprintf("%s:%d", ip, port), nil
+	return "", fmt.Errorf("all STUN servers failed, last error: %v", lastErr)
 }
 
 func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn, error) {
