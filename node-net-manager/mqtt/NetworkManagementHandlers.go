@@ -80,12 +80,9 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 	// format hoststring with [] if ipv6
 	idx := strings.LastIndex(hoststring, ":")
-	logger.DebugLogger().Printf("Idx: %d", idx)
 	if idx != -1 {
 		dstHost := responseStruct.NatDst[:idx]
 		dstPort := responseStruct.NatDst[idx+1:]
-
-		logger.DebugLogger().Printf("DstHost: %s", dstHost)
 
 		if strings.Contains(dstHost, ":") {
 			hoststring = fmt.Sprintf("[%s]:%s", dstHost, dstPort)
@@ -95,7 +92,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	}
 	logger.DebugLogger().Printf("Attempting NAT traversal with host address %s", hoststring)
 
-	if responseStruct.NatSrc != "" {
+	if responseStruct.NatSrc == "" {
 		// find this nodes nat addr and forward to other node
 		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
 		if err != nil {
