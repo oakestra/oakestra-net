@@ -50,23 +50,31 @@ func getNATHoststring() (string, error) {
 
 		var ip net.IP
 		var port int
+		var ConnErr error
+
 		// sending request to STUN server, waiting for response message
 		err = conn.Do(message, func(res stun.Event) {
 			if res.Error != nil {
 				logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, res.Error)
+				ConnErr = res.Error
 				return
 			}
 			// Decoding XOR-MAPPED-ADDRESS attribute from message.
 			var xorAddr stun.XORMappedAddress
 			if err := xorAddr.GetFrom(res.Message); err != nil {
 				logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
+				ConnErr = err
 				return
 			}
 			ip = xorAddr.IP
 			port = xorAddr.Port
 		})
+		if ConnErr != nil {
+			logger.DebugLogger().Printf("Unable to connect to stun server %v: %v", stunServer, ConnErr)
+			continue
+		}
 		if err != nil {
-			logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
+			logger.DebugLogger().Printf("Unable to connect to stun server %v: %v", stunServer, err)
 			continue
 		}
 		return fmt.Sprintf("%s:%d", ip, port), nil
