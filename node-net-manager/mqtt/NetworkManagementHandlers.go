@@ -84,6 +84,8 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		dstHost := responseStruct.NatDst[:idx]
 		dstPort := responseStruct.NatDst[idx+1:]
 
+		logger.DebugLogger().Printf("NAT formatting ipv6: %s:%s", dstHost, dstPort)
+
 		if strings.Contains(dstHost, ":") {
 			hoststring = fmt.Sprintf("[%s]:%s", dstHost, dstPort)
 		} else {
