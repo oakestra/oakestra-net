@@ -77,6 +77,7 @@ func getNATHoststring() (string, error) {
 // ConnectOverNAT will retry connecting to the passed nat multiple times.
 // On success, it will write the established quic connection to responseChannel
 func ConnectOverNAT(natHoststring string) {
+	logger.DebugLogger().Printf("Attempting to connect over NAT to %s", natHoststring)
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-proxy"},

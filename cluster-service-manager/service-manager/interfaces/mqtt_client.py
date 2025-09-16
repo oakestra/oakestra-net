@@ -148,7 +148,7 @@ def _tablequery_handler(client_id, payload):
     mqtt_publish_tablequery_result(client_id, result)
 
 def _nattraversal_handler(client_id, payload):
-    app.logger.debug("Received nat traversal request with payload: %s", payload.get("dst"))
+    app.logger.debug("Received nat traversal request with payload: %s", payload)
     # forward request to relevant nodes
     dst = payload.get("dst").rsplit(':', 1)
     dst_id = mongo_find_worker_id_by_host_ip_and_port(dst[0].strip("[]"), int(dst[1]))
