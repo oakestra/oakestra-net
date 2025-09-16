@@ -2,8 +2,7 @@ package mqtt
 
 import (
 	"NetManager/logger"
-	"context"
-	"crypto/tls"
+	"NetManager/natTraversal"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/quic-go/quic-go"
 )
 
 var subnetworkResponseChannel chan mqttSubnetworkResponse
@@ -35,8 +33,10 @@ type mqttDeployNotification struct {
 }
 
 type natTraversalPayload struct {
-	Src string `json:"src"`
-	Dst string `json:"dst"`
+	Src    string `json:"src"`
+	NatSrc string `json:"nat_src"`
+	Dst    string `json:"dst"`
+	NatDst string `json:"nat_dst"`
 }
 
 func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
@@ -52,7 +52,7 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 // RequestNATTraversal sends request to the cluster to facilitate NAT traversal
 func RequestNATTraversal(src string, dst string) error {
-	payload := natTraversalPayload{Dst: dst, Src: src}
+	payload := natTraversalPayload{Dst: dst, NatSrc: src}
 	req, err := json.Marshal(&payload)
 	if err != nil {
 		return err
@@ -76,43 +76,31 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		return
 	}
 
-	idx := strings.LastIndex(responseStruct.Dst, ":")
-	dstHost := responseStruct.Dst[:idx]
-	dstPort := responseStruct.Dst[idx+1:]
+	hoststring := responseStruct.NatDst
 
-	// Format hoststring with [] if ipv6
-	var hoststring string
-	if strings.Contains(dstHost, ":") {
-		hoststring = fmt.Sprintf("[%s]:%s", dstHost, dstPort)
-	} else {
-		hoststring = fmt.Sprintf("%s:%s", dstHost, dstPort)
+	// format hoststring with [] if ipv6
+	idx := strings.LastIndex(responseStruct.Dst, ":")
+	if idx != -1 {
+		dstHost := responseStruct.NatDst[:idx]
+		dstPort := responseStruct.NatDst[idx+1:]
+
+		if strings.Contains(dstHost, ":") {
+			hoststring = fmt.Sprintf("[%s]:%s", dstHost, dstPort)
+		} else {
+			hoststring = fmt.Sprintf("%s:%s", dstHost, dstPort)
+		}
 	}
 	logger.DebugLogger().Printf("Attempting NAT traversal with host address %s", hoststring)
 
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"quic-proxy"},
-	}
-
-	quicConf := &quic.Config{
-		HandshakeIdleTimeout: 5 * time.Second,
-		MaxIdleTimeout:       30 * time.Second,
-		EnableDatagrams:      true,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// repeat up to 5 times with small delay between attempts
-	for i := 0; i < 5; i++ {
-		_, err = quic.DialAddr(ctx, hoststring, tlsConf, quicConf)
-		if err == nil {
-			logger.DebugLogger().Println("Nat traversal succeeded")
+	if responseStruct.NatSrc != "" {
+		// find this nodes nat addr and forward to other node
+		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
+		if err != nil {
 			return
 		}
-		logger.DebugLogger().Println("Nat traversal failed", err)
-		time.Sleep(500 * time.Millisecond)
 	}
+
+	natTraversal.ConnectOverNAT(hoststring)
 
 	return
 }

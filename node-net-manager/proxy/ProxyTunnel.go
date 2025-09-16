@@ -5,6 +5,7 @@ import (
 	"NetManager/env"
 	"NetManager/logger"
 	"NetManager/mqtt"
+	"NetManager/natTraversal"
 	"NetManager/proxy/iputils"
 	"context"
 	"crypto/tls"
@@ -17,25 +18,12 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/pion/stun"
 	"github.com/quic-go/quic-go"
 	"github.com/songgao/water"
 )
 
 // const
 const BufferSize = 64 * 1024
-
-var stunServers = []string{
-	"stun.l.google.com:19302",
-	"stun:stun1.l.google.com:19302",
-	"stun:stun2.l.google.com:19302",
-	"stun:stun3.l.google.com:19302",
-	"stun:stun4.l.google.com:19302",
-	"stun:stun.cloudflare.com:3478",
-	"stun:global.stun.twilio.com:3478",
-	"stun:stun.services.mozilla.com:3478",
-	"stun:stun.stunprotocol.org:3478",
-}
 
 // Config
 type Configuration struct {
@@ -429,112 +417,25 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 
 	if err != nil {
 		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %s. Attempting NAT Traversal", err)
-		conn, err = proxy.initiateNatTraversal(hoststring)
+		responseChannel := make(chan *quic.Conn)
+		err = natTraversal.InitiateNATTraversal(hoststring, responseChannel, mqtt.RequestNATTraversal)
 		if err != nil {
 			return nil, err
+		}
+		for {
+			select {
+			case conn = <-responseChannel:
+				//event received, reset timer
+				logger.DebugLogger().Printf("NAT traversal succeeded")
+				return conn, nil
+			case <-time.After(30 * time.Second):
+				return nil, errors.New("no response from NAT traversal attempt")
+			}
 		}
 	}
 
 	logger.DebugLogger().Println("Successfully connected to remote addr via QUIC")
 	return conn, nil
-}
-
-// getPublicHoststring returns the public ip and port by querying a STUN server
-func getPublicHoststring() (string, error) {
-	for _, stunServer := range stunServers {
-		logger.DebugLogger().Println("Getting public host string from STUN server", stunServer)
-		// parse a STUN URI
-		uri, err := stun.ParseURI(stunServer)
-		if err != nil {
-			logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
-			continue
-		}
-
-		// connect to STUN server
-		conn, err := stun.DialURI(uri, &stun.DialConfig{})
-		if err != nil {
-			logger.DebugLogger().Printf("Unable to connect to stun server %v: %v", stunServer, err)
-			continue
-		}
-
-		// building binding request with random transaction id.
-		message := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
-
-		var ip net.IP
-		var port int
-		// sending request to STUN server, waiting for response message
-		err = conn.Do(message, func(res stun.Event) {
-			if res.Error != nil {
-				logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, res.Error)
-				return
-			}
-			// Decoding XOR-MAPPED-ADDRESS attribute from message.
-			var xorAddr stun.XORMappedAddress
-			if err := xorAddr.GetFrom(res.Message); err != nil {
-				logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
-				return
-			}
-			ip = xorAddr.IP
-			port = xorAddr.Port
-		})
-		if err != nil {
-			logger.DebugLogger().Printf("Unable to parse stun server %v: %v", stunServer, err)
-			continue
-		}
-		return fmt.Sprintf("%s:%d", ip, port), nil
-	}
-	return "", errors.New("unable to find public host")
-}
-
-func (proxy *GoProxyTunnel) initiateNatTraversal(hoststring string) (*quic.Conn, error) {
-	// find public address
-	src, err := getPublicHoststring()
-	if err != nil {
-		logger.ErrorLogger().Printf("Unable to determine public hoststring: %v", err)
-		return nil, err
-	}
-
-	logger.DebugLogger().Printf("Found public hoststring: %s", src)
-
-	// send to cluster service manager
-	err = mqtt.RequestNATTraversal(src, hoststring)
-	if err != nil {
-		logger.ErrorLogger().Println("Unable to request nat traversal:", err)
-		return nil, err
-	}
-
-	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"quic-proxy"},
-	}
-
-	quicConf := &quic.Config{
-		HandshakeIdleTimeout: 5 * time.Second,
-		MaxIdleTimeout:       30 * time.Second,
-		EnableDatagrams:      true,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var conn *quic.Conn
-
-	// repeat up to 5 times with small delay between attempts
-	for i := 0; i < 5; i++ {
-		conn, err = quic.DialAddr(ctx, hoststring, tlsConf, quicConf)
-		if err == nil {
-			logger.DebugLogger().Println("Nat traversal succeeded")
-			return conn, nil
-		}
-		logger.DebugLogger().Println("Nat traversal failed:", err)
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	if conn != nil {
-		return conn, nil
-	}
-
-	return nil, err
 }
 
 // read output from an interface and wrap the read operation with a channel
