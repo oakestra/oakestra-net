@@ -98,6 +98,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 			err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
 			if err != nil {
 				logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
+				return
 			}
 		}()
 	}

@@ -2,6 +2,7 @@ package natTraversal
 
 import (
 	"NetManager/logger"
+	"NetManager/model"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -124,7 +125,15 @@ func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, 
 	// find nat address
 	src, err := getNATHoststring()
 	if err != nil {
-		logger.ErrorLogger().Printf("Unable to determine public hoststring: %v", err)
+		logger.ErrorLogger().Printf("Unable to determine public hoststring: %v. Using public ip", err)
+
+		ip := net.ParseIP(model.NetConfig.NodePublicAddress)
+		if ip.To4() == nil {
+			src = fmt.Sprintf("[%s]:%s", ip, model.NetConfig.NodePublicPort)
+		} else {
+			src = fmt.Sprintf("%s:%s", ip, model.NetConfig.NodePublicPort)
+		}
+
 		return err
 	}
 
