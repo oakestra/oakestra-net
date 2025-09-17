@@ -1,7 +1,7 @@
 import json
 import re
 import traceback
-from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork, mongo_find_worker_ip_and_port_by_id, mongo_find_worker_id_by_host_ip_and_port
+from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork, mongo_find_worker_ip_and_port_by_id, mongo_find_worker_id_by_host_ip_and_port, mongo_find_node_hostname_by_id
 from network.deployment import *
 from network.tablequery import resolution, interests
 import paho.mqtt.client as paho_mqtt
@@ -148,7 +148,7 @@ def _tablequery_handler(client_id, payload):
     mqtt_publish_tablequery_result(client_id, result)
 
 def _nattraversal_handler(client_id, payload):
-    app.logger.debug("Received nat traversal request with payload %s from %s", payload, client_id)
+    app.logger.debug("Received nat traversal request with payload %s from %s", payload, mongo_find_node_hostname_by_id(client_id))
     # forward request to relevant nodes
     dst = payload.get("dst").rsplit(':', 1)
     dst_id = mongo_find_worker_id_by_host_ip_and_port(dst[0].strip("[]"), int(dst[1]))
