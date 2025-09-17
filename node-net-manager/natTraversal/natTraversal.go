@@ -119,8 +119,7 @@ func ConnectOverNAT(natHoststring string) {
 
 // InitiateNATTraversal will resolve this workers NAT address via STUN, pass it to the cluster service manager
 // and wait for the other workers NAT address to be resolved. Bother workers will then attempt to connect to each other
-// reply indicates whether this NAT traversal initiation is in response to a request over mqtt
-func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, mqttRequestor func(src string, dst string, reply bool) error, reply bool) error {
+func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, mqttRequestor func(src string, dst string) error) error {
 	// find nat address
 	src, err := getNATHoststring()
 	if err != nil {
@@ -137,7 +136,7 @@ func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, 
 	logger.DebugLogger().Printf("Found public hoststring: %s", src)
 
 	// send to cluster service manager
-	err = mqttRequestor(src, dstHoststring, reply)
+	err = mqttRequestor(src, dstHoststring)
 	if err != nil {
 		logger.ErrorLogger().Println("Unable to request nat traversal:", err)
 		return err
