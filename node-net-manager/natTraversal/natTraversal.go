@@ -16,9 +16,7 @@ import (
 
 var stunServers = []string{
 	"stun:stun.l.google.com:19302",
-	"stun:stun3.l.google.com:19302",
 	"stun:stun.cloudflare.com:3478",
-	"stun:stun.services.mozilla.com:3478",
 	"stun:stun.stunprotocol.org:3478",
 }
 
@@ -133,8 +131,6 @@ func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, 
 		} else {
 			src = fmt.Sprintf("%s:%s", ip, model.NetConfig.NodePublicPort)
 		}
-
-		return err
 	}
 
 	logger.DebugLogger().Printf("Found public hoststring: %s", src)
