@@ -421,13 +421,14 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 		if err != nil {
 			return nil, err
 		}
+		timeout := time.After(30 * time.Second)
 		for {
 			select {
 			case conn = <-responseChannel:
 				//event received, reset timer
 				logger.DebugLogger().Printf("NAT traversal succeeded")
 				return conn, nil
-			case <-time.After(30 * time.Second):
+			case <-timeout:
 				return nil, errors.New("no response from NAT traversal attempt")
 			}
 		}
