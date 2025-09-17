@@ -167,7 +167,8 @@ def _nattraversal_handler(client_id, payload):
         "src": payload.get("dst", ""),
         "nat_src": payload.get("nat_dst", ""),
         "dst": payload.get("src", ""),
-        "nat_dst": payload.get("nat_src", "")
+        "nat_dst": payload.get("nat_src", ""),
+        "reply": payload.get("reply", "")
     })
 
 

@@ -37,6 +37,7 @@ type natTraversalPayload struct {
 	NatSrc string `json:"nat_src"`
 	Dst    string `json:"dst"`
 	NatDst string `json:"nat_dst"`
+	Reply  bool   `json:"reply"`
 }
 
 func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
@@ -51,7 +52,7 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 }
 
 // RequestNATTraversal sends request to the cluster to facilitate NAT traversal
-func RequestNATTraversal(src string, dst string) error {
+func RequestNATTraversal(src string, dst string, reply bool) error {
 	payload := natTraversalPayload{Dst: dst, NatSrc: src}
 	req, err := json.Marshal(&payload)
 	if err != nil {
@@ -92,9 +93,9 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	}
 	logger.DebugLogger().Printf("Attempting NAT traversal with host address %s", hoststring)
 
-	if responseStruct.NatSrc == "" {
+	if !responseStruct.Reply {
 		// find this nodes nat addr and forward to other node
-		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
+		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal, true)
 		if err != nil {
 			logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
 			return
