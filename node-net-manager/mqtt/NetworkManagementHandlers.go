@@ -53,7 +53,7 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 // RequestNATTraversal sends request to the cluster to facilitate NAT traversal
 func RequestNATTraversal(src string, dst string, reply bool) error {
-	payload := natTraversalPayload{Dst: dst, NatSrc: src, Reply: reply}
+	payload := natTraversalPayload{Dst: dst, NatSrc: src}
 	req, err := json.Marshal(&payload)
 	if err != nil {
 		return err
