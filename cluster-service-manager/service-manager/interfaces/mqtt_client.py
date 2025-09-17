@@ -149,6 +149,17 @@ def _tablequery_handler(client_id, payload):
 
 def _nattraversal_handler(client_id, payload):
     app.logger.debug("Received nat traversal request with payload %s from %s", payload, client_id)
+
+    oid = payload.get("originator_id", None)
+    if oid is not None:
+        mqtt_publish_nat_traversal_result(oid, {
+            "src": payload.get("dst", ""),
+            "nat_src": payload.get("nat_dst", ""),
+            "dst": payload.get("src", ""),
+            "nat_dst": payload.get("nat_src", ""),
+            "originator_id": oid
+        })
+
     # forward request to relevant nodes
     dst = payload.get("dst").rsplit(':', 1)
     dst_id = mongo_find_worker_id_by_host_ip_and_port(dst[0].strip("[]"), int(dst[1]))
@@ -167,7 +178,8 @@ def _nattraversal_handler(client_id, payload):
         "src": payload.get("dst", ""),
         "nat_src": payload.get("nat_dst", ""),
         "dst": payload.get("src", ""),
-        "nat_dst": payload.get("nat_src", "")
+        "nat_dst": payload.get("nat_src", ""),
+        "originator_id": client_id
     })
 
 

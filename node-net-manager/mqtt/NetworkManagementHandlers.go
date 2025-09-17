@@ -33,10 +33,11 @@ type mqttDeployNotification struct {
 }
 
 type natTraversalPayload struct {
-	Src    string `json:"src"`
-	NatSrc string `json:"nat_src"`
-	Dst    string `json:"dst"`
-	NatDst string `json:"nat_dst"`
+	Src          string `json:"src"`
+	NatSrc       string `json:"nat_src"`
+	Dst          string `json:"dst"`
+	NatDst       string `json:"nat_dst"`
+	OriginatorId string `json:"originator_id"`
 }
 
 func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
@@ -92,7 +93,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	}
 	logger.DebugLogger().Printf("Attempting NAT traversal with host address %s", hoststring)
 
-	if responseStruct.NatSrc == "" {
+	if responseStruct.OriginatorId != "" {
 		// find this nodes nat addr and forward to other node
 		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
 		if err != nil {
