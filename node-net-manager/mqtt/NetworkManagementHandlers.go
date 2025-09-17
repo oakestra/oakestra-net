@@ -94,13 +94,11 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 	if responseStruct.NatSrc == "" {
 		// find this nodes nat addr and forward to other node
-		go func() {
-			err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
-			if err != nil {
-				logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
-				return
-			}
-		}()
+		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
+		if err != nil {
+			logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
+			return
+		}
 	}
 
 	natTraversal.ConnectOverNAT(hoststring)
