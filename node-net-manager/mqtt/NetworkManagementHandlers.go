@@ -84,7 +84,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		dstHost := responseStruct.NatDst[:idx]
 		dstPort := responseStruct.NatDst[idx+1:]
 
-		if strings.Contains(dstHost, ":") {
+		if strings.Contains(dstHost, ":") && dstHost[:1] != "[" {
 			hoststring = fmt.Sprintf("[%s]:%s", dstHost, dstPort)
 		} else {
 			hoststring = fmt.Sprintf("%s:%s", dstHost, dstPort)
