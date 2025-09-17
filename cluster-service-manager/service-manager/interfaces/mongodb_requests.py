@@ -48,7 +48,7 @@ def mongo_find_node_by_id_and_update_subnetwork(node_id, addr, addr_v6):
     return 1
 
 def mongo_find_node_hostname_by_id(node_id):
-    node = mongo_nodes.db.nodes.find(
+    node = mongo_nodes.db.nodes.find_one(
         {'_id': ObjectId(node_id)}
     )
     return node.get("node_info").get("host")
