@@ -1,7 +1,7 @@
 import json
 import re
 import traceback
-from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork, mongo_find_worker_ip_and_port_by_id, mongo_find_worker_id_by_host_ip_and_port, mongo_find_node_hostname_by_id
+from interfaces.mongodb_requests import mongo_find_node_by_id_and_update_subnetwork, mongo_find_worker_ip_and_port_by_id, mongo_find_worker_id_by_host_ip_and_port
 from network.deployment import *
 from network.tablequery import resolution, interests
 import paho.mqtt.client as paho_mqtt
