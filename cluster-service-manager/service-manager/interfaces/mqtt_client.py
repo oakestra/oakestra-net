@@ -172,12 +172,14 @@ def _nattraversal_handler(client_id, payload):
     if ip is None:
         app.logger.error("Could not find ip of worker %s", dst_id)
         return
+    src = ip + ":" + str(port)
 
+    app.logger.debug("Send nat traversal payload to %s", client_id)
     # tell src to connect to dst and tell dst to connect to src
     mqtt_publish_nat_traversal_result(dst_id, {
         "src": payload.get("dst", ""),
         "nat_src": payload.get("nat_dst", ""),
-        "dst": payload.get("src", ""),
+        "dst": src,
         "nat_dst": payload.get("nat_src", ""),
         "originator_id": client_id
     })
