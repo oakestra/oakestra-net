@@ -182,7 +182,7 @@ def _nattraversal_handler(client_id, payload):
         "originator_id": client_id
     }
 
-    app.logger.debug("Send nat traversal response %s to %s", dst_id)
+    app.logger.debug("Send nat traversal response %s to %s", response, dst_id)
     # tell src to connect to dst and tell dst to connect to src
     mqtt_publish_nat_traversal_result(dst_id, response)
 
