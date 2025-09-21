@@ -109,6 +109,8 @@ def mongo_find_worker_id_by_host_ip_and_port(host_ip, host_port):
         }
     })
 
+    print("Found job: ", job, flush=True)
+
     if not job:
         return None
 
