@@ -174,15 +174,17 @@ def _nattraversal_handler(client_id, payload):
         return
     src = ip + ":" + str(port)
 
-    app.logger.debug("Send nat traversal payload to %s", client_id)
-    # tell src to connect to dst and tell dst to connect to src
-    mqtt_publish_nat_traversal_result(dst_id, {
+    response = {
         "src": payload.get("dst", ""),
         "nat_src": payload.get("nat_dst", ""),
         "dst": src,
         "nat_dst": payload.get("nat_src", ""),
         "originator_id": client_id
-    })
+    }
+
+    app.logger.debug("Send nat traversal response %s to %s", dst_id)
+    # tell src to connect to dst and tell dst to connect to src
+    mqtt_publish_nat_traversal_result(dst_id, response)
 
 
 def _subnet_handler(client_id, payload):
