@@ -150,8 +150,8 @@ def _tablequery_handler(client_id, payload):
 def _nattraversal_handler(client_id, payload):
     app.logger.debug("Received nat traversal request with payload %s from %s", payload, client_id)
 
-    oid = payload.get("originator_id", None)
-    if oid is not None:
+    oid = payload.get("originator_id", "")
+    if oid != "":
         mqtt_publish_nat_traversal_result(oid, {
             "src": payload.get("dst", ""),
             "nat_src": payload.get("nat_dst", ""),

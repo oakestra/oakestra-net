@@ -418,7 +418,7 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 	if err != nil {
 		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %s. Attempting NAT Traversal", err)
 		responseChannel := make(chan *quic.Conn)
-		err = natTraversal.InitiateNATTraversal(hoststring, responseChannel, mqtt.RequestNATTraversal)
+		err = natTraversal.InitiateNATTraversal(hoststring, responseChannel, "", mqtt.RequestNATTraversal)
 		if err != nil {
 			return nil, err
 		}

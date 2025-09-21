@@ -52,8 +52,8 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 }
 
 // RequestNATTraversal sends request to the cluster to facilitate NAT traversal
-func RequestNATTraversal(src string, dst string) error {
-	payload := natTraversalPayload{Dst: dst, NatSrc: src}
+func RequestNATTraversal(src string, dst string, oid string) error {
+	payload := natTraversalPayload{Dst: dst, NatSrc: src, OriginatorId: oid}
 	req, err := json.Marshal(&payload)
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 
 	if responseStruct.OriginatorId != "" {
 		// find this nodes nat addr and forward to other node
-		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, RequestNATTraversal)
+		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, responseStruct.OriginatorId, RequestNATTraversal)
 		if err != nil {
 			logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
 			return
