@@ -87,6 +87,7 @@ func ConnectOverNAT(natHoststring string) {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-proxy"},
+		ServerName:         "quic-proxy",
 	}
 
 	quicConf := &quic.Config{

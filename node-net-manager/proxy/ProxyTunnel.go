@@ -403,6 +403,7 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-proxy"},
+		ServerName:         "quic-proxy",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
