@@ -34,11 +34,12 @@ type mqttDeployNotification struct {
 }
 
 type natTraversalPayload struct {
-	Src          string `json:"src"`
-	NatSrc       string `json:"nat_src"`
-	Dst          string `json:"dst"`
-	NatDst       string `json:"nat_dst"`
-	OriginatorId string `json:"originator_id"`
+	Src          string    `json:"src"`
+	NatSrc       string    `json:"nat_src"`
+	Dst          string    `json:"dst"`
+	NatDst       string    `json:"nat_dst"`
+	Timestamp    time.Time `json:"timestamp"`
+	OriginatorId string    `json:"originator_id"`
 }
 
 func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
@@ -53,8 +54,8 @@ func subnetworkAssignmentMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 }
 
 // RequestNATTraversal sends request to the cluster to facilitate NAT traversal
-func RequestNATTraversal(src string, dst string, oid string) error {
-	payload := natTraversalPayload{Dst: dst, NatSrc: src, OriginatorId: oid}
+func RequestNATTraversal(src string, dst string, oid string, timestamp time.Time) error {
+	payload := natTraversalPayload{Dst: dst, NatSrc: src, OriginatorId: oid, Timestamp: timestamp}
 	req, err := json.Marshal(&payload)
 	if err != nil {
 		return err
@@ -94,10 +95,11 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	}
 	logger.DebugLogger().Printf("Attempting NAT traversal with host address %s", hoststring)
 
+	timestamp := responseStruct.Timestamp
 	if responseStruct.OriginatorId != model.WorkerID {
 		// find this nodes nat addr and forward to other node
 		logger.DebugLogger().Printf("I am Node B")
-		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, responseStruct.OriginatorId, RequestNATTraversal)
+		timestamp, err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, responseStruct.OriginatorId, RequestNATTraversal)
 		if err != nil {
 			logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
 			return
@@ -106,7 +108,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		logger.DebugLogger().Printf("I am Node A")
 	}
 
-	natTraversal.ConnectOverNAT(hoststring)
+	natTraversal.ConnectOverNAT(hoststring, timestamp)
 
 	return
 }

@@ -80,9 +80,9 @@ func getNATHoststring() (string, error) {
 	return "", errors.New("unable to find public host")
 }
 
-// ConnectOverNAT will retry connecting to the passed nat multiple times.
+// ConnectOverNAT will retry connecting to the passed nat multiple times on reaching the synchronisation timestamp
 // On success, it will write the established quic connection to responseChannel
-func ConnectOverNAT(natHoststring string) {
+func ConnectOverNAT(natHoststring string, timestamp time.Time) {
 	logger.DebugLogger().Printf("Attempting to connect over NAT to %s", natHoststring)
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
@@ -101,6 +101,13 @@ func ConnectOverNAT(natHoststring string) {
 	var conn *quic.Conn
 	var err error
 
+	duration := time.Until(timestamp)
+	if duration < 0 || duration > time.Second*10 {
+		logger.ErrorLogger().Printf("Received invalid timestamp {%v}", timestamp)
+		return
+	}
+	time.Sleep(duration)
+
 	// repeat up to 5 times with small delay between attempts
 	for i := 0; i < 5; i++ {
 		conn, err = quic.DialAddr(ctx, natHoststring, tlsConf, quicConf)
@@ -117,9 +124,11 @@ func ConnectOverNAT(natHoststring string) {
 
 }
 
+// Todo(MH): Consider timezone implications
+
 // InitiateNATTraversal will resolve this workers NAT address via STUN, pass it to the cluster service manager
 // and wait for the other workers NAT address to be resolved. Bother workers will then attempt to connect to each other
-func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, oid string, mqttRequestor func(src string, dst string, oid string) error) error {
+func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, oid string, mqttRequestor func(src string, dst string, oid string, timestamp time.Time) error) (time.Time, error) {
 	// find nat address
 	src, err := getNATHoststring()
 	if err != nil {
@@ -135,14 +144,17 @@ func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, 
 
 	logger.DebugLogger().Printf("Found public hoststring: %s", src)
 
+	// choose synchronisation timestamp
+	timestamp := time.Now().Add(5 * time.Second)
+
 	// send to cluster service manager
-	err = mqttRequestor(src, dstHoststring, oid)
+	err = mqttRequestor(src, dstHoststring, oid, timestamp)
 	if err != nil {
 		logger.ErrorLogger().Println("Unable to request nat traversal:", err)
-		return err
+		return timestamp, err
 	}
 
 	responseChannel = responseChan
 
-	return nil
+	return timestamp, nil
 }
