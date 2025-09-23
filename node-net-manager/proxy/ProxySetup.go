@@ -5,10 +5,15 @@ import (
 	"NetManager/logger"
 	"NetManager/network"
 	"context"
+	crand "crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"math/rand"
 	"net"
 	"os"
@@ -113,6 +118,32 @@ func (proxy *GoProxyTunnel) Listen() {
 	}
 }
 
+// createSelfSignedCert creates a self-signed certificate to be used by the quic listener
+func createSelfSignedCert() tls.Certificate {
+	priv, _ := rsa.GenerateKey(crand.Reader, 2048)
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		Subject: pkix.Name{
+			Organization: []string{"Oakestra"},
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(24 * time.Hour),
+
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	derBytes, _ := x509.CreateCertificate(crand.Reader, &template, &template, &priv.PublicKey, priv)
+
+	cert := tls.Certificate{
+		Certificate: [][]byte{derBytes},
+		PrivateKey:  priv,
+	}
+	return cert
+}
+
 // create an instance of the proxy TUN device and setup the environment
 func (proxy *GoProxyTunnel) createTun() {
 	//create tun device
@@ -188,8 +219,8 @@ func (proxy *GoProxyTunnel) createTun() {
 
 	// listen to local socket
 	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
-		NextProtos:         []string{"quic-proxy"},
+		Certificates: []tls.Certificate{createSelfSignedCert()},
+		NextProtos:   []string{"quic-proxy"},
 	}
 
 	lstnConn, err := quic.ListenAddr(fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
