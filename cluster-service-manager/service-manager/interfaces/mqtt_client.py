@@ -162,7 +162,6 @@ def _nattraversal_handler(client_id, payload):
 
     # forward request to relevant nodes
     dst = payload.get("dst").rsplit(':', 1)
-    app.logger.debug("finding worker with hoststring %s:%s", dst[0].strip("[]"), int(dst[1]))
     dst_id = mongo_find_worker_id_by_host_ip_and_port(dst[0].strip("[]"), int(dst[1]))
     if dst_id is None:
         app.logger.error("Could not find worker with ip %s and port %s", dst[0], dst[1])

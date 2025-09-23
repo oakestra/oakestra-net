@@ -403,7 +403,6 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-proxy"},
-		ServerName:         "quic-proxy",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -415,7 +414,7 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 		EnableDatagrams:      true,
 	})
 
-	if err != nil {
+	if errors.Is(err, context.DeadlineExceeded) {
 		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %s. Attempting NAT Traversal", err)
 		responseChannel := make(chan *quic.Conn)
 		err = natTraversal.InitiateNATTraversal(hoststring, responseChannel, "", mqtt.RequestNATTraversal)
@@ -433,9 +432,12 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 				return nil, errors.New("no response from NAT traversal attempt")
 			}
 		}
+	} else if err != nil {
+		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %v", err)
+		return nil, err
 	}
 
-	logger.DebugLogger().Println("Successfully connected to remote addr via QUIC")
+	logger.DebugLogger().Println("Successfully connected to addr via QUIC")
 	return conn, nil
 }
 

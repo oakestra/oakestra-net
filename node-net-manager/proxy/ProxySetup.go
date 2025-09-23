@@ -190,7 +190,6 @@ func (proxy *GoProxyTunnel) createTun() {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-proxy"},
-		ServerName:         "quic-proxy",
 	}
 
 	lstnConn, err := quic.ListenAddr(fmt.Sprintf(":%v", proxy.TunnelPort), tlsConf, &quic.Config{
