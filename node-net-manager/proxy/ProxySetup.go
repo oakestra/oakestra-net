@@ -234,6 +234,7 @@ func (proxy *GoProxyTunnel) createTun() {
 
 	proxy.HostTUNDeviceName = ifce.Name()
 	proxy.ifce = ifce
+	proxy.listenConnections = make(map[string]*quic.Conn)
 
 	go func() {
 		for {
