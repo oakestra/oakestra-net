@@ -100,6 +100,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		// find this nodes nat addr and forward to other node
 		logger.DebugLogger().Printf("I am Node B")
 		timestamp, err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, responseStruct.OriginatorId, RequestNATTraversal)
+		logger.DebugLogger().Printf("Timestamp: %v", timestamp)
 		if err != nil {
 			logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
 			return
