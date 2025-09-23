@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"NetManager/logger"
+	"NetManager/model"
 	"NetManager/natTraversal"
 	"encoding/json"
 	"fmt"
@@ -93,8 +94,9 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 	}
 	logger.DebugLogger().Printf("Attempting NAT traversal with host address %s", hoststring)
 
-	if responseStruct.OriginatorId != "" {
+	if responseStruct.OriginatorId != model.WorkerID {
 		// find this nodes nat addr and forward to other node
+		logger.DebugLogger().Printf("I am Node B")
 		err = natTraversal.InitiateNATTraversal(responseStruct.Src, nil, responseStruct.OriginatorId, RequestNATTraversal)
 		if err != nil {
 			logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
