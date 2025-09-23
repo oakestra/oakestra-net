@@ -102,6 +102,8 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 			logger.DebugLogger().Printf("ERROR - NAT traversal error: %s", err)
 			return
 		}
+	} else {
+		logger.DebugLogger().Printf("I am Node A")
 	}
 
 	natTraversal.ConnectOverNAT(hoststring)
