@@ -467,11 +467,15 @@ func (proxy *GoProxyTunnel) ifaceread(ifce *water.Interface, out chan<- outgoing
 func (proxy *GoProxyTunnel) quicRead(conn *quic.Conn, out chan<- incomingMessage, errchannel chan<- error) {
 	for {
 		if conn == nil {
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
 		msg, err := conn.ReceiveDatagram(context.Background())
 		if err != nil {
+
+			logger.ErrorLogger().Printf("Error receiving quic datagram %T", err)
+
 			proxy.connwrite.Lock()
 			delete(proxy.listenConnections, conn.RemoteAddr().String())
 			proxy.connwrite.Unlock()
