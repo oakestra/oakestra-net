@@ -146,6 +146,7 @@ func InitiateNATTraversal(dstHoststring string, responseChan chan<- *quic.Conn, 
 
 	// choose synchronisation timestamp
 	timestamp := time.Now().Add(5 * time.Second)
+	logger.DebugLogger().Printf("Synchronisation timestamp: %v", timestamp)
 
 	// send to cluster service manager
 	err = mqttRequestor(src, dstHoststring, oid, timestamp)
