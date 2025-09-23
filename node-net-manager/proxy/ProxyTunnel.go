@@ -433,7 +433,7 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 			}
 		}
 	} else if err != nil {
-		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %v", err)
+		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %T:%v", err, err)
 		return nil, err
 	}
 
