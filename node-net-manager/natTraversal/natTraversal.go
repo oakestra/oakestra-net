@@ -16,8 +16,8 @@ import (
 
 var stunServers = []string{
 	"stun:stun.l.google.com:19302",
-	"stun:stun.cloudflare.com:3478",
-	"stun:stun.stunprotocol.org:3478",
+	//"stun:stun.cloudflare.com:3478",
+	//"stun:stun.stunprotocol.org:3478",
 }
 
 var responseChannel chan<- *quic.Conn
