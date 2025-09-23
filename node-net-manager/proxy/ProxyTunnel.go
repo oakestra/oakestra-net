@@ -414,7 +414,8 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 		EnableDatagrams:      true,
 	})
 
-	if errors.Is(err, context.DeadlineExceeded) {
+	var idleErr *quic.IdleTimeoutError
+	if errors.As(err, &idleErr) {
 		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %s. Attempting NAT Traversal", err)
 		responseChannel := make(chan *quic.Conn)
 		err = natTraversal.InitiateNATTraversal(hoststring, responseChannel, "", mqtt.RequestNATTraversal)
@@ -433,7 +434,7 @@ func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, er
 			}
 		}
 	} else if err != nil {
-		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %T:%v", err, err)
+		logger.ErrorLogger().Printf("Unable to connect to remote addr via QUIC: %v", err)
 		return nil, err
 	}
 
@@ -473,14 +474,11 @@ func (proxy *GoProxyTunnel) quicRead(conn *quic.Conn, out chan<- incomingMessage
 
 		msg, err := conn.ReceiveDatagram(context.Background())
 		if err != nil {
-
-			logger.ErrorLogger().Printf("Error receiving quic datagram %T", err)
-
 			proxy.connwrite.Lock()
 			delete(proxy.listenConnections, conn.RemoteAddr().String())
 			proxy.connwrite.Unlock()
 
-			logger.ErrorLogger().Printf("Unable to receive datagram: %s. Closing connection", err)
+			logger.ErrorLogger().Printf("Unable to receive datagram: %T:%s. Closing connection", err, err)
 			errchannel <- err
 			continue
 		}
