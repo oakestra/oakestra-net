@@ -62,6 +62,7 @@ type GoProxyTunnel struct {
 	quicwrite           sync.RWMutex
 	tunwrite            sync.RWMutex
 	connwrite           sync.RWMutex
+	connecting          map[string]bool
 	isListening         bool
 }
 
@@ -400,6 +401,17 @@ func (proxy *GoProxyTunnel) forward(dstHost net.IP, dstPort int, packet gopacket
 }
 
 func (proxy *GoProxyTunnel) createQUICChannel(hoststring string) (*quic.Conn, error) {
+	// make sure node is not already establishing connection
+	if _, ok := proxy.connecting[hoststring]; ok {
+		logger.DebugLogger().Println("Already connecting to", hoststring)
+		return nil, errors.New(fmt.Sprintf("node is already trying to connect to %s", hoststring))
+	}
+	proxy.connecting[hoststring] = true
+
+	defer func() {
+		delete(proxy.connecting, hoststring)
+	}()
+
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"quic-proxy"},
