@@ -68,8 +68,6 @@ func RequestNATTraversal(src string, dst string, oid string, timestamp time.Time
 
 // natTraversalMqttHandler receives a nat traversal request from the cluster
 func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
-	logger.DebugLogger().Println("Received NAT Traversal request")
-	// msg is natTraversalPayload
 	responseStruct := natTraversalPayload{}
 
 	logger.DebugLogger().Printf("NAT traversal request received: %s", string(msg.Payload()))
@@ -107,6 +105,7 @@ func natTraversalMqttHandler(_ mqtt.Client, msg mqtt.Message) {
 		}
 	} else {
 		logger.DebugLogger().Printf("I am Node A")
+		logger.DebugLogger().Printf("Timestamp: %v", timestamp)
 	}
 
 	natTraversal.ConnectOverNAT(hoststring, timestamp)

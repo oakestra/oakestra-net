@@ -152,6 +152,8 @@ def _nattraversal_handler(client_id, payload):
 
     oid = payload.get("originator_id", "")
     if oid != "":
+        timestamp = payload.get("timestamp", 0)
+        app.logger.debug("Sending payload to Node A with timestamp %s", timestamp)
         mqtt_publish_nat_traversal_result(oid, {
             "src": payload.get("dst", ""),
             "nat_src": payload.get("nat_dst", ""),
