@@ -108,6 +108,8 @@ func ConnectOverNAT(natHoststring string, timestamp time.Time) {
 	}
 	time.Sleep(duration)
 
+	logger.DebugLogger().Printf("Starting connection attempt at %s", time.Now().String())
+
 	// repeat up to 5 times with small delay between attempts
 	for i := 0; i < 5; i++ {
 		conn, err = quic.DialAddr(ctx, natHoststring, tlsConf, quicConf)
