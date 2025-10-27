@@ -36,8 +36,8 @@ func (m *WasmManager) Register(Env *env.Environment, WorkerID *string, NodePubli
 
 	env.InitWasmDeployment(Env)
 
-	Router.HandleFunc("/wasm/deploy", m.DeployWasmNamespace).Methods("POST")
-	Router.HandleFunc("/wasm/undeploy", m.DeleteWasmNamespace).Methods("POST")
+	Router.HandleFunc("/wasm/deploy", m.DeployWasmServiceNetwork).Methods("POST")
+	Router.HandleFunc("/wasm/undeploy", m.DeleteWasmServiceNetwork).Methods("POST")
 }
 
 /*
@@ -59,7 +59,7 @@ Response JSON:
 		"nsAddressV6": "fd00:1:2:3::2"
 	}
 */
-func (m *WasmManager) DeployWasmNamespace(writer http.ResponseWriter, request *http.Request) {
+func (m *WasmManager) DeployWasmServiceNetwork(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /wasm/deploy")
 
 	if *m.WorkerID == "" {
@@ -74,7 +74,7 @@ func (m *WasmManager) DeployWasmNamespace(writer http.ResponseWriter, request *h
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	
+
 	log.Printf("ReqBody received: %s", reqBody)
 	var requestStruct ContainerDeployTask
 	err = json.Unmarshal(reqBody, &requestStruct)
@@ -117,7 +117,7 @@ func (m *WasmManager) DeployWasmNamespace(writer http.ResponseWriter, request *h
 		ServiceName: requestStruct.ServiceName,
 		NsAddress:   result.IP.String(),
 	}
-	
+
 	if result.IPv6 != nil {
 		response.NsAddressV6 = result.IPv6.String()
 	}
@@ -145,7 +145,7 @@ Request JSON:
 
 Response: 200 OK or an error code.
 */
-func (m *WasmManager) DeleteWasmNamespace(writer http.ResponseWriter, request *http.Request) {
+func (m *WasmManager) DeleteWasmServiceNetwork(writer http.ResponseWriter, request *http.Request) {
 	log.Println("Received HTTP request - /wasm/undeploy")
 
 	if *m.WorkerID == "" {
@@ -160,7 +160,7 @@ func (m *WasmManager) DeleteWasmNamespace(writer http.ResponseWriter, request *h
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	
+
 	var requestStruct undeployRequest
 	err = json.Unmarshal(reqBody, &requestStruct)
 	if err != nil {
@@ -177,8 +177,8 @@ func (m *WasmManager) DeleteWasmNamespace(writer http.ResponseWriter, request *h
 	}
 
 	log.Println("WASM undeploy request:", requestStruct)
-	m.Env.DeleteWasmNamespace(requestStruct.Servicename, requestStruct.Instancenumber)
-	
+	m.Env.DetachContainer(requestStruct.Servicename, requestStruct.Instancenumber)
+
 	// Return success response
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
@@ -187,10 +187,10 @@ func (m *WasmManager) DeleteWasmNamespace(writer http.ResponseWriter, request *h
 		Message string `json:"message"`
 	}{
 		Success: true,
-		Message: fmt.Sprintf("Successfully removed WASM namespace for service %s instance %d", 
+		Message: fmt.Sprintf("Successfully removed WASM namespace for service %s instance %d",
 			requestStruct.Servicename, requestStruct.Instancenumber),
 	}
-	
+
 	if err := json.NewEncoder(writer).Encode(response); err != nil {
 		logger.ErrorLogger().Printf("Failed to encode response: %v", err)
 	}
