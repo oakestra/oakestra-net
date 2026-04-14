@@ -60,8 +60,13 @@ def root_table_query_ip(ip):
     request_addr = (
         ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/ip/" + str(job_ip) + "/instances"
     )
+
+    cluster_ip = os.environ.get("CLUSTER_IP")
+    if cluster_ip:
+        params = {"cluster_ip": cluster_ip}
+
     try:
-        return requests.get(request_addr).json()
+        return requests.get(request_addr, params=params).json()
     except requests.exceptions.RequestException:
         logger.error("Calling System Manager /api/job/ip/../instances not successful.")
 
@@ -71,8 +76,13 @@ def root_table_query_service_name(name):
     request_addr = (
         ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/" + str(job_name) + "/instances"
     )
+
+    cluster_ip = os.environ.get("CLUSTER_IP")
+    if cluster_ip:
+        params = {"cluster_ip": cluster_ip}
+
     try:
-        resp = requests.get(request_addr)
+        resp = requests.get(request_addr, params=params)
         return resp.json()
     except requests.exceptions.RequestException as e:
         logger.error(e)
@@ -81,8 +91,13 @@ def root_table_query_service_name(name):
 
 def root_remove_interest(job_name):
     request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/interest/" + str(job_name)
+
+    cluster_ip = os.environ.get("CLUSTER_IP")
+    if cluster_ip:
+        params = {"cluster_ip": cluster_ip}
+    
     try:
-        result = requests.delete(request_addr)
+        result = requests.delete(request_addr, params=params)
         if result.status_code == 404:
             # TODO fallback cluster re-register and re-register the interests
             logger.error(result)
