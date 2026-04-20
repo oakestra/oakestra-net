@@ -4,6 +4,7 @@ import (
 	"NetManager/env"
 	"NetManager/handlers"
 	"NetManager/logger"
+	"NetManager/model"
 	"NetManager/mqtt"
 	"NetManager/network"
 	"NetManager/proxy"
@@ -14,9 +15,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 )
+
+const IP_UPDATE_TIMER = 2 * time.Minute
 
 type undeployRequest struct {
 	Servicename    string `json:"serviceName"`
@@ -33,34 +37,44 @@ type DeployResponse struct {
 	NsAddress   string `json:"nsAddress"`
 }
 
-type netConfiguration struct {
-	NodePublicAddress string
-	NodePublicPort    string
-	ClusterUrl        string
-	ClusterMqttPort   string
-	Debug             bool
-	MqttCert          string
-	MqttKey           string
+func update() {
+	for {
+		time.Sleep(IP_UPDATE_TIMER)
+		defaultLink := network.GetOutboundIP()
+		if model.NetConfig.NodePublicAddress != defaultLink.String() {
+			logger.InfoLogger().Printf("Updating NodePublicAddress from %s to %s", model.NetConfig.NodePublicAddress, defaultLink.String())
+			// update service in the cluster
+			//for each service instance in the worker, update the public address
+			for _, si := range Env.GetTableEntriesOnNode() {
+				err := mqtt.NotifyAddressChange(si.Appname, si.Instancenumber, defaultLink.String(), model.NetConfig.NodePublicPort)
+				if err != nil {
+					logger.ErrorLogger().Println("[ERROR]:", err)
+				}
+			}
+			model.NetConfig.NodePublicAddress = defaultLink.String()
+		}
+	}
 }
 
 func HandleRequests(port int) {
 	netRouter := mux.NewRouter().StrictSlash(true)
 	netRouter.HandleFunc("/register", register).Methods("POST")
 
-	//If default route, fetch default gateway address and use that.
-	if Configuration.NodePublicAddress == "0.0.0.0" {
+	//If default route, fetch default gateway address and use that, update regularly
+	if model.NetConfig.NodePublicAddress == "0.0.0.0" {
 		defaultLink := network.GetOutboundIP()
-		Configuration.NodePublicAddress = defaultLink.String()
+		model.NetConfig.NodePublicAddress = defaultLink.String()
+		go update()
 	}
 
-	handlers.RegisterAllManagers(&Env, &WorkerID, Configuration.NodePublicAddress, Configuration.NodePublicPort, netRouter)
+	handlers.RegisterAllManagers(&Env, &model.WorkerID, model.NetConfig.NodePublicAddress, model.NetConfig.NodePublicPort, netRouter)
 
 	if port <= 0 {
 		logger.InfoLogger().Println("Starting NetManager on unix socket /etc/netmanager/netmanager.sock")
 		_ = os.Remove("/etc/netmanager/netmanager.sock")
 		listener, err := net.Listen("unix", "/etc/netmanager/netmanager.sock")
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Could not create listner: %s", err)
 		}
 		log.Fatal(http.Serve(listener, netRouter))
 	} else {
@@ -69,10 +83,8 @@ func HandleRequests(port int) {
 }
 
 var (
-	Env           env.Environment
-	Proxy         proxy.GoProxyTunnel
-	WorkerID      string
-	Configuration netConfiguration
+	Env   env.Environment
+	Proxy proxy.GoProxyTunnel
 )
 
 /*
@@ -99,8 +111,8 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	log.Println(requestStruct)
 
 	// drop the request if the node is already initialized
-	if WorkerID != "" {
-		if WorkerID == requestStruct.ClientID {
+	if model.WorkerID != "" {
+		if model.WorkerID == requestStruct.ClientID {
 			logger.InfoLogger().Printf("Node already initialized")
 			writer.WriteHeader(http.StatusOK)
 		} else {
@@ -110,24 +122,24 @@ func register(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	WorkerID = requestStruct.ClientID
+	model.WorkerID = requestStruct.ClientID
 
 	//Use default cluster address given by NodeEngine version >= v0.4.302
 	if requestStruct.ClusterAddress != "" {
-		Configuration.ClusterUrl = requestStruct.ClusterAddress
+		model.NetConfig.ClusterUrl = requestStruct.ClusterAddress
 	}
 
 	//log registration startup
 	logger.InfoLogger().Printf(
 		"STARTUP_CONFIG: Node=%s:%s | Cluster=%s:%s",
-		Configuration.NodePublicAddress,
-		Configuration.NodePublicPort,
-		Configuration.ClusterUrl,
-		Configuration.ClusterMqttPort,
+		model.NetConfig.NodePublicAddress,
+		model.NetConfig.NodePublicPort,
+		model.NetConfig.ClusterUrl,
+		model.NetConfig.ClusterMqttPort,
 	)
 
 	// initialize mqtt connection to the broker
-	mqtt.InitNetMqttClient(requestStruct.ClientID, Configuration.ClusterUrl, Configuration.ClusterMqttPort, Configuration.MqttCert, Configuration.MqttKey)
+	mqtt.InitNetMqttClient(requestStruct.ClientID, model.NetConfig.ClusterUrl, model.NetConfig.ClusterMqttPort, model.NetConfig.MqttCert, model.NetConfig.MqttKey)
 
 	// initialize the proxy tunnel
 	Proxy = proxy.New()
