@@ -67,6 +67,14 @@ jwt = JWTManager(app)
 MY_PORT = os.environ.get("MY_PORT") or 10100
 
 
+def determine_cluster_ip(request):
+    cluster_ip = request.args.get("cluster_ip")
+    if cluster_ip:
+        return sanitize(cluster_ip)
+
+    return sanitize(request.remote_addr)
+
+
 # .............. Cluster Registration ..................#
 # ......................................................#
 
@@ -101,11 +109,11 @@ def deregister_cluster_interest(job_name):
     """
     Deregistration of an interest
     json file structure:{
-        'job_name':string
+        'cluster_ip':string
     }
     """
     logger.info("Incoming Request DELETE /api/net/interest/" + job_name)
-    addr = sanitize(request.remote_addr)
+    addr = determine_cluster_ip(request)
     return routes_interests.deregister_interest(addr, job_name)
 
 
@@ -217,7 +225,7 @@ def table_query_resolution_by_jobname(service_name):
     service_name = service_name.replace("_", ".")
     logger.info("Incoming Request /api/net/service/" + str(service_name) + "/instances")
     return instances_management.get_service_instances(
-        name=service_name, cluster_ip=request.remote_addr
+        name=service_name, cluster_ip=determine_cluster_ip(request)
     )
 
 
@@ -231,7 +239,7 @@ def table_query_resolution_by_ip(service_ip):
         "Incoming Request /api/net/service/ip/" + str(service_ip) + "/instances"
     )
     return instances_management.get_service_instances(
-        ip=service_ip, cluster_ip=request.remote_addr
+        ip=service_ip, cluster_ip=determine_cluster_ip(request)
     )
 
 
