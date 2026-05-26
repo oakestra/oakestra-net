@@ -139,7 +139,7 @@ func register(writer http.ResponseWriter, request *http.Request) {
 	)
 
 	// initialize mqtt connection to the broker
-	mqtt.InitNetMqttClient(requestStruct.ClientID, model.NetConfig.ClusterUrl, model.NetConfig.ClusterMqttPort, model.NetConfig.MqttCert, model.NetConfig.MqttKey)
+	mqtt.InitNetMqttClient(requestStruct.ClientID, model.NetConfig.ClusterUrl, model.NetConfig.ClusterMqttPort, model.NetConfig.MqttCert, model.NetConfig.MqttKey, model.NetConfig.MqttCa)
 
 	// initialize the proxy tunnel
 	Proxy = proxy.New()
