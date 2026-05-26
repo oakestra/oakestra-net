@@ -94,6 +94,7 @@ def root_table_query_ip(ip):
         ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/ip/" + str(job_ip) + "/instances"
     )
 
+    params = None
     cluster_ip = os.environ.get("CLUSTER_IP")
     if cluster_ip:
         params = {"cluster_ip": cluster_ip}
@@ -110,6 +111,7 @@ def root_table_query_service_name(name):
         ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/" + str(job_name) + "/instances"
     )
 
+    params = None
     cluster_ip = os.environ.get("CLUSTER_IP")
     if cluster_ip:
         params = {"cluster_ip": cluster_ip}
@@ -125,6 +127,7 @@ def root_table_query_service_name(name):
 def root_remove_interest(job_name):
     request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/interest/" + str(job_name)
 
+    params = None
     cluster_ip = os.environ.get("CLUSTER_IP")
     if cluster_ip:
         params = {"cluster_ip": cluster_ip}
