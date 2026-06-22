@@ -18,12 +18,24 @@ ROOT_CA_FILE = os.environ.get("ROOT_CA_FILE")
 # Manual port override in case cluster is behind gateway
 CLUSTER_GATEWAY_PORT = os.environ.get("CLUSTER_GATEWAY_PORT")
 
+# What to verify the cluster gateway's *server* cert against:
+#   ""       -> the internal root CA (default; works with the fallback gateway cert)
+#   "system" -> the system trust store (cluster uses a BYO public cert)
+#   <path>   -> a custom CA bundle
+CLUSTER_GATEWAY_TRUST = os.environ.get("CLUSTER_GATEWAY_TRUST", "")
+
 
 def _mtls_enabled() -> bool:
     return all(
         path and os.path.isfile(path)
         for path in (ROOT_CERT_FILE, ROOT_KEY_FILE, ROOT_CA_FILE)
     )
+
+
+def _gateway_verify():
+    if CLUSTER_GATEWAY_TRUST == "system":
+        return True
+    return CLUSTER_GATEWAY_TRUST or ROOT_CA_FILE
 
 
 def notify_undeployment(cluster_addr, cluster_port, job_name, instancenum):
@@ -62,7 +74,7 @@ def request_with_retry(url, json):
 
     if _mtls_enabled():
         s.cert = (ROOT_CERT_FILE, ROOT_KEY_FILE)
-        s.verify = ROOT_CA_FILE
+        s.verify = _gateway_verify()
 
     session = s.post(url=url, json=json, timeout=2)
     return session.status_code

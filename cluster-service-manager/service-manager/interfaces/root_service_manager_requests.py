@@ -15,6 +15,12 @@ ROOT_SERVICE_MANAGER_USE_TLS = os.environ.get("ROOT_SERVICE_MANAGER_USE_TLS", ""
     "yes",
 )
 
+# What to verify the root gateway's *server* cert against:
+#   ""       -> the internal root CA (default; works with the fallback gateway cert)
+#   "system" -> the system trust store (root gateway uses a BYO public cert)
+#   <path>   -> a custom CA bundle
+ROOT_GATEWAY_TRUST = os.environ.get("ROOT_GATEWAY_TRUST", "")
+
 
 def _mtls_enabled() -> bool:
     if not ROOT_SERVICE_MANAGER_USE_TLS:
@@ -23,6 +29,12 @@ def _mtls_enabled() -> bool:
         path and os.path.isfile(path)
         for path in (CLUSTER_CERT_FILE, CLUSTER_KEY_FILE, ROOT_CA_FILE)
     )
+
+
+def _gateway_verify():
+    if ROOT_GATEWAY_TRUST == "system":
+        return True
+    return ROOT_GATEWAY_TRUST or ROOT_CA_FILE
 
 
 _scheme = "https" if _mtls_enabled() else "http"
@@ -39,7 +51,7 @@ def _build_session() -> requests.Session:
     session = requests.Session()
     if _mtls_enabled():
         session.cert = (CLUSTER_CERT_FILE, CLUSTER_KEY_FILE)
-        session.verify = ROOT_CA_FILE
+        session.verify = _gateway_verify()
     return session
 
 
