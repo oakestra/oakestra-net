@@ -69,8 +69,8 @@ def mqtt_init(flask_app):
         try:
             mqtt.tls_set(
                 ca_certs=os.environ.get("MQTT_CERT") + "/ca.crt",
-                certfile=os.environ.get("MQTT_CERT") + "/cluster_net.crt",
-                keyfile=os.environ.get("MQTT_CERT") + "/cluster_net.key",
+                certfile=os.environ.get("MQTT_CERT") + "/cluster.crt",
+                keyfile=os.environ.get("MQTT_CERT") + "/cluster.key",
                 keyfile_password=os.environ.get("CLUSTER_SERVICE_KEYFILE_PASSWORD"),
             )
             logger.info("MQTT - TLS configured")
@@ -166,7 +166,7 @@ def _tablequery_handler(client_id, payload):
         "instance_list": resolution.format_instance_response(instances, siplist),
         "query_key": query_key,
     }
-    logger.debug("Tablequery Result: ", result)
+    logger.debug("Tablequery Result: %s", result)
     mqtt_publish_tablequery_result(client_id, result)
 
 

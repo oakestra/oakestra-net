@@ -3,8 +3,10 @@ package mqtt
 import (
 	"NetManager/logger"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +24,7 @@ type NetMqttClient struct {
 	brokerPort             string
 	mqttCert               string
 	mqttKey                string
+	mqttCa                 string
 	mqttWriteMutex         *sync.Mutex
 	mqttTopicsMutex        *sync.RWMutex
 	tableQueryRequestCache *TableQueryRequestCache
@@ -29,7 +32,7 @@ type NetMqttClient struct {
 
 var netMqttClient NetMqttClient
 
-func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqttcert string, mqttkey string) *NetMqttClient {
+func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqttcert string, mqttkey string, mqttca string) *NetMqttClient {
 	initMqttClient.Do(func() {
 		netMqttClient = NetMqttClient{
 			topics:                 make(map[string]mqtt.MessageHandler),
@@ -39,6 +42,7 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			brokerPort:             brokerport,
 			mqttCert:               mqttcert,
 			mqttKey:                mqttkey,
+			mqttCa:                 mqttca,
 			mqttWriteMutex:         &sync.Mutex{},
 			mqttTopicsMutex:        &sync.RWMutex{},
 			tableQueryRequestCache: GetTableQueryRequestCacheInstance(),
@@ -87,7 +91,6 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			subnetworkAssignmentMqttHandler
 
 		opts := mqtt.NewClientOptions()
-		opts.AddBroker(fmt.Sprintf("tcp://%s:%s", netMqttClient.brokerUrl, netMqttClient.brokerPort))
 		opts.SetClientID(clientid)
 		opts.SetUsername("")
 		opts.SetPassword("")
@@ -100,12 +103,27 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			cert, err := tls.LoadX509KeyPair(netMqttClient.mqttCert, netMqttClient.mqttKey)
 			logger.InfoLogger().Printf("Cert: %s, Key: %s", netMqttClient.mqttCert, netMqttClient.mqttKey)
 			if err != nil {
-				logger.ErrorLogger().Printf("Error loading certificate: %v", err)
+				logger.ErrorLogger().Fatalf("Error loading certificate: %v", err)
 			}
-			opts.SetTLSConfig(&tls.Config{
+			tlsCfg := &tls.Config{
 				Certificates: []tls.Certificate{cert},
-			})
+				MinVersion:   tls.VersionTLS12,
+			}
+			if netMqttClient.mqttCa != "" {
+				caPem, err := os.ReadFile(netMqttClient.mqttCa)
+				if err != nil {
+					logger.ErrorLogger().Fatalf("Error reading cluster CA: %v", err)
+				}
+				pool := x509.NewCertPool()
+				if !pool.AppendCertsFromPEM(caPem) {
+					logger.ErrorLogger().Fatalf("Failed to parse cluster CA PEM")
+				}
+				tlsCfg.RootCAs = pool
+			}
+			opts.SetTLSConfig(tlsCfg)
 			opts.AddBroker(fmt.Sprintf("tls://%s:%s", netMqttClient.brokerUrl, netMqttClient.brokerPort))
+		} else {
+			opts.AddBroker(fmt.Sprintf("tcp://%s:%s", netMqttClient.brokerUrl, netMqttClient.brokerPort))
 		}
 
 		netMqttClient.runMqttClient(opts)
