@@ -35,6 +35,8 @@ class ServiceNetinfoSchema(Schema):
     service_ns = fields.String(allow_none=True)
     service_name = fields.String(allow_none=True)
     service_job_id = fields.String(allow_none=True)
+    rr_ip = fields.String(allow_none=True) 
+    rr_ip_v6 = fields.String(allow_none=True)
     service_ip_list = fields.Nested(ServiceIpSchema, many=True)
     instance_list = fields.Nested(InstanceSchema, many=True)
 
