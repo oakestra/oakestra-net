@@ -78,9 +78,12 @@ func BenchmarkIngoingProxyV4(b *testing.B) {
 	}
 }
 
-// BenchmarkHandleOutgoingLoopback measures the complete outgoing path -
-// parse, translate, and an actual UDP write to another node - rather than the
-// translation alone.
+// BenchmarkHandleOutgoingLoopback measures parse, translate and a real UDP
+// write to another node - but via Tunnel.Emit, i.e. the replay path with a
+// fresh scratch outgoingBatch per call, not the batched runOutgoingBatch loop
+// the daemon actually runs. That's where its allocations come from (plus the
+// write itself on platforms without sendmmsg). BenchmarkOutgoingBatchGrouping
+// covers the batched path.
 func BenchmarkHandleOutgoingLoopback(b *testing.B) {
 	tunnel, listener := loopbackTunnel(b)
 

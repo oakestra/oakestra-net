@@ -370,6 +370,35 @@ func TestWgTunDeviceErrTooManySegmentsIgnoresStaleSizes(t *testing.T) {
 	}
 }
 
+// The TUN write path stops coalescing once the head buffer's capacity runs
+// out, so the batch buffers have to fit a whole GRO superpacket, not just one
+// packet. Easy to lose to a well-meaning memory tweak, hence the test.
+func TestBatchEnvelopesFitAGROSuperpacket(t *testing.T) {
+	const wantCap = tunHeaderOffset + 65535
+
+	out := newOutgoingBatch(4)
+	for i, env := range out.envelopes {
+		if cap(env) < wantCap {
+			t.Errorf("outgoing envelope %d: cap %d; want >= %d", i, cap(env), wantCap)
+		}
+		if cap(out.bufs[i]) < wantCap {
+			t.Errorf("outgoing bufs %d: cap %d; want >= %d", i, cap(out.bufs[i]), wantCap)
+		}
+	}
+
+	in := newIngoingBatch(4)
+	for i, env := range in.envelopes {
+		if cap(env) < wantCap {
+			t.Errorf("ingoing envelope %d: cap %d; want >= %d", i, cap(env), wantCap)
+		}
+		// bufs is envelope sliced past tunHeaderOffset, so its cap is smaller
+		// by exactly that much - it should still cover a full superpacket.
+		if cap(in.bufs[i]) < 65535 {
+			t.Errorf("ingoing bufs %d: cap %d; want >= %d", i, cap(in.bufs[i]), 65535)
+		}
+	}
+}
+
 // TestUDPTunnelSocketDualStackReceive checks that udpTunnelSocket's
 // ipv6.PacketConn wrapper receives both IPv4 and IPv6 loopback datagrams
 // over the same dual-stack listen socket.

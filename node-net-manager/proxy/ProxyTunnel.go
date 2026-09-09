@@ -13,17 +13,26 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-// packetReadBufferSize is the size of Emit's pooled per-packet buffers.
-// Deliberately not shared with batchPacketCap below - that one is a fixed
-// per-loop allocation, and sizing it to this would waste megabytes per loop.
+// packetReadBufferSize is the size of Emit's pooled per-packet buffers. Kept
+// separate from batchPacketCap even though they're nearly the same: one is a
+// pool buffer for the replay path, the other the fixed per-loop set.
 const packetReadBufferSize = 64 * 1024
 
-// batchPacketCap is the per-packet payload capacity of both batched read
-// loops' buffers (ingoingBatch/outgoingBatch). These are fixed arrays of
-// TunDevice.BatchSize() buffers held for the process lifetime, so the size
-// sets a memory floor - 9000 bytes covers jumbo frames while keeping the
-// worst case (128 buffers * ~9KiB) to about 1.1MiB per loop.
-const batchPacketCap = 9000
+// batchPacketCap is the per-packet capacity of the buffers both batched read
+// loops hold for the process lifetime (ingoingBatch/outgoingBatch).
+//
+// This has to be a full IP packet, not an MTU. The TUN write path
+// (wireguard-go's Write on Linux) does GRO: same-flow TCP segments get
+// coalesced into one superpacket by appending onto the head packet's buffer
+// in place. It never grows that buffer - once the capacity is used up it
+// just starts a new superpacket, and every superpacket is a separate
+// write(2). MTU-sized buffers silently cap that at a handful of segments per
+// write; 65535 is the most an IP packet can hold, so it's where the cap
+// stops mattering.
+//
+// Mostly virtual memory: pages only get touched as GRO fills them, and the
+// outgoing loop's reads never write past one MTU-sized segment per buffer.
+const batchPacketCap = 65535
 
 // socketBufferSize is the requested SO_RCVBUF/SO_SNDBUF size for the tunnel
 // UDP sockets, so a packet burst has room to queue instead of being dropped.
