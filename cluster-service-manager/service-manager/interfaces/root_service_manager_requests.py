@@ -144,7 +144,8 @@ def root_table_query_service_name(name):
 def root_remove_interest(job_name):
     request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/interest/" + str(job_name)
 
-    params = _cluster_identity_params()
+    # Behind the gateway the root sees the proxy as remote_addr, so advertise the address.
+    params = _cluster_identity_params() if _mtls_enabled() else None
 
     try:
         result = _session.delete(request_addr, params=params)

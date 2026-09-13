@@ -91,6 +91,10 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			subnetworkAssignmentMqttHandler
 
 		opts := mqtt.NewClientOptions()
+		if netMqttClient.mqttCa == "" {
+			// Without a cluster CA (non-gateway setups) keep the plain broker first, as before.
+			opts.AddBroker(fmt.Sprintf("tcp://%s:%s", netMqttClient.brokerUrl, netMqttClient.brokerPort))
+		}
 		opts.SetClientID(clientid)
 		opts.SetUsername("")
 		opts.SetPassword("")
@@ -103,7 +107,7 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			cert, err := tls.LoadX509KeyPair(netMqttClient.mqttCert, netMqttClient.mqttKey)
 			logger.InfoLogger().Printf("Cert: %s, Key: %s", netMqttClient.mqttCert, netMqttClient.mqttKey)
 			if err != nil {
-				logger.ErrorLogger().Fatalf("Error loading certificate: %v", err)
+				logger.ErrorLogger().Printf("Error loading certificate: %v", err)
 			}
 			tlsCfg := &tls.Config{
 				Certificates: []tls.Certificate{cert},
@@ -122,8 +126,6 @@ func InitNetMqttClient(clientid string, brokerurl string, brokerport string, mqt
 			}
 			opts.SetTLSConfig(tlsCfg)
 			opts.AddBroker(fmt.Sprintf("tls://%s:%s", netMqttClient.brokerUrl, netMqttClient.brokerPort))
-		} else {
-			opts.AddBroker(fmt.Sprintf("tcp://%s:%s", netMqttClient.brokerUrl, netMqttClient.brokerPort))
 		}
 
 		netMqttClient.runMqttClient(opts)
