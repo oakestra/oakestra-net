@@ -58,6 +58,17 @@ def _build_session() -> requests.Session:
 _session = _build_session()
 
 
+def _cluster_identity_params():
+    params = {}
+    cluster_address = os.environ.get("CLUSTER_ADDRESS")
+    cluster_name = os.environ.get("CLUSTER_NAME")
+    if cluster_address:
+        params["cluster_address"] = cluster_address
+    if cluster_name:
+        params["cluster_name"] = cluster_name
+    return params
+
+
 def root_service_manager_get_subnet():
     logger.info("get subnet - logging")
     try:
@@ -106,10 +117,7 @@ def root_table_query_ip(ip):
         ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/ip/" + str(job_ip) + "/instances"
     )
 
-    params = None
-    cluster_ip = os.environ.get("CLUSTER_IP")
-    if cluster_ip:
-        params = {"cluster_ip": cluster_ip}
+    params = _cluster_identity_params()
 
     try:
         return _session.get(request_addr, params=params).json()
@@ -123,10 +131,7 @@ def root_table_query_service_name(name):
         ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/" + str(job_name) + "/instances"
     )
 
-    params = None
-    cluster_ip = os.environ.get("CLUSTER_IP")
-    if cluster_ip:
-        params = {"cluster_ip": cluster_ip}
+    params = _cluster_identity_params()
 
     try:
         resp = _session.get(request_addr, params=params)
@@ -139,10 +144,7 @@ def root_table_query_service_name(name):
 def root_remove_interest(job_name):
     request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/interest/" + str(job_name)
 
-    params = None
-    cluster_ip = os.environ.get("CLUSTER_IP")
-    if cluster_ip:
-        params = {"cluster_ip": cluster_ip}
+    params = _cluster_identity_params()
 
     try:
         result = _session.delete(request_addr, params=params)

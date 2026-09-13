@@ -67,10 +67,11 @@ jwt = JWTManager(app)
 MY_PORT = os.environ.get("MY_PORT") or 10100
 
 
-def determine_cluster_ip(request):
-    cluster_ip = request.args.get("cluster_ip")
-    if cluster_ip:
-        return sanitize(cluster_ip)
+def determine_cluster_address(request):
+    # Behind the gateway remote_addr is the proxy, so prefer the advertised address.
+    cluster_address = request.args.get("cluster_address")
+    if cluster_address:
+        return sanitize(cluster_address)
 
     return sanitize(request.remote_addr)
 
@@ -108,12 +109,12 @@ def register_new_cluster():
 def deregister_cluster_interest(job_name):
     """
     Deregistration of an interest
-    json file structure:{
-        'cluster_ip':string
+    query params:{
+        'cluster_address':string
     }
     """
     logger.info("Incoming Request DELETE /api/net/interest/" + job_name)
-    addr = determine_cluster_ip(request)
+    addr = determine_cluster_address(request)
     return routes_interests.deregister_interest(addr, job_name)
 
 
@@ -225,7 +226,9 @@ def table_query_resolution_by_jobname(service_name):
     service_name = service_name.replace("_", ".")
     logger.info("Incoming Request /api/net/service/" + str(service_name) + "/instances")
     return instances_management.get_service_instances(
-        name=service_name, cluster_ip=determine_cluster_ip(request)
+        name=service_name,
+        cluster_ip=request.args.get("cluster_address"),
+        cluster_name=request.args.get("cluster_name"),
     )
 
 
@@ -239,7 +242,9 @@ def table_query_resolution_by_ip(service_ip):
         "Incoming Request /api/net/service/ip/" + str(service_ip) + "/instances"
     )
     return instances_management.get_service_instances(
-        ip=service_ip, cluster_ip=determine_cluster_ip(request)
+        ip=service_ip,
+        cluster_ip=request.args.get("cluster_address"),
+        cluster_name=request.args.get("cluster_name"),
     )
 
 
