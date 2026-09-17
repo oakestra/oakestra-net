@@ -23,7 +23,7 @@ type ConversionEntry struct {
 	srcInstanceIp netip.Addr
 	// dstInstanceIp is the address replies actually arrive from (not dstip:
 	// the remote node's outgoingProxy sources them from its own instance IP).
-	// Zero means "matches any remote" - used when the entry has no
+	// Zero means "matches any remote", used when the entry has no
 	// InstanceNumber ServiceIP to predict a reply source from.
 	dstInstanceIp netip.Addr
 	srcport       int
@@ -58,8 +58,8 @@ func (e *ConversionEntry) touch() {
 }
 
 // conversionBucket holds every flow whose *local* port is this bucket's index.
-// Both directions key on the local port - outgoing on its source port, ingoing
-// on the reply's destination port - so one direct index serves both without
+// Both directions key on the local port (outgoing on its source port, ingoing
+// on the reply's destination port), so one direct index serves both without
 // hashing anything on the packet path.
 type conversionBucket struct {
 	entries []ConversionEntry
@@ -178,7 +178,7 @@ func (e *ConversionEntry) matchesFlow(key *FlowKey) bool {
 }
 
 // Lookup resolves the cached route for key, but only when that route was
-// chosen under gen - meaning the translation table has not been rebuilt
+// chosen under gen, meaning the translation table has not been rebuilt
 // since, so the route is known current. This is the steady-state packet path,
 // and the point of the generation check is that a hit here needs no table
 // access at all: not the Service IP index, not the namespace IP index, just
@@ -211,8 +211,8 @@ func (cache *ProxyCache) Lookup(key *FlowKey, gen uint64, route *Route) bool {
 	return false
 }
 
-// use marks the entry as just used - both for eviction and for the
-// destination job's MQTT interest - and writes its route to out. Caller must
+// use marks the entry as just used, both for eviction and for the
+// destination job's MQTT interest, and writes its route to out. Caller must
 // hold the entry's shard lock.
 func (e *ConversionEntry) use(out *Route) {
 	e.touch()
@@ -234,7 +234,7 @@ func (e *ConversionEntry) use(out *Route) {
 // have moved it; version selects the address family the refreshed reply
 // source is read in.
 //
-// ok is false when there is no cached flow, or its instance is gone - either
+// ok is false when there is no cached flow, or its instance is gone; either
 // way the caller has to choose a new route and Install it.
 func (cache *ProxyCache) Revalidate(key FlowKey, srcInstanceIP netip.Addr, version uint8, lookup resolver.ServiceLookup) (Route, bool) {
 	shard := shardOf(key.SrcPort)
@@ -319,8 +319,8 @@ func (cache *ProxyCache) Reverse(protocol uint8, localNsIP netip.Addr, localPort
 	return ReverseRoute{}, false
 }
 
-// sameFlowAs compares the full forward identity of two entries. Anything less
-// - notably comparing destination port alone - conflates distinct flows.
+// sameFlowAs compares the full forward identity of two entries. Anything less,
+// notably comparing destination port alone, conflates distinct flows.
 func (e *ConversionEntry) sameFlowAs(other *ConversionEntry) bool {
 	return e.protocol == other.protocol &&
 		e.srcport == other.srcport &&

@@ -1,12 +1,11 @@
 // Package iputils provides a zero-copy, zero-allocation view over raw IPv4
 // and IPv6 datagrams for the proxy's NAT-style translation: it swaps the
 // source and destination addresses in place and fixes up the affected
-// checksums incrementally (RFC 1624) instead of parsing into gopacket layer
-// structs, rebuilding in a fresh buffer, and re-parsing the result.
+// checksums incrementally (RFC 1624) instead of re-parsing and rebuilding
+// the packet with gopacket.
 //
-// Only addresses are ever rewritten, never ports or payload - exactly the
-// case RFC 1624 covers: the checksum can be updated from the old/new header
-// bytes alone, in O(1), without touching the payload.
+// Only addresses are ever rewritten, never ports or payload, which is
+// exactly the case RFC 1624 covers in O(1) without touching the payload.
 package iputils
 
 import "net/netip"
@@ -27,12 +26,12 @@ const (
 
 // Packet is a zero-copy view over a single raw IP datagram held in buf.
 // Every method reads or mutates buf directly; Packet itself never allocates
-// and never copies buf. The zero value is not valid - always obtain a
-// Packet via Parse.
-// Fields are ordered widest-first and l4Start is an int32 rather than an int
-// so the whole thing packs into 40 bytes: Parse returns one of these by value
-// for every packet, and the padding a natural field order leaves behind is
-// pure copy cost on that path.
+// and never copies buf. The zero value is not valid; always obtain a Packet
+// via Parse.
+//
+// Fields are ordered widest-first and l4Start is int32 rather than int so
+// the struct packs into 40 bytes. Parse returns one of these by value for
+// every packet, so any padding is pure copy cost on that path.
 type Packet struct {
 	buf      []byte
 	fragID   uint32
@@ -43,10 +42,10 @@ type Packet struct {
 }
 
 // Parse decodes buf just far enough to translate it: IP version, header
-// length, protocol, and - for the first fragment or an unfragmented packet -
-// the L4 header offset. It returns false if buf is too short or malformed
-// to safely process. buf is retained, not copied: the caller must not reuse
-// it while the returned Packet is in use.
+// length, protocol, and (for an unfragmented packet or the first fragment)
+// the L4 header offset. It returns false if buf is too short or malformed.
+// buf is retained, not copied, so the caller must not reuse it while the
+// returned Packet is in use.
 func Parse(buf []byte) (Packet, bool) {
 	if len(buf) < 1 {
 		return Packet{}, false
@@ -76,10 +75,9 @@ func parseIPv4(buf []byte) (Packet, bool) {
 		protocol: buf[9],
 		l4Start:  -1,
 	}
-	// Fragment Offset is the low 13 bits of the flags+offset field, and MF
-	// (More Fragments) is bit 0x2000. Only the first fragment (offset 0)
-	// carries an L4 header - later fragments are raw payload continuation and
-	// must not be parsed as one.
+	// Fragment Offset is the low 13 bits of the flags+offset field, MF (More
+	// Fragments) is bit 0x2000. Only the first fragment (offset 0) carries
+	// an L4 header; later fragments are raw payload continuation.
 	flagsAndOffset := readUint16(buf[6:8])
 	fragOffset := flagsAndOffset & 0x1fff
 	p.fragment = fragOffset != 0 || flagsAndOffset&0x2000 != 0
@@ -180,8 +178,8 @@ func (p Packet) HasTransport() bool {
 }
 
 // IsFragment reports whether this packet is one fragment of a larger
-// datagram - including the first one, which is indistinguishable from an
-// unfragmented packet by its L4 header alone.
+// datagram, including the first one (which looks just like an unfragmented
+// packet from its L4 header alone).
 func (p Packet) IsFragment() bool { return p.fragment }
 
 // IsFirstFragment reports whether this fragment carries the datagram's
@@ -222,11 +220,11 @@ func (p Packet) DstPort() uint16 {
 func (p Packet) Bytes() []byte { return p.buf }
 
 // Rewrite replaces the packet's source and destination IP addresses in
-// place and fixes up the affected checksums - the IPv4 header checksum and
-// the TCP/UDP checksum (which covers the pseudo-header's addresses) - using
-// RFC 1624 incremental updates. Cost is O(1): it never reads or copies the
-// payload. Returns false if newSrc/newDst don't match the packet's address
-// family or the buffer is too short to be a valid packet.
+// place and fixes up the affected checksums (the IPv4 header checksum and
+// the TCP/UDP checksum, which covers the pseudo-header's addresses) using
+// RFC 1624 incremental updates. It never reads or copies the payload.
+// Returns false if newSrc/newDst don't match the packet's address family or
+// the buffer is too short to be valid.
 func (p Packet) Rewrite(newSrc, newDst netip.Addr) bool {
 	if p.version == 4 {
 		return p.rewriteV4(newSrc, newDst)
@@ -276,12 +274,11 @@ func (p Packet) rewriteV6(newSrc, newDst netip.Addr) bool {
 }
 
 // patchL4Checksum fixes up the TCP/UDP checksum at l4Start for the address
-// swap described by delta, via RFC 1624 incremental update (checksumAdjust).
-// ipv4UDP selects IPv4/UDP's special case, where a stored checksum of
-// 0x0000 means "not computed" and must be left untouched rather than
-// patched - unlike TCP and IPv6/UDP, where the checksum is mandatory and a
-// result that folds to 0 is instead transmitted as the reserved all-ones
-// value.
+// swap described by delta, via RFC 1624 incremental update. ipv4UDP selects
+// IPv4/UDP's special case: a stored checksum of 0x0000 means "not computed"
+// and must be left alone. TCP and IPv6/UDP have no such exception; there a
+// checksum that folds to 0 is transmitted as the reserved all-ones value
+// instead.
 func patchL4Checksum(buf []byte, l4Start int, protocol uint8, delta uint64, ipv4UDP bool) {
 	switch protocol {
 	case ProtoTCP:

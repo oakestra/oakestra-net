@@ -104,10 +104,9 @@ func TestNegativeCacheExpires(t *testing.T) {
 	<-done
 }
 
-// A successful cold lookup must be shared by every packet waiting on the same
-// Service IP, install the complete response, and turn later lookups into local
-// cache hits. The proxy replay tests cover what happens after Resolving closes;
-// this test covers the real resolver on the other side of that channel.
+// The proxy replay tests cover what happens after Resolving closes; this one
+// covers the resolver side: sharing one in-flight query and installing the
+// full response so later lookups hit the local cache.
 func TestSuccessfulLookupInstallsAndReusesResolvedEntries(t *testing.T) {
 	const (
 		job = "app.ns.svc.svcns"

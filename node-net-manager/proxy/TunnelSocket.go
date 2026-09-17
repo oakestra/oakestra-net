@@ -8,7 +8,7 @@ import (
 
 // TunnelSocket abstracts the tunnel's listen socket: batched reads off it
 // (recvmmsg, where the kernel supports it). Sending to a peer never goes
-// through this socket - every outgoing send has a specific peer, and that
+// through this socket: every outgoing send has a specific peer, and that
 // traffic goes out over connectionBuffer's per-peer dialled connections
 // instead (see Tunnel.sendOverTunnelBatch and tunnelConn.batch).
 type TunnelSocket interface {
@@ -23,14 +23,14 @@ type TunnelSocket interface {
 // and Darwin: a bare port with no host resolves to the unspecified address,
 // and "udp" (rather than "udp4"/"udp6") leaves IPV6_V6ONLY off, so v4 peers
 // arrive as v4-mapped v6 addresses on the same socket. Wrap it in
-// ipv6.NewPacketConn, not ipv4's - ipv4.NewPacketConn only sees the raw v6
+// ipv6.NewPacketConn, not ipv4's: ipv4.NewPacketConn only sees the raw v6
 // addresses and fails to read the v4-mapped ones. See
 // TestUDPTunnelSocketDualStackReceive.
 type udpTunnelSocket struct {
 	conn *net.UDPConn
 	pc   *ipv6.PacketConn
-	// msgs is reused across ReadBatch calls - this socket has a single
-	// reader (see ingoingLoop) - so batching doesn't cost an allocation per
+	// msgs is reused across ReadBatch calls. This socket has a single
+	// reader (see ingoingLoop), so batching doesn't cost an allocation per
 	// call. It grows to fit the largest bufs any caller has passed so far.
 	msgs []ipv6.Message
 }

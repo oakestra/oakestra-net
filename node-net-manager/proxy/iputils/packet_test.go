@@ -228,13 +228,9 @@ func TestRewriteV4UDPZeroChecksumStaysZero(t *testing.T) {
 }
 
 func TestRewriteNeverProducesZeroUDPChecksum(t *testing.T) {
-	// Any incremental update that folds to exactly 0 must be transmitted as
-	// 0xffff instead, both because 0 means "no checksum" on IPv4/UDP and
-	// because IPv6/UDP must never carry a zero checksum at all. Exhaustively
-	// try many src/dst pairs against a handful of base packets - if the
-	// adjusted checksum is ever internally computed as 0, checksumAdjust
-	// must have promoted it, so we just need to confirm we never observe a
-	// literal 0x0000 next to a non-zero original checksum.
+	// 0x0000 is invalid here for both families (no-checksum on IPv4/UDP,
+	// forbidden on IPv6/UDP), so any adjustment that folds to zero must come
+	// out as 0xffff instead. Sweep enough src/dst pairs to actually hit that case.
 	for _, v6 := range []bool{false, true} {
 		var wire []byte
 		if v6 {
@@ -284,9 +280,8 @@ func netFmtV6(a, b int) string {
 // --- fragmentation ---
 
 func TestNonFirstFragmentHasNoTransport(t *testing.T) {
-	// Hand-build a minimal 20-byte IPv4 header for a non-first fragment
-	// (fragment offset > 0): the bytes after the header are payload
-	// continuation, not a TCP/UDP header, and must not be parsed as one.
+	// Non-first fragment (offset > 0): the bytes after the header are
+	// payload continuation, not a TCP/UDP header.
 	buf := make([]byte, 40)
 	buf[0] = 0x45 // version 4, IHL 5
 	buf[9] = 6    // protocol TCP

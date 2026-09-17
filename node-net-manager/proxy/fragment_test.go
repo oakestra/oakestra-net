@@ -8,10 +8,9 @@ import (
 	"testing"
 )
 
-// fragmentIPv4 splits a complete IPv4 datagram the way the kernel would when
-// it exceeds the outgoing MTU: the transport header rides on the first
-// fragment only, and everything after it is raw payload continuation.
-// splitAt is an offset into the IP payload and must be a multiple of 8.
+// fragmentIPv4 splits a datagram the way the kernel would: the transport
+// header only survives on the first fragment. splitAt is an offset into the
+// payload and must be a multiple of 8.
 func fragmentIPv4(t testing.TB, wire []byte, splitAt int) (first, later []byte) {
 	t.Helper()
 	if splitAt%8 != 0 {
@@ -132,7 +131,6 @@ func TestOutgoingFragmentedDatagram(t *testing.T) {
 		t.Fatal("later fragment rewrite failed")
 	}
 
-	// It must end up addressed exactly like its first fragment...
 	if laterPkt.SrcIP() != firstPkt.SrcIP() || laterPkt.DstIP() != firstPkt.DstIP() {
 		t.Errorf("later fragment translated to %s -> %s; want %s -> %s",
 			laterPkt.SrcIP(), laterPkt.DstIP(), firstPkt.SrcIP(), firstPkt.DstIP())
@@ -141,12 +139,10 @@ func TestOutgoingFragmentedDatagram(t *testing.T) {
 		t.Errorf("later fragment routed to %s:%d; want %s:%d",
 			translation.dstNode, translation.dstNodePort, node, port)
 	}
-	// ...with a valid header checksum...
 	if got := ipv4HeaderChecksum(laterPkt.Bytes()[:20]); got != 0 {
 		t.Errorf("IPv4 header checksum does not verify (residual %#04x)", got)
 	}
-	// ...and its payload bytes untouched: there is no transport header here
-	// to patch, and touching the payload would corrupt the datagram.
+	// no transport header to patch here, so the payload bytes must be untouched.
 	if !bytes.Equal(laterPkt.Bytes()[20:], laterPayloadBefore) {
 		t.Error("later fragment payload was modified")
 	}
@@ -198,8 +194,8 @@ func TestFragmentedDatagramIPv6(t *testing.T) {
 	}
 }
 
-// TestFragmentStateIsolation checks the parts of the key that stop one
-// datagram's translation being applied to another's fragments.
+// TestFragmentStateIsolation makes sure no field of the key can be ignored
+// when matching a later fragment to its datagram.
 func TestFragmentStateIsolation(t *testing.T) {
 	cache := newFragmentCache()
 	base := fragmentKey{
@@ -264,9 +260,8 @@ func TestFragmentCacheBounded(t *testing.T) {
 	}
 }
 
-// TestUnknownLaterFragmentDropped checks that a fragment whose first fragment
-// was never seen here is dropped: there is no way to make it consistent with
-// its siblings.
+// TestUnknownLaterFragmentDropped: without the first fragment there's no way
+// to translate this one consistently, so it must be dropped untouched.
 func TestUnknownLaterFragmentDropped(t *testing.T) {
 	dp := getFakeDatapath()
 	wire := buildUDPv4(t, clientNsIP, serverVIP, 40000, 53, largePayload(2000))
@@ -285,9 +280,8 @@ func TestUnknownLaterFragmentDropped(t *testing.T) {
 	}
 }
 
-// TestHandleOutgoingForwardsWholeDatagram drives the complete outgoing path
-// over a real socket: every fragment of an oversized UDP datagram must reach
-// the same node, consistently translated.
+// TestHandleOutgoingForwardsWholeDatagram runs both fragments through a real
+// socket and checks they both land on the same node, translated the same way.
 func TestHandleOutgoingForwardsWholeDatagram(t *testing.T) {
 	tunnel, listener := loopbackTunnel(t)
 

@@ -32,7 +32,7 @@ func SetDebugMode() {
 }
 
 // IsDebug reports whether debug logging is enabled. Guard DebugLogger() calls
-// on hot paths with this - DebugLogger() still formats its arguments and
+// on hot paths with this: DebugLogger() still formats its arguments and
 // takes the logger mutex even when the output is discarded.
 func IsDebug() bool {
 	return debugMode

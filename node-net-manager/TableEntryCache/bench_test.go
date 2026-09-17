@@ -39,7 +39,7 @@ func BenchmarkSearchByServiceIP(b *testing.B) {
 	for _, n := range []int{10, 100, 500} {
 		b.Run(fmt.Sprintf("entries=%d", n), func(b *testing.B) {
 			table := populatedTable(n)
-			// look up the last entry inserted - worst case for a linear scan
+			// last entry inserted, the worst case for a linear scan
 			target := netip.MustParseAddr(fmt.Sprintf("10.30.%d.%d", (n-1)/250, (n-1)%250))
 			b.ReportAllocs()
 			b.ResetTimer()

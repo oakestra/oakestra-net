@@ -19,7 +19,7 @@ const (
 
 // fragmentKey identifies one datagram in flight. The identification field is
 // only unique per source/destination/protocol pair, and IPv4 and IPv6 number
-// their fragments independently, so all of that belongs in the key - otherwise
+// their fragments independently, so all of that belongs in the key; otherwise
 // an unrelated datagram reusing an ID would pick up stale translation state.
 type fragmentKey struct {
 	src, dst netip.Addr

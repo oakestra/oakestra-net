@@ -11,13 +11,10 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-// fakeBatchWriter stands in for a real *ipv4.PacketConn/*ipv6.PacketConn (see
-// tunnelConn.batch), counting calls and recording every packet handed to it.
-// If err is set, every call fails and records nothing.
-//
-// A failed call returns -1, not 0, because that is what Linux does: WriteBatch
-// passes sendmmsg(2)'s return through untouched. Darwin normalises it to 0, and
-// a fake that copied Darwin is how the negative count slipped past to begin with.
+// fakeBatchWriter stands in for *ipv4.PacketConn/*ipv6.PacketConn (see
+// tunnelConn.batch). Failed calls return -1, not 0, because that's what
+// Linux's sendmmsg(2) does; a fake that returned 0 like Darwin is how the
+// negative-count bug slipped through before.
 type fakeBatchWriter struct {
 	calls   int
 	written [][]byte
@@ -35,9 +32,9 @@ func (f *fakeBatchWriter) WriteBatch(ms []ipv4.Message, flags int) (int, error) 
 	return len(ms), nil
 }
 
-// fakeConn returns a tunnelConn whose batched writes go through writer. conn
-// itself is a real (if unused) UDP socket, since a write failure closes and
-// redials it exactly as the real path does.
+// fakeConn returns a tunnelConn whose batched writes go through writer. The
+// underlying conn is a real (unused) UDP socket, since a write failure closes
+// and redials it just like the real path.
 func fakeConn(t testing.TB, writer batchWriter) *tunnelConn {
 	t.Helper()
 	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9})
@@ -48,9 +45,7 @@ func fakeConn(t testing.TB, writer batchWriter) *tunnelConn {
 	return &tunnelConn{conn: conn, batch: writer}
 }
 
-// TestOutgoingBatchAmortisesSyscalls checks that N packets bound for K
-// distinct destinations in one TunDevice read reach the network through
-// exactly K WriteBatch calls, one per destination.
+// N packets to K distinct destinations should cost K WriteBatch calls, not N.
 func TestOutgoingBatchAmortisesSyscalls(t *testing.T) {
 	sock := &fakeTunnelSocket{}
 	tunDev := &fakeTunDevice{batchSize: 32}
@@ -91,9 +86,8 @@ func TestOutgoingBatchAmortisesSyscalls(t *testing.T) {
 	}
 }
 
-// TestOutgoingBatchCorrectAtBatchSizeOne covers the no-batching fallback
-// (Darwin always, an older Linux kernel sometimes): grouping and sending must
-// still work correctly with one ReadBatch call per packet.
+// batchSize 1 is the real fallback on Darwin (and older Linux kernels), so
+// grouping still has to work one packet at a time.
 func TestOutgoingBatchCorrectAtBatchSizeOne(t *testing.T) {
 	sock := &fakeTunnelSocket{}
 	tunDev := &fakeTunDevice{batchSize: 1}
@@ -138,10 +132,8 @@ func TestOutgoingBatchCorrectAtBatchSizeOne(t *testing.T) {
 	}
 }
 
-// TestOutgoingBatchMixesLocalDeliveryAndForward checks that a batch
-// containing both a locally-destined packet (ActionDeliver) and a
-// remote-bound one (ActionForward) delivers each correctly without the two
-// paths interfering.
+// One batch here mixes a local packet (ActionDeliver) with a forwarded one
+// (ActionForward); they shouldn't interfere with each other.
 func TestOutgoingBatchMixesLocalDeliveryAndForward(t *testing.T) {
 	const (
 		selfVIP    = "10.30.255.240"
@@ -187,9 +179,6 @@ func TestOutgoingBatchMixesLocalDeliveryAndForward(t *testing.T) {
 	}
 }
 
-// TestOutgoingBatchOnePeerFailureDoesNotBlockOthers checks that one
-// destination's write failing doesn't stop the batch's other destinations
-// from being delivered.
 func TestOutgoingBatchOnePeerFailureDoesNotBlockOthers(t *testing.T) {
 	sock := &fakeTunnelSocket{}
 	tunDev := &fakeTunDevice{batchSize: 4}
@@ -232,8 +221,7 @@ func TestOutgoingBatchReusesHighFanoutGroups(t *testing.T) {
 		t.Fatalf("first batch contains %d destination groups; want %d", batch.liveGroups, peers)
 	}
 
-	// Reuse the retained slots in reverse order. Each slot's packet slice
-	// must be cleared even though the slots themselves remain allocated.
+	// Reused slots stay allocated, so their old packet slice must be cleared.
 	batch.liveGroups = 0
 	for i := peers - 1; i >= 0; i-- {
 		batch.group(destinations[i], []byte{byte(i)})
@@ -258,10 +246,8 @@ func TestOutgoingBatchReusesHighFanoutGroups(t *testing.T) {
 	}
 }
 
-// TestSendOverTunnelBatchSurvivesNegativeWriteCount checks that a failed
-// batched send doesn't take the outgoing loop down with it. Linux reports the
-// failure as -1, and peers restarting make that routine: their ICMP
-// port-unreachable comes back as ECONNREFUSED on the next send.
+// A restarted peer's ICMP port-unreachable shows up as ECONNREFUSED on the
+// next send, so this needs to be a routine failure, not a crash.
 func TestSendOverTunnelBatchSurvivesNegativeWriteCount(t *testing.T) {
 	tunnel := batchTestTunnel(&fakeTunnelSocket{}, &fakeTunDevice{batchSize: 4})
 	dst := netip.AddrPortFrom(mustAddr(nodeBIP), uint16(tunnelPort))
@@ -276,9 +262,6 @@ func TestSendOverTunnelBatchSurvivesNegativeWriteCount(t *testing.T) {
 	}
 }
 
-// TestNewTunnelConnPicksAddressFamily checks that a dialled tunnelConn gets
-// an ipv4.PacketConn or ipv6.PacketConn matching its peer's address family,
-// by sending real datagrams over both an IPv4 and IPv6 loopback peer.
 func TestNewTunnelConnPicksAddressFamily(t *testing.T) {
 	v4Listener, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
 	if err != nil {

@@ -78,12 +78,10 @@ func BenchmarkIngoingProxyV4(b *testing.B) {
 	}
 }
 
-// BenchmarkHandleOutgoingLoopback measures parse, translate and a real UDP
-// write to another node - but via Tunnel.Emit, i.e. the replay path with a
-// fresh scratch outgoingBatch per call, not the batched runOutgoingBatch loop
-// the daemon actually runs. That's where its allocations come from (plus the
-// write itself on platforms without sendmmsg). BenchmarkOutgoingBatchGrouping
-// covers the batched path.
+// This goes through Tunnel.Emit, the replay path with a fresh scratch
+// outgoingBatch per call, not the batched runOutgoingBatch loop the daemon
+// actually runs, so its allocations come from that plus the write itself.
+// BenchmarkOutgoingBatchGrouping covers the batched path.
 func BenchmarkHandleOutgoingLoopback(b *testing.B) {
 	tunnel, listener := loopbackTunnel(b)
 
@@ -108,9 +106,8 @@ func BenchmarkHandleOutgoingLoopback(b *testing.B) {
 	wire := buildTestPacketV4(b, clientNsIP, serverVIP, 666, 80)
 	buf := make([]byte, len(wire))
 
-	// Warm the flow cache and dial the socket on a copy: Handle rewrites the
-	// packet in place, and reusing the rewritten one would leave the
-	// benchmark measuring a destination that is no longer proxied at all.
+	// Warm on a copy: Handle rewrites the packet in place, and reusing the
+	// rewritten one would measure a destination that's no longer proxied.
 	copy(buf, wire)
 	tunnel.Emit(tunnel.dp.Handle(Outgoing, buf))
 
@@ -147,9 +144,8 @@ func BenchmarkFlowCacheParallel(b *testing.B) {
 	})
 }
 
-// BenchmarkOutgoingProxyReplicas shows the cost of a warm cache hit as the
-// service's replica count grows: the revalidation scan is skipped entirely
-// while the table generation is unchanged.
+// BenchmarkOutgoingProxyReplicas shows a warm cache hit stays cheap as the
+// replica count grows, since the generation match skips the revalidation scan.
 func BenchmarkOutgoingProxyReplicas(b *testing.B) {
 	for _, replicas := range []int{1, 10, 100, 1000} {
 		b.Run(fmt.Sprintf("replicas=%d", replicas), func(b *testing.B) {
@@ -176,10 +172,8 @@ func BenchmarkOutgoingProxyReplicas(b *testing.B) {
 	}
 }
 
-// BenchmarkOutgoingProxyRegeneration shows the cost of the other cache hit:
-// one whose route was chosen under a generation the table has since moved
-// past, forcing one revalidation scan against the service's replicas before
-// the route can be reused.
+// BenchmarkOutgoingProxyRegeneration is the other cache hit: the generation
+// has moved on, so each call pays for one revalidation scan.
 func BenchmarkOutgoingProxyRegeneration(b *testing.B) {
 	for _, replicas := range []int{1, 10, 100, 1000} {
 		b.Run(fmt.Sprintf("replicas=%d", replicas), func(b *testing.B) {
@@ -217,8 +211,8 @@ func BenchmarkOutgoingProxyRegeneration(b *testing.B) {
 	}
 }
 
-// benchNoopBatchWriter counts WriteBatch calls without copying the packets,
-// unlike fakeBatchWriter - that copy would dominate the allocation count
+// benchNoopBatchWriter counts calls without copying packets like
+// fakeBatchWriter does, since that copy would dominate the allocation count
 // this benchmark is meant to isolate.
 type benchNoopBatchWriter struct{ calls int }
 
@@ -250,8 +244,8 @@ func BenchmarkOutgoingBatchGrouping(b *testing.B) {
 	batch := newOutgoingBatch(tunDev.BatchSize())
 
 	// fakeTunDevice.ReadBatch drains readQueue by reslicing off the front, so
-	// reassigning tunDev.readQueue = readQueue each iteration below is free -
-	// rebuilding it with append every time would measure that rebuild instead.
+	// reassigning it each iteration is free; rebuilding it with append every
+	// time would measure that rebuild instead.
 	readQueue := append([][]byte(nil), packets...)
 
 	// Warm the batch's grouping map, buffer slices and message scratch so the

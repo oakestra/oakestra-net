@@ -84,7 +84,7 @@ func cachedRoute(t *testing.T, dp *Datapath, protocol uint8, srcIP, dstServiceIP
 }
 
 // routeGenOf reads the generation tag off a cached entry directly, since the
-// public Route API deliberately doesn't expose it - callers only ever need to
+// public Route API deliberately doesn't expose it: callers only ever need to
 // know whether a cached route is current, not what generation tagged it.
 func routeGenOf(t *testing.T, dp *Datapath, protocol uint8, srcIP, srcInstanceIP, dstServiceIP string, srcPort, dstPort int) uint64 {
 	t.Helper()

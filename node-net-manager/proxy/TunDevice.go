@@ -10,7 +10,7 @@ import (
 // TunDevice abstracts the platform TUN device the proxy reads outgoing
 // packets from and writes ingoing ones to. ReadBatch/WriteBatch coalesce
 // several packets into one syscall where the kernel supports it
-// (BatchSize() > 1 - it's 1 on Darwin and on Linux without IFF_VNET_HDR).
+// (BatchSize() > 1; it's 1 on Darwin and on Linux without IFF_VNET_HDR).
 //
 // Every implementation agrees on buffer layout: bufs[i][tunHeaderOffset :
 // tunHeaderOffset+sizes[i]] holds the packet, on both Read and Write. See
@@ -30,7 +30,7 @@ type TunDevice interface {
 
 // tunHeaderOffset is the headroom every buffer handed to Read/WriteBatch
 // reserves before the packet itself. offset 0 is not safe on either platform
-// this repo builds for - verified by reading golang.zx2c4.com/wireguard/tun's
+// this repo builds for, verified by reading golang.zx2c4.com/wireguard/tun's
 // own Read/Write:
 //
 //   - Darwin's utun prepends a 4-byte address-family word: Write rejects
@@ -41,7 +41,7 @@ type TunDevice interface {
 //     virtio_net_hdr Write expects there: it computes offset -= 10 and
 //     slices at that, which is also a negative (panicking) bound at offset 0.
 //
-// 10 covers both - the 6 spare bytes on Darwin, and on a pre-vnet_hdr Linux
+// 10 covers both: the 6 spare bytes on Darwin, and on a pre-vnet_hdr Linux
 // kernel where Write never even looks at the header room, are simply unused
 // padding.
 const tunHeaderOffset = 10
@@ -69,7 +69,7 @@ func (w *wgTunDevice) ReadBatch(bufs [][]byte, sizes []int) (int, error) {
 		// the segments that fit rather than throwing the whole read away.
 		//
 		// gsoSplit fills every buffer before giving up but returns i-1, so its
-		// count is one short of what it actually wrote. Undo that - but only
+		// count is one short of what it actually wrote. Undo that, but only
 		// for that exact shape, and only if the buffer really was written. If
 		// upstream ever fixes the arithmetic, or falls short by more than one,
 		// believe the count instead: losing a segment costs one packet,

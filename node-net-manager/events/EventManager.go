@@ -16,15 +16,11 @@ type Activity struct {
 }
 
 // Touch records that target was just used. It runs on the packet path, so it
-// reads the shared coarse clock rather than calling time.Now() itself. The
-// only consumer is mqtt's idle check, which sleeps in whole seconds anyway,
-// so sub-second precision would buy it nothing.
+// reads the shared coarse clock instead of calling time.Now() itself.
 //
-// The store is skipped when the stamp already reads the current second, which
-// is the case for all but the first packet of each second. One Activity is
-// shared by every flow of a job, across both packet loops, so an
-// unconditional store would bounce its cache line between cores on every
-// single packet - a load that usually hits shared state costs far less.
+// The store is skipped once the stamp already matches the current second.
+// Activity is shared across every flow of a job, so an unconditional store
+// would bounce its cache line between cores on every packet.
 func (a *Activity) Touch() {
 	now := clock.Unix()
 	if a.stamp.Load() != now {

@@ -120,8 +120,8 @@ func TestIngoingV6Proxy(t *testing.T) {
 }
 
 func TestIPv6NextHeader(t *testing.T) {
-	// keep this test in, since the IPv6 extension header walk seemed to mess
-	// up the parsing of the packet afterwards. for future safety
+	// keep this test in, since the IPv6 extension header walk seemed to mess up the parsing of the packet afterwards.
+	// for future safety
 	msg, _ := hex.DecodeString(ipv6Packet)
 	pkt, ok := iputils.Parse(msg)
 	if !ok {
@@ -132,11 +132,9 @@ func TestIPv6NextHeader(t *testing.T) {
 	}
 }
 
-// TestRoundTrip drives a complete request and response across two nodes'
-// proxies. It is the executable definition of the reverse-translation key:
-// the reply does not arrive from the target's namespace IP but from its
-// *instance* IP, because node B's own outgoingProxy translates the reply
-// (its destination, our instance IP, is inside B's proxy subnetwork too).
+// TestRoundTrip runs a full request/response cycle across two nodes. The
+// reply comes back from the server's instance IP, not its namespace IP,
+// because node B's own outgoingProxy translates it again on the way out.
 func TestRoundTrip(t *testing.T) {
 	for _, tc := range []struct {
 		name                                       string
@@ -174,8 +172,8 @@ func TestRoundTrip(t *testing.T) {
 				t.Error("node B should have no reverse mapping for the request")
 			}
 
-			// 3. the server replies to the source it saw - the client's
-			// instance IP - and node B translates that reply on the way out.
+			// 3. the server replies to the source it saw: the client's
+			// instance IP. node B translates that reply on the way out too.
 			reply := parseTestPacket(t, tc.build(t, tc.serverNs, tc.clientInst, 80, 40000))
 			backNode, _, _, ok := nodeB.outgoingProxy(&reply)
 			if !ok {

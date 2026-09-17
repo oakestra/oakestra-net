@@ -11,9 +11,8 @@ import (
 	"time"
 )
 
-// resolvingEnv reports a Service IP as unresolved until release is called,
-// mimicking the window in which the real Environment is waiting on an MQTT
-// table query.
+// resolvingEnv holds a Service IP unresolved until release is called,
+// mimicking the wait for an MQTT table query.
 type resolvingEnv struct {
 	mu       sync.Mutex
 	table    TableEntryCache.TableManager
@@ -105,10 +104,8 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Fatalf("timed out waiting for %s", what)
 }
 
-// coldDatapath is a Datapath whose target service is not resolved yet. Its
-// replay goroutine's output is captured by a recordingSink rather than sent
-// anywhere real, since these tests only care about what the datapath decided
-// to do with each queued packet, not about actual socket I/O.
+// coldDatapath returns a Datapath whose target service isn't resolved yet;
+// output goes to a recordingSink instead of a real socket.
 func coldDatapath(t *testing.T) (*Datapath, *recordingSink, *resolvingEnv) {
 	t.Helper()
 	resolving := newResolvingEnv(replayFixtureEntries()...)
@@ -117,9 +114,8 @@ func coldDatapath(t *testing.T) (*Datapath, *recordingSink, *resolvingEnv) {
 	return dp, sink, resolving
 }
 
-// replayFixtureEntries mirrors the standard fixture table but is inserted
-// into resolvingEnv's own table, which starts every ServiceIP off unresolved
-// until release is called.
+// replayFixtureEntries mirrors the standard fixture table, inserted into
+// resolvingEnv's own table so every ServiceIP starts unresolved.
 func replayFixtureEntries() []TableEntryCache.TableEntry {
 	server := tableEntry("serverapp", nodeBIP, serverNsIP, serverNsIPv6,
 		serverVIP, serverVIPv6, serverInstIP, serverInstIPv6)
@@ -137,8 +133,6 @@ func datagramPayload(t *testing.T, wire []byte) string {
 	return string(wire[28:])
 }
 
-// TestReplayPreservesOrder checks that packets queued behind one unresolved
-// Service IP replay in the order they arrived.
 func TestReplayPreservesOrder(t *testing.T) {
 	dp, sink, resolving := coldDatapath(t)
 	vip := mustAddr(serverVIP)
@@ -179,8 +173,6 @@ func TestReplayPreservesOrder(t *testing.T) {
 	}
 }
 
-// TestReplaySeparateVIPsResolveIndependently checks that one Service IP
-// resolving does not flush packets waiting on another.
 func TestReplaySeparateVIPsResolveIndependently(t *testing.T) {
 	dp, sink, resolving := coldDatapath(t)
 
@@ -210,8 +202,8 @@ func TestReplaySeparateVIPsResolveIndependently(t *testing.T) {
 	}
 }
 
-// TestReplayQueueBounded checks that the queue is capped, and that the cap
-// counts packets actually retained rather than pooled 64KiB buffers.
+// TestReplayQueueBounded checks the cap counts retained packets, not the
+// pooled 64KiB read buffers they arrived in.
 func TestReplayQueueBounded(t *testing.T) {
 	dp, _, _ := coldDatapath(t)
 
@@ -226,17 +218,15 @@ func TestReplayQueueBounded(t *testing.T) {
 	if bytes > maxReplayBytes {
 		t.Errorf("retained %d bytes; cap is %d", bytes, maxReplayBytes)
 	}
-	// Retention is proportional to the packets held, not to the 64KiB read
-	// buffer they arrived in.
+	// retention should track packet length, not the read buffer size
 	if bytes > maxReplayPacketsPerVIP*2048 {
 		t.Errorf("retained %d bytes for %d small packets; retention should track packet length",
 			bytes, maxReplayPacketsPerVIP)
 	}
 }
 
-// TestReplayFailedResolutionReleasesQueue checks that an attempt finishing
-// without resolving anything drops its queue rather than re-queueing it
-// forever.
+// TestReplayFailedResolutionReleasesQueue: a failed resolution should drop
+// its queue, not retry it forever.
 func TestReplayFailedResolutionReleasesQueue(t *testing.T) {
 	dp, _, resolving := coldDatapath(t)
 
@@ -251,9 +241,6 @@ func TestReplayFailedResolutionReleasesQueue(t *testing.T) {
 	})
 }
 
-// TestReplayHoldsLaterFragmentsOfAColdDatagram checks that both fragments of
-// a datagram sent to an unresolved Service IP queue for replay, not just the
-// first.
 func TestReplayHoldsLaterFragmentsOfAColdDatagram(t *testing.T) {
 	dp, sink, resolving := coldDatapath(t)
 	vip := mustAddr(serverVIP)
@@ -296,8 +283,7 @@ func TestReplayHoldsLaterFragmentsOfAColdDatagram(t *testing.T) {
 		t.Fatal("expected the later fragment second")
 	}
 
-	// Both must be addressed identically, or the far end cannot reassemble
-	// them into one datagram.
+	// must match or the far end can't reassemble the datagram
 	if gotLater.SrcIP() != gotFirst.SrcIP() || gotLater.DstIP() != gotFirst.DstIP() {
 		t.Errorf("fragments forwarded as %s -> %s and %s -> %s; they must match",
 			gotFirst.SrcIP(), gotFirst.DstIP(), gotLater.SrcIP(), gotLater.DstIP())
@@ -314,10 +300,8 @@ func TestReplayHoldsLaterFragmentsOfAColdDatagram(t *testing.T) {
 	}
 }
 
-// TestLaterFragmentNeverStartsAResolution covers the fact that a later fragment carries no
-// transport ports, so it cannot drive a route lookup of its own. With nothing
-// already waiting on its destination there is no first fragment for it to stay
-// consistent with, and it must simply be dropped.
+// A later fragment carries no transport ports, so it can't drive a route
+// lookup on its own; with no first fragment already queued it just gets dropped.
 func TestLaterFragmentNeverStartsAResolution(t *testing.T) {
 	dp, _, _ := coldDatapath(t)
 
@@ -332,9 +316,6 @@ func TestLaterFragmentNeverStartsAResolution(t *testing.T) {
 	}
 }
 
-// TestReplayFragmentQueueRespectsBounds checks that fragments queue through
-// the same bounded FIFO as everything else, so a flood cannot grow it without
-// limit.
 func TestReplayFragmentQueueRespectsBounds(t *testing.T) {
 	dp, _, _ := coldDatapath(t)
 

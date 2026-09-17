@@ -27,8 +27,8 @@ const (
 	ActionDeliver            // write to the TUN device
 )
 
-// Action is the datapath's verdict on one packet: what to do with it, and -
-// for ActionForward - where to send it. Packet aliases the caller's buffer
+// Action is the datapath's verdict on one packet: what to do with it, and,
+// for ActionForward, where to send it. Packet aliases the caller's buffer
 // rather than copying it, so the caller must not reuse that buffer until the
 // Action has been acted on.
 type Action struct {
@@ -37,7 +37,7 @@ type Action struct {
 	Packet []byte
 }
 
-// Sink receives Actions produced off the synchronous path - today only from
+// Sink receives Actions produced off the synchronous path, today only from
 // the replay goroutine (see replayWhenResolved).
 type Sink interface {
 	Emit(Action)
@@ -46,7 +46,7 @@ type Sink interface {
 // Datapath decides what happens to a packet: translate it, queue it for
 // replay, or drop it. It owns the flow cache, fragment state, replay queues,
 // the resolver, the local IP and the proxy prefixes, and performs no socket
-// or TUN I/O itself - that is Tunnel's job, driven by the Action this returns.
+// or TUN I/O itself; that is Tunnel's job, driven by the Action this returns.
 type Datapath struct {
 	environment resolver.Resolver
 	localIP     netip.Addr
@@ -56,7 +56,7 @@ type Datapath struct {
 	ProxyIPv6Prefix netip.Prefix
 	proxycache      *ProxyCache
 	// out is where the replay goroutine (the only asynchronous producer of
-	// Actions) sends what it decides. The synchronous path never uses it -
+	// Actions) sends what it decides. The synchronous path never uses it;
 	// Handle returns its Action directly to the caller instead.
 	out Sink
 	// replayLock guards replays and replayBytes. Both are only touched on a
@@ -67,7 +67,7 @@ type Datapath struct {
 }
 
 // NewDatapath builds a Datapath. out receives whatever the replay goroutine
-// decides once a Service IP resolves - see Sink.
+// decides once a Service IP resolves; see Sink.
 func NewDatapath(r resolver.Resolver, localIP netip.Addr, v4, v6 netip.Prefix, out Sink) *Datapath {
 	return &Datapath{
 		environment:     r,
@@ -109,7 +109,7 @@ func (d *Datapath) handleOutgoing(buf []byte, mayRetain bool) Action {
 	}
 
 	// A later fragment carries no transport header, so it can only reuse the
-	// translation its first fragment established - queue it behind that
+	// translation its first fragment established; queue it behind that
 	// fragment if the route is still pending, rather than dropping it.
 	if isLaterFragment(&pkt) {
 		if action, ok := d.forwardLaterFragment(&pkt); ok {
@@ -211,7 +211,7 @@ type pendingReplay struct {
 // resolved and re-runs it once resolution finishes; without it a cold flow's
 // first packet is just dropped, which silently loses a one-shot UDP datagram
 // (TCP just retransmits). Packets queue per Service IP and replay in arrival
-// order - one goroutine per packet, all waiting on the same channel, would
+// order; one goroutine per packet, all waiting on the same channel, would
 // leave replay order up to the scheduler instead.
 func (d *Datapath) retainForReplay(buf []byte, vip netip.Addr, resolving <-chan struct{}) {
 	d.replayLock.Lock()
@@ -245,7 +245,7 @@ func (d *Datapath) retainForReplay(buf []byte, vip netip.Addr, resolving <-chan 
 //
 // Only appends to a queue that already exists: a later fragment carries no
 // ports, so it can't start a resolution of its own, and with no first
-// fragment already waiting there's nothing for it to stay consistent with -
+// fragment already waiting there's nothing for it to stay consistent with;
 // buffering it speculatively would just hold attacker-controllable bytes for
 // a first fragment that may never come. outgoingLoop reads the TUN one packet
 // at a time, so a datagram's own fragments always arrive in order; the only
@@ -329,7 +329,7 @@ func (d *Datapath) handleIngoing(buf []byte) Action {
 
 	if isLaterFragment(&pkt) {
 		// Unlike outgoing, an unknown fragment is still delivered to the TUN
-		// device unchanged - ingoingProxy only matches flows this node
+		// device unchanged: ingoingProxy only matches flows this node
 		// originated, so every inbound request fragment is unmatched by
 		// design. Known gap: if the tunnel reorders and a later fragment
 		// beats the first fragment that does get reverse-translated, the
@@ -362,7 +362,7 @@ func (d *Datapath) handleIngoing(buf []byte) Action {
 
 // outgoingProxy rewrites pkt in place if its destination falls in the
 // semantic-routing subnetwork, resolving the target instance via the
-// per-flow ProxyCache and - only when that cache can't answer on its own -
+// per-flow ProxyCache and, only when that cache can't answer on its own,
 // the translation table. ok is false if the packet should be dropped.
 // resolving is non-nil only on a cold miss still being resolved in the
 // background, letting the caller hold the packet for retry instead of losing
@@ -392,7 +392,7 @@ func (d *Datapath) outgoingProxy(pkt *iputils.Packet) (dstHost netip.Addr, dstPo
 	// Steady state: the flow is cached and the translation table has not been
 	// rebuilt since its route was chosen, so the route is known current and
 	// this packet never touches the table at all. Everything below is the
-	// cold path - a new flow, or a table that has moved on.
+	// cold path: a new flow, or a table that has moved on.
 	var route Route
 	if !d.proxycache.Lookup(&key, d.environment.TableGeneration(), &route) {
 		route, resolving, ok = d.resolveRoute(key, version)
@@ -423,14 +423,14 @@ func (d *Datapath) resolveRoute(key FlowKey, version uint8) (Route, <-chan struc
 	}
 
 	// A flow that already exists keeps the replica it was pinned to, as long
-	// as that replica is still in the table - only a genuinely new or broken
+	// as that replica is still in the table; only a genuinely new or broken
 	// flow gets to pick.
 	if route, revalidated := d.proxycache.Revalidate(key, instanceIP, version, lookup); revalidated {
 		return route, nil, true
 	}
 
 	// TODO: only does round-robin so far; ServiceIP policies belong here.
-	// rand.IntN is safe for concurrent use unlike a shared *rand.Rand -
+	// rand.IntN is safe for concurrent use unlike a shared *rand.Rand,
 	// needed since replay goroutines can call in here too.
 	tableEntry := &lookup.Entries[rand.IntN(len(lookup.Entries))]
 
@@ -448,7 +448,7 @@ func (d *Datapath) resolveRoute(key FlowKey, version uint8) (Route, <-chan struc
 	}
 
 	// dstNode/dstNodePort are cached here too, since an Nsip is only ever
-	// valid on the node that issued it - no need to look it back up by
+	// valid on the node that issued it: no need to look it back up by
 	// Nsip on every packet.
 	route := Route{
 		SrcInstanceIP: instanceIP,

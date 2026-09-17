@@ -7,11 +7,9 @@ import (
 	"testing"
 )
 
-// The proxy package's datapath benchmarks answer table lookups from a
-// TableManager directly, so they never exercise ServiceResolver itself - and
-// therefore never measure the Touch() that keeps a job's MQTT interest alive on
-// every outgoing packet. These cover the two lookups the packet path actually
-// makes, through the real resolver.
+// The proxy package's datapath benchmarks read the TableManager directly, so
+// they miss the Touch() that keeps a job's MQTT interest alive. These go
+// through the real resolver to cover that too.
 
 func benchResolver(b *testing.B, entries ...TableEntryCache.TableEntry) *ServiceResolver {
 	b.Helper()
@@ -32,9 +30,8 @@ func benchResolver(b *testing.B, entries ...TableEntryCache.TableEntry) *Service
 	return r
 }
 
-// benchEntry is resolvableEntry plus the InstanceNumber ServiceIP that
-// GetInstanceIP resolves against - the RoundRobin one alone would make that
-// lookup miss.
+// benchEntry adds the InstanceNumber ServiceIP that GetInstanceIP needs;
+// resolvableEntry's RoundRobin one alone would make that lookup miss.
 func benchEntry(job, nsip, vip string) TableEntryCache.TableEntry {
 	entry := resolvableEntry(job, vip)
 	entry.Nsip = net.ParseIP(nsip)

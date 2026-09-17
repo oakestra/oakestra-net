@@ -155,7 +155,7 @@ func TestIngoingBatchCorrectAtBatchSizeOne(t *testing.T) {
 }
 
 // TestHandleIngoingOnlyDeliversOrDrops checks that Handle(Ingoing, ...) never
-// returns ActionForward - runIngoingBatch relies on this - for a matched
+// returns ActionForward (runIngoingBatch relies on this) for a matched
 // flow, an unmatched one, and a malformed packet.
 func TestHandleIngoingOnlyDeliversOrDrops(t *testing.T) {
 	dp := getFakeDatapath()
@@ -194,7 +194,7 @@ func TestHandleIngoingOnlyDeliversOrDrops(t *testing.T) {
 // (which needs root).
 //
 // The overflow case copies gsoSplit exactly: fill every buffer, then report
-// one fewer. Both halves matter - (0, err) would let an adapter that throws n
+// one fewer. Both halves matter: (0, err) would let an adapter that throws n
 // away pass, and the honest count would hide the off-by-one it has to undo.
 type fakeWgDevice struct {
 	calls int
@@ -248,7 +248,7 @@ func TestWgTunDeviceErrTooManySegmentsIsNotFatal(t *testing.T) {
 }
 
 // TestWgTunDeviceErrTooManySegmentsKeepsTheSegmentsThatFit checks that every
-// segment that fit survives the error, the last one included - gsoSplit writes
+// segment that fit survives the error, the last one included: gsoSplit writes
 // it but leaves it out of its count. Dropping segments here costs good packets
 // on every oversized superpacket, on top of those that really didn't fit.
 func TestWgTunDeviceErrTooManySegmentsKeepsTheSegmentsThatFit(t *testing.T) {
@@ -279,7 +279,7 @@ func TestWgTunDeviceErrTooManySegmentsKeepsTheSegmentsThatFit(t *testing.T) {
 
 // fakeOverflowWgDevice fails with ErrTooManySegments in whatever shape the
 // test picks: it writes filled buffers and claims report of them. The pinned
-// gsoSplit is always exactly one short of a full batch - this covers the
+// gsoSplit is always exactly one short of a full batch; this covers the
 // upstreams that wouldn't be.
 type fakeOverflowWgDevice struct {
 	filled int
@@ -359,7 +359,7 @@ func TestWgTunDeviceErrTooManySegmentsIgnoresStaleSizes(t *testing.T) {
 	}
 
 	// This one stops short without writing the last buffer, yet reports the
-	// same count as the off-by-one case - only the size entry tells them apart.
+	// same count as the off-by-one case: only the size entry tells them apart.
 	w = newWgTunDevice(&fakeOverflowWgDevice{filled: batch - 1, report: batch - 1})
 	n, err := w.ReadBatch(bufs, sizes)
 	if err != nil {
@@ -392,7 +392,7 @@ func TestBatchEnvelopesFitAGROSuperpacket(t *testing.T) {
 			t.Errorf("ingoing envelope %d: cap %d; want >= %d", i, cap(env), wantCap)
 		}
 		// bufs is envelope sliced past tunHeaderOffset, so its cap is smaller
-		// by exactly that much - it should still cover a full superpacket.
+		// by exactly that much; it should still cover a full superpacket.
 		if cap(in.bufs[i]) < 65535 {
 			t.Errorf("ingoing bufs %d: cap %d; want >= %d", i, cap(in.bufs[i]), 65535)
 		}

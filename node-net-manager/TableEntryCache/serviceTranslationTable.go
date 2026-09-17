@@ -40,9 +40,8 @@ func (e *TableEntry) Touch() {
 	}
 }
 
-// Activity exposes the entry's shared per-job activity stamp so a cached
-// route can keep the job's MQTT interest alive without looking the entry up
-// again on every packet. Nil for an entry that never went through Add.
+// Activity returns the entry's shared per-job activity stamp, or nil for an
+// entry that never went through Add.
 func (e *TableEntry) Activity() *events.Activity {
 	return e.activity
 }
@@ -61,10 +60,9 @@ type ServiceIP struct {
 	Address_v6 net.IP        `json:"address_v6"`
 }
 
-// InstanceAddrs is the packet path's slice of a TableEntry: the two addresses
-// that identify one deployed instance, without the ~200 bytes of job metadata
-// around them. The packet path reads nothing else off an entry, and copying a
-// whole TableEntry per packet to get at these dominated the outgoing path.
+// InstanceAddrs holds the two addresses that identify one deployed instance,
+// without the rest of a TableEntry's job metadata. Copying a whole TableEntry
+// per packet just to read these used to dominate the outgoing path.
 type InstanceAddrs struct{ V4, V6 netip.Addr }
 
 // For returns the instance address in the requested address family.
@@ -76,9 +74,9 @@ func (a InstanceAddrs) For(version uint8) netip.Addr {
 }
 
 // InstanceAddrsOf returns the addresses that uniquely identify one deployed
-// instance of a service - the ones its own proxy sources replies from. Every
-// caller must agree on this rule, since a route installed under one reading of
-// it is later matched against replies under another.
+// instance of a service: the ones its own proxy sources replies from. Every
+// caller has to agree on this, or a route installed under one reading gets
+// matched against replies under another.
 func InstanceAddrsOf(entry *TableEntry) InstanceAddrs {
 	for _, sip := range entry.ServiceIP {
 		if sip.IpType != InstanceNumber {
@@ -99,17 +97,14 @@ type TableManager struct {
 	// reallocated. Rebuilt wholesale on every mutation.
 	byServiceIP map[netip.Addr][]TableEntry
 	byNsIP      map[netip.Addr]TableEntry
-	// byNsIPInstance answers the packet path's only question about a namespace
-	// IP. Kept separate from byNsIP rather than derived from it per packet: the
-	// selection rule below is fixed at rebuild time, so a lookup costs one
-	// 48-byte map read instead of copying a whole TableEntry and rescanning its
-	// ServiceIP slice on every packet.
+	// byNsIPInstance precomputes the packet path's only question about a
+	// namespace IP, so a lookup is one map read instead of copying a
+	// TableEntry and rescanning its ServiceIP slice per packet.
 	byNsIPInstance map[netip.Addr]InstanceAddrs
-	// bumped on every index rebuild; a cached route tagged with the current
-	// generation is known still-valid, so the packet path can skip
-	// rescanning replicas on a hit. Atomic rather than rwlock-guarded so the
-	// packet path can ask "did anything change?" without taking the lock at
-	// all - see Generation.
+	// generation bumps on every index rebuild. A cached route tagged with the
+	// current generation is known still valid, so the packet path can skip
+	// rescanning replicas on a hit. It's atomic rather than rwlock-guarded so
+	// that check doesn't need the lock at all; see Generation.
 	generation atomic.Uint64
 	rwlock     sync.RWMutex
 }
@@ -125,10 +120,10 @@ func NewTableManager() TableManager {
 	// TODO cleanup of old entry every X seconds
 }
 
-// AddrFromIP converts a net.IP to a netip.Addr for use as a map key. Unmap is
-// required: net.ParseIP stores IPv4 as 16-byte IPv4-in-IPv6, which otherwise
-// compares unequal to the plain Is4 address iputils builds from wire bytes,
-// even though both print the same.
+// AddrFromIP converts a net.IP to a netip.Addr for use as a map key. The
+// Unmap call matters: net.ParseIP stores IPv4 as 16-byte IPv4-in-IPv6, which
+// otherwise compares unequal to a plain 4-byte address even though both
+// print the same.
 func AddrFromIP(ip net.IP) (netip.Addr, bool) {
 	if ip == nil {
 		return netip.Addr{}, false
@@ -290,12 +285,11 @@ func (t *TableManager) removeByIndexLocked(index int) {
 	t.translationTable = t.translationTable[:len(t.translationTable)-1]
 }
 
-// SearchByServiceIP looks up entries by ServiceIP via the index (O(1)
-// instead of scanning the table) and also returns the generation the result
-// was read under (see TableManager.generation). The returned slice is the
-// index's own bucket, capped at its length so a caller append can't spill
-// into the map's spare capacity - safe since rebuildIndexesLocked always
-// replaces byServiceIP wholesale rather than mutating a bucket in place.
+// SearchByServiceIP looks up entries by ServiceIP via the index and returns
+// the generation the result was read under (see TableManager.generation). The
+// slice is capped at its length so a caller append can't spill into the map's
+// spare capacity; that's safe because rebuildIndexesLocked always replaces
+// byServiceIP wholesale instead of mutating a bucket in place.
 func (t *TableManager) SearchByServiceIP(addr netip.Addr) ([]TableEntry, uint64) {
 	t.rwlock.RLock()
 	defer t.rwlock.RUnlock()
@@ -304,10 +298,8 @@ func (t *TableManager) SearchByServiceIP(addr netip.Addr) ([]TableEntry, uint64)
 }
 
 // Generation returns the current index generation without taking the lock.
-// The packet path reads it on every packet to decide whether a cached route
-// still needs checking against the table; a rebuild racing this read just
-// means one more packet takes the old route, the same window the locked read
-// has.
+// A rebuild racing this read just means one more packet takes the old route,
+// the same window a locked read would have anyway.
 func (t *TableManager) Generation() uint64 {
 	return t.generation.Load()
 }
@@ -415,16 +407,15 @@ func (t *TableManager) isValid(entry TableEntry) bool {
 }
 
 // MatchRoute finds the entry a cached route is pinned to, matching the full
-// route (nsip, node IP, node port) rather than just nsip: a refresh can
-// reassign an instance to a different node while its nsip stays the same, and
-// an nsip-only check would keep a cached flow tunnelling to the stale node
-// indefinitely. Returns nil if the instance is no longer in table, so the
-// caller has to choose a new one.
+// route (nsip, node IP, node port) rather than just nsip. A refresh can
+// reassign an instance to a different node while its nsip stays the same, so
+// an nsip-only check would keep a cached flow tunnelling to a stale node
+// forever. Returns nil if the instance is gone, so the caller picks a new one.
 //
-// The entry itself is returned, not just a yes/no, because a route surviving
-// a table rebuild still has to be refreshed from the entry it survived
-// against - the job's activity stamp is replaced when the job is removed and
-// re-added, and the address its replies come from can change.
+// It hands back the entry itself, not just a bool, because a route that
+// survives a table rebuild still needs refreshing from it: the job's activity
+// stamp is replaced if the job was removed and re-added, and the address its
+// replies come from can change too.
 func MatchRoute(nsip netip.Addr, nodeip netip.Addr, nodeport int, table []TableEntry) *TableEntry {
 	for i := range table {
 		entry := &table[i]

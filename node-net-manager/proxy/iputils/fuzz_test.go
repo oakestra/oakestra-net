@@ -132,7 +132,7 @@ func FuzzParseAndRewrite(f *testing.F) {
 		// so unlike the v4 case it does get adjusted.
 		v6Seed(ProtoUDP, nil, udpHeader(0)),
 		v6Seed(ProtoTCP, nil, tcpHeader(0x1234)[:4]),
-		// Hop-by-hop options, then a fragment header - the extension chain
+		// Hop-by-hop options, then a fragment header: the extension-header
 		// walk has to land the transport offset past both.
 		v6Seed(0, []byte{ProtoTCP, 0, 0, 0, 0, 0, 0, 0}, tcpHeader(0x1234)),
 		v6Seed(44, []byte{ProtoTCP, 0, 0x00, 0x01, 0, 0, 0, 7}, tcpHeader(0x1234)),
@@ -169,13 +169,12 @@ func FuzzParseAndRewrite(f *testing.F) {
 			dstPort = packet.DstPort()
 		}
 
-		// Checksums over fuzzed bytes are almost never valid, so the
-		// invariant to check isn't that the result verifies - it's that the
-		// incremental update leaves the residual alone. A checksum field and
-		// the addresses it covers sum to the same value before and after a
-		// correct rewrite, whatever that value happens to be, because the
-		// adjustment cancels the address change exactly. Only the fields
-		// that actually change need summing: the payload is untouched.
+		// Checksums over fuzzed bytes are almost never valid, so we can't
+		// check that the result verifies. Instead we check the residual
+		// (address fields plus checksum, summed together) doesn't change:
+		// a correct rewrite cancels the address delta against the checksum
+		// delta exactly, whatever the absolute value is. Only fields that
+		// actually change need summing; the payload is untouched.
 		src, dst := checksummedAddrs(buf, version)
 		l4Csum := l4ChecksumField(&packet)
 		// An IPv4/UDP checksum of zero means "not computed" and is left

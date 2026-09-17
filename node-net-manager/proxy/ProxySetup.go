@@ -15,7 +15,7 @@ import (
 )
 
 // create a new Tunnel with the configuration from the custom local file. localIP is the
-// host address to source tunnel traffic from - discovering it is host-specific and left to the caller.
+// host address to source tunnel traffic from; discovering it is host-specific and left to the caller.
 func New(localIP netip.Addr) *Tunnel {
 	// load netcfg.json
 	cfg, err := os.Open("/etc/netmanager/tuncfg.json")

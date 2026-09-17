@@ -7,10 +7,8 @@ import (
 	"time"
 )
 
-// TestCachedRouteSurvivesUnchangedTable checks that while the translation
-// table has not moved, a cached flow keeps its route and is tagged with the
-// current generation, which is what lets the packet path skip rescanning
-// every replica of the service on each hit.
+// A hit is tagged with the table's current generation, which is what lets
+// the fast path skip rescanning the service's replicas.
 func TestCachedRouteSurvivesUnchangedTable(t *testing.T) {
 	dp := getFakeDatapath()
 	environment := dp.environment.(*FakeEnv)
@@ -29,10 +27,8 @@ func TestCachedRouteSurvivesUnchangedTable(t *testing.T) {
 	}
 }
 
-// TestCachedRouteRevalidatedOnce checks that a route survives one
-// revalidation scan after the table's generation moves, and that the next
-// lookup trusts the retagged generation instead of scanning again - the
-// second revalidation is handed Entries that would fail the scan if it ran.
+// A route retagged by revalidation must then be trusted on its generation
+// alone, without rescanning the table on the next lookup.
 func TestCachedRouteRevalidatedOnce(t *testing.T) {
 	dp := getFakeDatapath()
 	environment := dp.environment.(*FakeEnv)
@@ -63,17 +59,13 @@ func TestCachedRouteRevalidatedOnce(t *testing.T) {
 		t.Fatalf("cached route not retagged after revalidation: generation %d, want %d", got, generation)
 	}
 
-	// The generation now matches, so the fast path must take the route on the
-	// tag alone, without a scan it could fail.
 	if !dp.proxycache.Lookup(&key, generation, &route) {
 		t.Error("a cached route was rescanned (and failed) instead of trusting its generation tag")
 	}
 }
 
-// TestCachedRouteFollowsNodeChange covers a refresh moving an instance to another
-// node while its namespace IP stays the same. A cached flow that only compared
-// namespace IPs would keep tunnelling to the old node forever, because cache
-// hits refresh the entry's own idle timer.
+// A cached flow keyed only on namespace IP would keep tunnelling to the old
+// node forever once the instance moves.
 func TestCachedRouteFollowsNodeChange(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
@@ -108,9 +100,6 @@ func TestCachedRouteFollowsNodeChange(t *testing.T) {
 	}
 }
 
-// TestCachedRouteDroppedWhenInstanceRemoved checks that once the only
-// instance is gone there is no route to fall back on, so the packet is dropped
-// rather than sent to the stale node.
 func TestCachedRouteDroppedWhenInstanceRemoved(t *testing.T) {
 	dp := getFakeDatapath()
 	environment := dp.environment.(*FakeEnv)
@@ -124,8 +113,6 @@ func TestCachedRouteDroppedWhenInstanceRemoved(t *testing.T) {
 	}
 }
 
-// TestIdleTunnelConnectionsEvicted checks that a tunnel connection unused
-// past the idle timeout gets closed, while one still in use survives.
 func TestIdleTunnelConnectionsEvicted(t *testing.T) {
 	tunnel, _ := loopbackTunnel(t)
 

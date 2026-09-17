@@ -148,7 +148,7 @@ func TestFlowSurvivesAnInstanceIPChange(t *testing.T) {
 }
 
 // TestRevalidationKeepsThePinnedReplica checks that a table rebuild leaving a
-// flow's replica in place does not reroute that flow - an established
+// flow's replica in place does not reroute that flow: an established
 // connection moved to another replica mid-stream is a broken connection.
 func TestRevalidationKeepsThePinnedReplica(t *testing.T) {
 	dp := fakeDatapathOn(nodeAIP, newFakeEnv(replicatedFixture(t, 8)...))
@@ -169,7 +169,7 @@ func TestRevalidationKeepsThePinnedReplica(t *testing.T) {
 }
 
 // TestConcurrentDirectionsShareAFlow runs both packet loops against the same
-// cached flow the way the daemon does - a flow and its own replies land in the
+// cached flow the way the daemon does: a flow and its own replies land in the
 // same shard, since both directions key on the local port. Worth running under
 // -race: both directions touch the entry's idle stamp.
 func TestConcurrentDirectionsShareAFlow(t *testing.T) {

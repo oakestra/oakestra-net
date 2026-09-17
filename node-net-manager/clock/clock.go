@@ -1,8 +1,6 @@
-// Package clock provides a coarse, 1Hz-updated Unix-seconds clock for code on
-// the packet path. Recording "last used" on every packet doesn't need
-// sub-second precision, and time.Now() is a vDSO call costing more than the
-// cache lookup it would be timestamping - so a single ticker goroutine writes
-// the timestamp and everyone else just reads it.
+// Package clock provides a coarse, 1Hz Unix-seconds clock for the packet
+// path. time.Now() costs more than the lookups it would be timestamping, so
+// one ticker goroutine updates the value and everyone else just reads it.
 package clock
 
 import (

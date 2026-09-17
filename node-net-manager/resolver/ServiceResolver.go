@@ -13,29 +13,27 @@ import (
 )
 
 // ServiceLookup is the result of resolving a Service IP on the packet path.
-// Entries is empty on a miss; Resolving is then either a channel that closes
-// when the in-flight background resolution finishes (caller can hold the
-// packet and retry) or nil if no resolution is running (drop the packet).
-// Generation is the table generation Entries was read under - a cached route
-// tagged with the same generation is still current.
+// Entries is empty on a miss; Resolving is then a channel that closes when
+// the background resolution finishes, or nil if the caller should just drop
+// the packet. Generation is the table generation Entries was read under, so
+// a cached route tagged with the same generation is still current.
 type ServiceLookup struct {
 	Entries    []TableEntryCache.TableEntry
 	Generation uint64
 	Resolving  <-chan struct{}
 }
 
-// takes netip.Addr, not net.IP: the parser produces netip.Addr off the wire,
-// and converting back allocated on every packet
+// Resolver takes netip.Addr rather than net.IP because the packet parser
+// already produces netip.Addr, and converting back would allocate per packet.
 type Resolver interface {
-	// starts background resolution on a miss instead of blocking - see resolveServiceIPOnce
+	// GetTableEntryByServiceIP starts a background resolution on a miss
+	// instead of blocking (see resolveServiceIPOnce).
 	GetTableEntryByServiceIP(addr netip.Addr) ServiceLookup
-	// resolves only the instance address, not the whole table entry: the
-	// packet path reads nothing else off it, and copying a TableEntry per
-	// packet to get at one address dominated the outgoing path
+	// GetInstanceIP resolves just the instance address, not the whole table
+	// entry, since copying a TableEntry per packet dominated the outgoing path.
 	GetInstanceIP(addr netip.Addr, version uint8) (netip.Addr, bool)
-	// the current table generation, cheap enough to read on every packet -
-	// an unchanged generation is what lets the datapath reuse a cached route
-	// without consulting the table at all
+	// TableGeneration lets the datapath tell whether a cached route is still
+	// current without consulting the table itself.
 	TableGeneration() uint64
 }
 
@@ -57,8 +55,7 @@ type ServiceResolver struct {
 	failedServiceIPs map[netip.Addr]time.Time     // ServiceIP -> when resolution last failed
 	// nil selects the real MQTT round trip; tests substitute a stub
 	tableQuery func(netip.Addr) ([]TableEntryCache.TableEntry, error)
-	// nil registers through MQTT; tests substitute a recorder so the successful
-	// resolution path can be exercised without a live broker/client.
+	// nil registers through MQTT; tests substitute a recorder instead
 	interestRegistrar func(string)
 }
 
@@ -99,10 +96,10 @@ const maxConcurrentResolves = 32
 const maxFailedServiceIPs = 1024
 
 // GetTableEntryByServiceIP searches the local table for addr. On a miss it
-// kicks off background resolution rather than blocking here - this runs on
-// the single outgoing-packet goroutine, and resolution needs an MQTT round
-// trip - and returns the channel that signals completion so the caller can
-// hold the packet and retry.
+// starts resolution in the background instead of blocking here, because this
+// runs on the single outgoing-packet goroutine and resolution needs an MQTT
+// round trip. The returned channel signals completion so the caller can hold
+// the packet and retry.
 func (r *ServiceResolver) GetTableEntryByServiceIP(addr netip.Addr) ServiceLookup {
 	table, generation := r.translationTable.SearchByServiceIP(addr)
 	if len(table) > 0 {
@@ -259,8 +256,8 @@ func (r *ServiceResolver) GetInstanceIP(addr netip.Addr, version uint8) (netip.A
 	return r.translationTable.SearchInstanceIPByNsIP(addr, version)
 }
 
-// TableGeneration returns the translation table's current generation. Read on
-// every packet, so it takes no lock - see TableManager.Generation.
+// TableGeneration returns the translation table's current generation. Takes
+// no lock since it runs on every packet; see TableManager.Generation.
 func (r *ServiceResolver) TableGeneration() uint64 {
 	return r.translationTable.Generation()
 }

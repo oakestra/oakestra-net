@@ -139,9 +139,10 @@ type discardSink struct{}
 
 func (discardSink) Emit(Action) {}
 
-// recordingSink records every Action Emit is called with, in order - stands
-// in for a Tunnel in tests that only care about what the replay goroutine
-// (see Datapath.replayWhenResolved) decided, not about actual socket I/O.
+// recordingSink records every Action Emit is called with, in order. It
+// stands in for a Tunnel in tests that only care about what the replay
+// goroutine (see Datapath.replayWhenResolved) decided, not about actual
+// socket I/O.
 type recordingSink struct {
 	mu      sync.Mutex
 	actions []Action
@@ -197,7 +198,7 @@ func fakeTunnelOn(localIP string) *Tunnel {
 }
 
 // buildTestPacketV4/V6 build a valid, correctly-checksummed wire-format packet
-// for feeding into iputils.Parse - gopacket is only used here, as a test
+// for feeding into iputils.Parse. gopacket is only used here, as a test
 // fixture builder, never by the production code in this package.
 func buildTestPacketV4(t testing.TB, srcIP, dstIP string, srcPort, dstPort int) []byte {
 	return buildTCPv4(t, srcIP, dstIP, srcPort, dstPort)
@@ -274,8 +275,8 @@ func serialize(t testing.TB, ls ...gopacket.SerializableLayer) []byte {
 func mustAddr(s string) netip.Addr { return netip.MustParseAddr(s) }
 
 // loopbackTunnel returns a Tunnel whose target service resolves to a real UDP
-// socket on loopback, so tests can drive the complete outgoing path -
-// translation, fragment state and an actual forward over the wire - through
+// socket on loopback, so tests can drive the complete outgoing path
+// (translation, fragment state and an actual forward over the wire) through
 // Tunnel.Emit and read back exactly what went on the wire.
 func loopbackTunnel(t testing.TB) (*Tunnel, *net.UDPConn) {
 	t.Helper()
