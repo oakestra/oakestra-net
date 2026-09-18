@@ -15,10 +15,11 @@ ROOT_SERVICE_MANAGER_USE_TLS = os.environ.get("ROOT_SERVICE_MANAGER_USE_TLS", ""
     "yes",
 )
 
-# What to verify the root gateway's *server* cert against:
-#   ""       -> the internal root CA (default; works with the fallback gateway cert)
-#   "system" -> the system trust store (root gateway uses a BYO public cert)
-#   <path>   -> a custom CA bundle
+# What to verify the root gateway's *server* cert against (same values as cluster_manager):
+#   ""         -> the internal root CA
+#   "system"   -> the system trust store (root gateway uses a BYO public cert)
+#   <path>     -> a custom CA bundle, as a path inside the container
+#   "insecure" -> no verification
 ROOT_GATEWAY_TRUST = os.environ.get("ROOT_GATEWAY_TRUST", "")
 
 
@@ -34,6 +35,8 @@ def _mtls_enabled() -> bool:
 def _gateway_verify():
     if ROOT_GATEWAY_TRUST == "system":
         return True
+    if ROOT_GATEWAY_TRUST == "insecure":
+        return False
     return ROOT_GATEWAY_TRUST or ROOT_CA_FILE
 
 
