@@ -67,6 +67,15 @@ jwt = JWTManager(app)
 MY_PORT = os.environ.get("MY_PORT") or 10100
 
 
+def determine_cluster_address(request):
+    # Behind the gateway remote_addr is the proxy, so prefer the advertised address.
+    cluster_address = request.args.get("cluster_address")
+    if cluster_address:
+        return sanitize(cluster_address)
+
+    return sanitize(request.remote_addr)
+
+
 # .............. Cluster Registration ..................#
 # ......................................................#
 
@@ -100,12 +109,12 @@ def register_new_cluster():
 def deregister_cluster_interest(job_name):
     """
     Deregistration of an interest
-    json file structure:{
-        'job_name':string
+    query params:{
+        'cluster_address':string
     }
     """
     logger.info("Incoming Request DELETE /api/net/interest/" + job_name)
-    addr = sanitize(request.remote_addr)
+    addr = determine_cluster_address(request)
     return routes_interests.deregister_interest(addr, job_name)
 
 
