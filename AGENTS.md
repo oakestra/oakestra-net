@@ -132,6 +132,8 @@ Set `"Debug": true` to enable verbose logging to `/var/log/oakestra/netmanager.l
 | `JWT_GENERATOR_URL` | `localhost` | jwt_generator host (for RS256 public key) |
 | `JWT_GENERATOR_PORT` | `10011` | jwt_generator port |
 | `MY_PORT` | `10100` | Port this service listens on |
+| `GATEWAY_ENABLED` | unset | Set by Oakestra's `override-gateway.yml`. Cluster calls then carry the cluster's verified client cert (`X-Client-Cert`), and `net_deploy_status` only accepts instances placed on the calling cluster |
+| `ROOT_CA_FILE` | — | Root CA bundle; behind the gateway, a cluster cert must be signed directly by it |
 
 ### cluster-service-manager
 

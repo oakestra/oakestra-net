@@ -17,6 +17,7 @@ from network import subnetwork_management, routes_interests
 from network.utils import sanitize
 from operations import instances_management, cluster_management
 from operations import service_management
+from utils import client_identity
 
 my_logger = configure_logging()
 app = Flask(__name__)
@@ -139,11 +140,24 @@ def update_instance_local_deployment_addresses():
     """
 
     logger.info("Incoming Request /api/net/service/net_deploy_status")
+    cluster_id = None
+    if client_identity.GATEWAY_ENABLED:
+        # Other clusters route the instances' traffic to these addresses, so a
+        # cluster may only report its own instances; the gateway forwards its
+        # verified certificate.
+        try:
+            cluster_id = client_identity.caller_cluster_id(
+                request.headers.get("X-Client-Cert")
+            )
+        except client_identity.ClientCertError as e:
+            return {"message": str(e)}, e.status
     data = request.json
     logger.info(data)
 
     return instances_management.update_instance_local_addresses(
-        instances=data.get("instances"), job_id=data.get("job_id")
+        instances=data.get("instances"),
+        job_id=data.get("job_id"),
+        cluster_id=cluster_id,
     )
 
 
