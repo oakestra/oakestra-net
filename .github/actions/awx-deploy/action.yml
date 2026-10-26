@@ -1,0 +1,34 @@
+name: "AWX Deployment Trigger"
+description: "Triggers a deployment on Ansible AWX and waits for the result"
+
+inputs:
+  AWX_URL:
+    description: "The URL for the Ansible AWX instance"
+    required: true
+  AWX_TOKEN:
+    description: "The API token for authenticating with AWX"
+    required: true
+  AWX_TEMPLATE_ID:
+    description: "The Job Template ID to trigger in AWX"
+    required: true
+  PR_USER:
+    description: "The user who opened the PR that triggered the deployment"
+    required: true
+  PR_NET_BRANCH:
+    description: "The oakestra-net branch of the PR that triggered the deployment"
+    required: true
+  PR_NET_COMMIT:
+    description: "The oakestra-net commit SHA of the PR that triggered the deployment"
+    required: true
+  OAK_BRANCH:
+    description: "The oakestra repository branch to test the PR against"
+    required: false
+    default: "develop"
+  OAK_COMMIT:
+    description: "The oakestra repository commit to test the PR against"
+    required: false
+    default: "HEAD"
+
+runs:
+  using: "node24"
+  main: "index.js"
