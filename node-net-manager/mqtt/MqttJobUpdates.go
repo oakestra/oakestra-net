@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var runningHandlers = utils.NewStringSlice()
+var runningHandlers = utils.NewSlice[string]()
 var runningHandlersLock sync.RWMutex
 
 type jobUpdatesTimer struct {
