@@ -38,6 +38,9 @@ type TableQueryResponse struct {
 	JobName      string            `json:"app_name"`
 	InstanceList []ServiceInstance `json:"instance_list"`
 	QueryKey     string            `json:"query_key"`
+	// set by the cluster when it could not resolve the query; InstanceList
+	// is then empty and says nothing about whether the job has instances
+	Error string `json:"error,omitempty"`
 }
 
 type ServiceInstance struct {

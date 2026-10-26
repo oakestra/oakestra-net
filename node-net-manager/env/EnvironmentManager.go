@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"runtime"
@@ -179,6 +180,23 @@ func (env *Environment) IsServiceDeployed(jobName string) bool {
 		}
 	}
 	return false
+}
+
+func (env *Environment) NamespaceIPs(jobName string) []netip.Addr {
+	env.deployedServicesLock.RLock()
+	defer env.deployedServicesLock.RUnlock()
+	var addrs []netip.Addr
+	for _, element := range env.deployedServices {
+		if element.sname != jobName {
+			continue
+		}
+		for _, ip := range []net.IP{element.ip, element.ipv6} {
+			if addr, ok := TableEntryCache.AddrFromIP(ip); ok {
+				addrs = append(addrs, addr)
+			}
+		}
+	}
+	return addrs
 }
 
 // ConfigureDockerNetwork creates a docker network compatible with the enviornment and returns it

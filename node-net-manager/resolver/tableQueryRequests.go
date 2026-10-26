@@ -4,6 +4,7 @@ import (
 	"NetManager/TableEntryCache"
 	mqttifce "NetManager/mqtt"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -42,6 +43,10 @@ func tableQueryByJobName(jobname string, force_optional ...bool) ([]TableEntryCa
 }
 
 func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCache.TableEntry, error) {
+	if responseStruct.Error != "" {
+		return nil, fmt.Errorf("cluster failed to resolve %s: %s", responseStruct.QueryKey, responseStruct.Error)
+	}
+
 	appCompleteName := strings.Split(responseStruct.JobName, ".")
 
 	if len(appCompleteName) != 4 {

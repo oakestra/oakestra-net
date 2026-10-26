@@ -259,3 +259,57 @@ def test_remove_interest(requests_mock):
     interests.remove_interest("app1.aa", "dafsdòf22")
     mongodb_client.mongo_remove_interest.assert_called_with("app1.aa", "dafsdòf22")
     assert adapter.call_count == 1
+
+
+@patch("network.tablequery.interests.add_interest")
+def test_tablequery_failure_is_reported_not_answered_empty(add_interest):
+    # An empty instance_list on failure made workers wipe their entries for a
+    # job that still had instances (issue #248).
+    mongodb_client.mongo_find_job_by_name = MagicMock(
+        side_effect=RuntimeError("mongo unreachable")
+    )
+    mqtt_client.mqtt_publish_tablequery_result = MagicMock()
+
+    _tablequery_handler("baba", {"sname": "aaa"})
+
+    # the worker registers its interest regardless and will try to remove it
+    add_interest.assert_called_once_with("aaa", "baba")
+    mqtt_client.mqtt_publish_tablequery_result.assert_called_once_with(
+        "baba",
+        {
+            "app_name": "aaa",
+            "instance_list": [],
+            "query_key": "aaa",
+            "error": "mongo unreachable",
+        },
+    )
+
+
+@patch(
+    "network.tablequery.interests.add_interest",
+    side_effect=RuntimeError("mongo unreachable"),
+)
+def test_tablequery_failure_is_reported_even_if_interest_fails(add_interest):
+    mongodb_client.mongo_find_job_by_name = MagicMock(
+        side_effect=RuntimeError("mongo unreachable")
+    )
+    mqtt_client.mqtt_publish_tablequery_result = MagicMock()
+
+    _tablequery_handler("baba", {"sname": "aaa"})
+
+    mqtt_client.mqtt_publish_tablequery_result.assert_called_once()
+    assert "error" in mqtt_client.mqtt_publish_tablequery_result.call_args[0][1]
+
+
+@patch("network.tablequery.interests.add_interest")
+def test_tablequery_failure_by_ip_registers_no_interest(add_interest):
+    # a failed Service IP query never learned which job it was about
+    mongodb_client.mongo_find_job_by_ip = MagicMock(
+        side_effect=RuntimeError("mongo unreachable")
+    )
+    mqtt_client.mqtt_publish_tablequery_result = MagicMock()
+
+    _tablequery_handler("baba", {"sip": "172.30.0.1"})
+
+    add_interest.assert_not_called()
+    assert "error" in mqtt_client.mqtt_publish_tablequery_result.call_args[0][1]

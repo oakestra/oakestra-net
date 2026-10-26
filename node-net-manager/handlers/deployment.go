@@ -113,10 +113,11 @@ func deploymentHandler(requestStruct *ContainerDeployTask) (net.IP, net.IP, erro
 }
 
 func updateInternalProxyDataStructures(requestStruct *ContainerDeployTask) {
-	// Update internal table entry if an interest has not been set already.
-	// Otherwise, do nothing, the net will autonomously update.
+	// Refresh even when an interest is already registered: a redeploy inside
+	// the interest's lifetime brings a namespace IP the table has never seen,
+	// and the cluster won't necessarily publish an update for it on its own.
+	requestStruct.Env.RefreshServiceTable(requestStruct.ServiceName)
 	if !mqtt.MqttIsInterestRegistered(requestStruct.ServiceName) {
-		requestStruct.Env.RefreshServiceTable(requestStruct.ServiceName)
 		mqtt.MqttRegisterInterest(requestStruct.ServiceName, requestStruct.Env, requestStruct.Instancenumber)
 	}
 }

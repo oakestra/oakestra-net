@@ -157,8 +157,27 @@ def _tablequery_handler(client_id, payload):
             instances, siplist = resolution.service_resolution(serviceName)
     except Exception as e:
         logger.error(e)
-        instances = []
-        siplist = []
+        # The worker installs whatever instance_list it gets, so an empty one
+        # would wipe its entries for a job that may still have instances.
+        mqtt_publish_tablequery_result(
+            client_id,
+            {
+                "app_name": serviceName,
+                "instance_list": [],
+                "query_key": query_key,
+                "error": str(e),
+            },
+        )
+        # The worker registers its interest even when the query fails and
+        # later sends interest/remove for it, which breaks unless we recorded
+        # it too. After publishing, because a mongo failure likely hits this
+        # call as well.
+        if serviceName:
+            try:
+                interests.add_interest(serviceName, client_id)
+            except Exception as add_error:
+                logger.error(add_error)
+        return
 
     interests.add_interest(serviceName, client_id)
     result = {
