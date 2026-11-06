@@ -2,6 +2,8 @@ import requests
 import os
 import logging
 
+from interfaces import mongodb_requests
+
 logger = logging.getLogger("cluster_service_manager")
 
 
@@ -61,13 +63,16 @@ _session = _build_session()
 
 
 def _cluster_identity_params():
-    params = {}
+    """Who this cluster is, for the root; None until the cluster manager sends the id."""
+    cluster_id = mongodb_requests.mongo_get_cluster_id()
+    if not cluster_id:
+        logger.error("Cluster id unknown, has the cluster manager registered yet?")
+        return None
+    # The root pushes routes to the advertised address, so it follows address changes.
+    params = {"cluster_id": cluster_id}
     cluster_address = os.environ.get("CLUSTER_ADDRESS")
-    cluster_name = os.environ.get("CLUSTER_NAME")
     if cluster_address:
         params["cluster_address"] = cluster_address
-    if cluster_name:
-        params["cluster_name"] = cluster_name
     return params
 
 
@@ -91,6 +96,9 @@ def root_service_manager_get_subnet():
 
 def system_manager_notify_deployment_status(job, worker_id):
     logger.info("notify deployment status")
+    params = _cluster_identity_params()
+    if params is None:
+        return
     data = {
         "job_id": str(job["_id"]),
         "instances": [],
@@ -109,7 +117,9 @@ def system_manager_notify_deployment_status(job, worker_id):
     try:
         logger.debug(job)
         _session.post(
-            ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/net_deploy_status", json=data
+            ROOT_SERVICE_MANAGER_ADDR + "/api/net/service/net_deploy_status",
+            json=data,
+            params=params,
         )
     except requests.exceptions.RequestException:
         logger.error(
@@ -124,6 +134,8 @@ def root_table_query_ip(ip):
     )
 
     params = _cluster_identity_params()
+    if params is None:
+        return None
 
     try:
         return _session.get(request_addr, params=params).json()
@@ -138,6 +150,8 @@ def root_table_query_service_name(name):
     )
 
     params = _cluster_identity_params()
+    if params is None:
+        return None
 
     try:
         resp = _session.get(request_addr, params=params)
@@ -150,8 +164,9 @@ def root_table_query_service_name(name):
 def root_remove_interest(job_name):
     request_addr = ROOT_SERVICE_MANAGER_ADDR + "/api/net/interest/" + str(job_name)
 
-    # Behind the gateway the root sees the proxy as remote_addr, so advertise the address.
-    params = _cluster_identity_params() if _mtls_enabled() else None
+    params = _cluster_identity_params()
+    if params is None:
+        return
 
     try:
         result = _session.delete(request_addr, params=params)
