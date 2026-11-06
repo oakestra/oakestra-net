@@ -186,7 +186,6 @@ func fakeTunnelOn(localIP string) *Tunnel {
 	tunnel := &Tunnel{
 		tunNetIP:          "10.19.1.254",
 		tun:               nil,
-		isListening:       true,
 		HostTUNDeviceName: "goProxyTun",
 		TunnelPort:        tunnelPort,
 		sock:              nil,

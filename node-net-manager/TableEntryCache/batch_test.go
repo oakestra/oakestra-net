@@ -104,6 +104,20 @@ func TestReplaceJobEntriesRejectsInvalidInputAtomically(t *testing.T) {
 	}
 }
 
+// an empty list means the job has no instances, which is not an invalid input
+func TestReplaceJobEntriesEmptyListClearsJob(t *testing.T) {
+	table := NewTableManager()
+	if err := table.ReplaceJobEntries("job", jobEntries("job", 3, "10.0.0.1", 50103)); err != nil {
+		t.Fatal(err)
+	}
+	if err := table.ReplaceJobEntries("job", nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(table.SearchByJobName("job")); got != 0 {
+		t.Errorf("job still has %d entries", got)
+	}
+}
+
 // a namespace IP claimed by a new entry must displace whoever held it, even across jobs
 func TestReplaceJobEntriesDisplacesNamespaceIPs(t *testing.T) {
 	table := NewTableManager()

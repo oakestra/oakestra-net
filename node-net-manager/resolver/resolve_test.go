@@ -3,7 +3,9 @@ package resolver
 import (
 	"NetManager/TableEntryCache"
 	"NetManager/events"
+	mqttifce "NetManager/mqtt"
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"sync/atomic"
@@ -260,5 +262,86 @@ func TestMixedJobResponseRejected(t *testing.T) {
 	}
 	if got := len(r.translationTable.SearchByJobName("jobone")); got != 0 {
 		t.Errorf("a malformed response was partially installed: jobone has %d entries", got)
+	}
+}
+
+func queryInstance(number int, vip string) mqttifce.ServiceInstance {
+	return mqttifce.ServiceInstance{
+		InstanceNumber: number,
+		NamespaceIp:    fmt.Sprintf("10.19.1.%d", number+1),
+		NamespaceIpv6:  fmt.Sprintf("fc00::%x", number+1),
+		HostIp:         "10.0.0.1",
+		HostPort:       50103,
+		ServiceIp:      []mqttifce.Sip{{Type: "RR", Address: vip, Address_v6: "fdff::1"}},
+	}
+}
+
+func queryResponse(instances ...mqttifce.ServiceInstance) mqttifce.TableQueryResponse {
+	return mqttifce.TableQueryResponse{JobName: "app.ns.svc.svcns", InstanceList: instances}
+}
+
+func parsedQuery(response mqttifce.TableQueryResponse) func(netip.Addr) ([]TableEntryCache.TableEntry, error) {
+	return func(netip.Addr) ([]TableEntryCache.TableEntry, error) {
+		return responseParser(response)
+	}
+}
+
+// one bad instance must not cost the job its healthy ones
+func TestInvalidInstanceDoesNotBlockTheRest(t *testing.T) {
+	const vip = "10.30.9.9"
+	bad := queryInstance(0, vip)
+	bad.HostIp = ""
+
+	r := &ServiceResolver{
+		translationTable:  TableEntryCache.NewTableManager(),
+		interestRegistrar: func(string) {},
+		tableQuery:        parsedQuery(queryResponse(bad, queryInstance(1, vip))),
+	}
+
+	if err := r.resolveServiceIP(netip.MustParseAddr(vip)); err != nil {
+		t.Fatalf("a response with a valid instance was rejected: %v", err)
+	}
+	entries := r.translationTable.SearchByJobName("app.ns.svc.svcns")
+	if len(entries) != 1 || entries[0].Instancenumber != 1 {
+		t.Errorf("want only the valid instance installed, got %+v", entries)
+	}
+}
+
+// skipping the invalid entry must not let the query pass as a success: addr
+// would stay unresolved with the negative cache unarmed
+func TestAddressOnlyOnInvalidInstanceIsAFailure(t *testing.T) {
+	const wantedVIP = "10.30.9.9"
+	bad := queryInstance(1, wantedVIP)
+	bad.HostIp = ""
+
+	r := &ServiceResolver{
+		translationTable:  TableEntryCache.NewTableManager(),
+		interestRegistrar: func(string) {},
+		tableQuery:        parsedQuery(queryResponse(queryInstance(0, "10.30.1.1"), bad)),
+	}
+
+	if err := r.resolveServiceIP(netip.MustParseAddr(wantedVIP)); err == nil {
+		t.Fatal("expected an error when only an invalid instance advertises the address")
+	}
+	if got := len(r.translationTable.SearchByJobName("app.ns.svc.svcns")); got != 0 {
+		t.Errorf("the failed query installed %d entries", got)
+	}
+}
+
+func TestResponseWithNoValidInstanceIsAnError(t *testing.T) {
+	bad := queryInstance(0, "10.30.9.9")
+	bad.HostIp = ""
+	if _, err := responseParser(queryResponse(bad)); err == nil {
+		t.Fatal("expected an error, an empty result would wipe the job's routes")
+	}
+}
+
+func TestEmptyResponseMeansNoInstances(t *testing.T) {
+	entries, err := responseParser(queryResponse())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("got %d entries from an empty response", len(entries))
 	}
 }

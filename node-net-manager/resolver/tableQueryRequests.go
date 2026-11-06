@@ -4,6 +4,7 @@ import (
 	"NetManager/TableEntryCache"
 	mqttifce "NetManager/mqtt"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -41,6 +42,11 @@ func tableQueryByJobName(jobname string, force_optional ...bool) ([]TableEntryCa
 	return responseParser(responseStruct)
 }
 
+// responseParser turns a table query response into table entries. Invalid
+// instances are skipped (IsValid logs why) so one bad instance doesn't cost
+// the job its healthy ones. A response with nothing usable left is an error,
+// not an empty result: an empty result means the job has no instances, and
+// would wipe its working routes.
 func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCache.TableEntry, error) {
 	appCompleteName := strings.Split(responseStruct.JobName, ".")
 
@@ -72,9 +78,14 @@ func responseParser(responseStruct mqttifce.TableQueryResponse) ([]TableEntryCac
 			ServiceIP:        sipList,
 		}
 
-		result = append(result, entry)
+		if TableEntryCache.IsValid(entry) {
+			result = append(result, entry)
+		}
 	}
 
+	if len(result) == 0 && len(responseStruct.InstanceList) > 0 {
+		return nil, fmt.Errorf("table query response for %s has no valid instances", responseStruct.JobName)
+	}
 	return result, nil
 }
 

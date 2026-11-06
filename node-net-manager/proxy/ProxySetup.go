@@ -49,10 +49,6 @@ func New(localIP netip.Addr) *Tunnel {
 // create a new Tunnel with a custom configuration
 func NewCustom(configuration Configuration, localIP netip.Addr) *Tunnel {
 	tunnel := Tunnel{
-		isListening:      false,
-		errorChannel:     make(chan error),
-		finishChannel:    make(chan bool),
-		stopChannel:      make(chan bool),
 		connectionBuffer: make(map[netip.AddrPort]*tunnelConn),
 		mtu:              configuration.Mtusize,
 	}
@@ -110,16 +106,37 @@ func (t *Tunnel) SetResolver(r resolver.Resolver) {
 	t.dp.SetResolver(r)
 }
 
-func (t *Tunnel) IsListening() bool {
-	return t.isListening
-}
-
 // start listening for packets in the TUN Proxy device
 func (t *Tunnel) Listen() {
-	if !t.isListening {
-		logger.InfoLogger().Println("Starting proxy listening mode")
-		go t.tunOutgoingListen()
-		go t.tunIngoingListen()
+	logger.InfoLogger().Println("Starting proxy listening mode")
+	go t.outgoingLoop()
+	go t.ingoingLoop()
+}
+
+// logTunEvents drains dev's event channel until the device closes it.
+func logTunEvents(dev tun.Device) {
+	// the device emits EventMTUUpdate for every link message on the interface,
+	// whether or not the MTU moved
+	lastMTU := 0
+	for event := range dev.Events() {
+		switch event {
+		case tun.EventUp:
+			logger.InfoLogger().Println("TUN device is up")
+		case tun.EventDown:
+			logger.InfoLogger().Println("TUN device is down")
+		case tun.EventMTUUpdate:
+			mtu, err := dev.MTU()
+			if err != nil {
+				logger.ErrorLogger().Println("TUN MTU changed, unable to read it:", err)
+				continue
+			}
+			if mtu != lastMTU {
+				logger.InfoLogger().Println("TUN MTU is", mtu)
+				lastMTU = mtu
+			}
+		default:
+			logger.InfoLogger().Println("Unknown TUN device event:", event)
+		}
 	}
 }
 
@@ -130,6 +147,10 @@ func (t *Tunnel) createTun() {
 	if err != nil {
 		log.Fatalf("Unable to create new TUN/TAP interface: %s", err)
 	}
+	// Has to start right away: the device's status goroutines do blocking
+	// sends on a small buffered channel and hang once it fills up.
+	go logTunEvents(dev)
+
 	name, err := dev.Name()
 	if err != nil {
 		log.Fatalf("Unable to read TUN/TAP interface name: %s", err)

@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 )
 
-// compiled once instead of per isValid call
+// compiled once instead of per IsValid call
 var nameRegexp = regexp.MustCompile("^[a-zA-Z0-9]{1,30}$")
 
 type TableEntry struct {
@@ -169,7 +169,7 @@ func (t *TableManager) rebuildIndexesLocked() {
 }
 
 func (t *TableManager) Add(entry TableEntry) error {
-	if !t.isValid(entry) {
+	if !IsValid(entry) {
 		return errors.New("InvalidEntry")
 	}
 	entry.activity = events.GetOrCreate(entry.JobName)
@@ -188,7 +188,7 @@ func (t *TableManager) Add(entry TableEntry) error {
 func (t *TableManager) ReplaceJobEntries(jobName string, entries []TableEntry) error {
 	prepared := make([]TableEntry, 0, len(entries))
 	for _, entry := range entries {
-		if !t.isValid(entry) {
+		if !IsValid(entry) {
 			return errors.New("InvalidEntry")
 		}
 		entry.activity = events.GetOrCreate(entry.JobName)
@@ -351,18 +351,15 @@ func (t *TableManager) SearchByJobName(jobname string) []TableEntry {
 	return results
 }
 
-// Sanity check for Appname and namespace
-// 0<len(Appname)<11
-// 0<len(Appns)<11
-// 0<len(Servicename)<11
-// 0<len(Servicenamespace)<11
-// Instancenumber>0
-// Cluster>0
+// IsValid is the sanity check an entry must pass to enter the table:
+// Appname, Appns, Servicename and Servicenamespace match nameRegexp
+// Instancenumber>=0
+// Cluster>=0
 // Nodeip != nil
 // Nsip != nil
 // Nsipv6 != nil
 // len(entry.ServiceIP)>0
-func (t *TableManager) isValid(entry TableEntry) bool {
+func IsValid(entry TableEntry) bool {
 	if !nameRegexp.MatchString(entry.Appname) {
 		log.Println("TranslationTable: Invalid Entry, wrong appname:", entry.Appname)
 		return false

@@ -3,8 +3,10 @@ package proxy
 import (
 	"NetManager/clock"
 	"NetManager/logger"
+	"errors"
 	"net"
 	"net/netip"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,6 +48,10 @@ const (
 	connectionSweepInterval = time.Minute
 )
 
+// readErrorBackoff paces a read loop whose source keeps failing, so a broken
+// device costs a few log lines per second rather than a spinning core.
+const readErrorBackoff = 100 * time.Millisecond
+
 // Config
 type Configuration struct {
 	HostTUNDeviceName         string `json:"HostTunnelDeviceName"`
@@ -79,9 +85,9 @@ type tunnelConn struct {
 }
 
 // Tunnel owns the TUN device, the listen socket, the per-peer connection pool
-// and its idle eviction, the read loops and the lifecycle channels: every bit
-// of actual socket/TUN I/O. It performs no translation decisions itself;
-// those belong to Datapath, which it drives via Handle/Emit.
+// and its idle eviction, and the read loops: every bit of actual socket/TUN
+// I/O. It performs no translation decisions itself; those belong to Datapath,
+// which it drives via Handle/Emit.
 type Tunnel struct {
 	dp *Datapath
 	// sock is only used for the batched ingoing read (see ingoingLoop).
@@ -92,9 +98,6 @@ type Tunnel struct {
 	sock              TunnelSocket
 	connectionBuffer  map[netip.AddrPort]*tunnelConn
 	tun               TunDevice
-	finishChannel     chan bool
-	errorChannel      chan error
-	stopChannel       chan bool
 	HostTUNDeviceName string
 	tunNetIPv6        string
 	tunNetIP          string
@@ -104,7 +107,6 @@ type Tunnel struct {
 	// itself safe for concurrent use, so nothing else needs to hold this
 	// while a packet is actually being written.
 	connectionBufferLock sync.RWMutex
-	isListening          bool
 }
 
 // packetBufPool holds MTU-sized buffers for Emit's ActionDeliver copies, so
@@ -150,57 +152,39 @@ func (t *Tunnel) Emit(action Action) {
 	}
 }
 
-// Enable listening to outgoing packets
-// if the goroutine must be stopped, send true to the stop channel
-// when the channels finish listening a "true" is sent back to the finish channel
-// in case of fatal error they are routed back to the err channel
-func (t *Tunnel) tunOutgoingListen() {
-	readerror := make(chan error)
-
-	// async reader+processor
-	go t.outgoingLoop(readerror)
-
-	t.isListening = true
-	logger.InfoLogger().Println("Tunnel outgoing listening started")
-	for {
-		select {
-		case stopmsg := <-t.stopChannel:
-			if stopmsg {
-				logger.DebugLogger().Println("Outgoing listener received stop message")
-				t.isListening = false
-				t.finishChannel <- true
-				return
-			}
-		case errormsg := <-readerror:
-			t.errorChannel <- errormsg
-		}
+// keepReadingAfter logs a failed batch read and reports whether the read loop
+// should carry on. Nothing supervises these loops, so handing the error to a
+// channel nobody reads would wedge the datapath on the first failure.
+//
+// An isolated failure retries at once: this is the direction's only reader, so
+// sleeping on one bad packet would stall every flow behind it. A closed source
+// can never recover and retrying would spin forever, but nothing closes one on
+// purpose, so losing it is an error rather than a clean stop.
+func keepReadingAfter(err error, consecutiveFailures int) bool {
+	if errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrClosed) {
+		logger.ErrorLogger().Println("Tunnel read loop stopping, source closed:", err)
+		return false
 	}
+	logger.ErrorLogger().Println("Tunnel read failed:", err)
+	if consecutiveFailures > 1 {
+		time.Sleep(readErrorBackoff)
+	}
+	return true
 }
 
-// Enable listening for ingoing packets
-// if the goroutine must be stopped, send true to the stop channel
-// when the channels finish listening a "true" is sent back to the finish channel
-// in case of fatal error they are routed back to the err channel
-func (t *Tunnel) tunIngoingListen() {
-	readerror := make(chan error)
-
-	// async reader+processor
-	go t.ingoingLoop(readerror)
-
-	t.isListening = true
-	logger.InfoLogger().Println("Tunnel ingoing listening started")
+// readUntilClosed drives one direction's read loop, running a batch at a time
+// until keepReadingAfter gives up on the source.
+func readUntilClosed(runBatch func() error) {
+	failures := 0
 	for {
-		select {
-		case stopmsg := <-t.stopChannel:
-			if stopmsg {
-				logger.DebugLogger().Println("Ingoing listener received stop message")
-				_ = t.sock.Close()
-				t.isListening = false
-				t.finishChannel <- true
-				return
-			}
-		case errormsg := <-readerror:
-			t.errorChannel <- errormsg
+		err := runBatch()
+		if err == nil {
+			failures = 0
+			continue
+		}
+		failures++
+		if !keepReadingAfter(err, failures) {
+			return
 		}
 	}
 }
@@ -339,13 +323,9 @@ func (t *Tunnel) runOutgoingBatch(b *outgoingBatch) error {
 
 // outgoingLoop reads batches of packets off the TUN device and forwards them
 // via runOutgoingBatch.
-func (t *Tunnel) outgoingLoop(errchannel chan<- error) {
+func (t *Tunnel) outgoingLoop() {
 	batch := newOutgoingBatch(t.tun.BatchSize())
-	for {
-		if err := t.runOutgoingBatch(batch); err != nil {
-			errchannel <- err
-		}
-	}
+	readUntilClosed(func() error { return t.runOutgoingBatch(batch) })
 }
 
 // ingoingBatch holds the fixed set of buffers the ingoing loop reuses across
@@ -409,13 +389,9 @@ func (t *Tunnel) runIngoingBatch(b *ingoingBatch) error {
 // ingoingLoop reads batches of packets off the tunnel UDP socket and, for
 // whatever needs delivering to the TUN device, writes them back in a single
 // batched call; see runIngoingBatch.
-func (t *Tunnel) ingoingLoop(errchannel chan<- error) {
+func (t *Tunnel) ingoingLoop() {
 	batch := newIngoingBatch(t.tun.BatchSize())
-	for {
-		if err := t.runIngoingBatch(batch); err != nil {
-			errchannel <- err
-		}
-	}
+	readUntilClosed(func() error { return t.runIngoingBatch(batch) })
 }
 
 // connFor resolves dst's tunnelConn, dialling and storing a new one if none
@@ -592,18 +568,4 @@ func createUDPChannel(raddr netip.AddrPort) (*net.UDPConn, error) {
 
 func (t *Tunnel) GetName() string {
 	return t.HostTUNDeviceName
-}
-
-func (t *Tunnel) GetErrCh() <-chan error {
-	return t.errorChannel
-}
-
-// GetStopCh sends true to stop the tunnel's listeners.
-func (t *Tunnel) GetStopCh() chan<- bool {
-	return t.stopChannel
-}
-
-// GetFinishCh confirms a listener has stopped after a stop signal.
-func (t *Tunnel) GetFinishCh() <-chan bool {
-	return t.finishChannel
 }

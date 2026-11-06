@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -451,5 +452,116 @@ func TestUDPTunnelSocketDualStackReceive(t *testing.T) {
 
 	if !got["hello-v4"] || !got["hello-v6"] {
 		t.Fatalf("expected both v4 and v6 datagrams through one dual-stack socket; got %v", got)
+	}
+}
+
+// scriptedReadErrors hands out one error per read, in order.
+type scriptedReadErrors struct {
+	mu   sync.Mutex
+	errs []error
+	used int
+}
+
+func (s *scriptedReadErrors) next() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	err := s.errs[s.used]
+	s.used++
+	return err
+}
+
+func (s *scriptedReadErrors) reads() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.used
+}
+
+type failingTunnelSocket struct {
+	fakeTunnelSocket
+	scriptedReadErrors
+}
+
+func (f *failingTunnelSocket) ReadBatch([][]byte, []int) (int, error) { return 0, f.next() }
+
+type failingTunDevice struct {
+	fakeTunDevice
+	scriptedReadErrors
+}
+
+func (f *failingTunDevice) ReadBatch([][]byte, []int) (int, error) { return 0, f.next() }
+
+func waitForLoopExit(t *testing.T, loop func()) {
+	t.Helper()
+	var exited atomic.Bool
+	go func() {
+		loop()
+		exited.Store(true)
+	}()
+	waitFor(t, "read loop to exit", exited.Load)
+}
+
+// Nothing supervises the read loops, so a read error must not end the datapath:
+// only a closed source stops them.
+func TestIngoingLoopSurvivesReadErrorsUntilClosed(t *testing.T) {
+	sock := &failingTunnelSocket{}
+	sock.errs = []error{errors.New("transient"), net.ErrClosed}
+	tunnel := &Tunnel{sock: sock, tun: &fakeTunDevice{batchSize: 1}}
+
+	waitForLoopExit(t, tunnel.ingoingLoop)
+
+	if got := sock.reads(); got != 2 {
+		t.Errorf("loop read %d times, want 2", got)
+	}
+}
+
+func TestOutgoingLoopSurvivesReadErrorsUntilClosed(t *testing.T) {
+	dev := &failingTunDevice{}
+	dev.batchSize = 1
+	dev.errs = []error{errors.New("transient"), os.ErrClosed}
+	tunnel := &Tunnel{tun: dev}
+
+	waitForLoopExit(t, tunnel.outgoingLoop)
+
+	if got := dev.reads(); got != 2 {
+		t.Errorf("loop read %d times, want 2", got)
+	}
+}
+
+// The error a real close produces has to be one keepReadingAfter recognises,
+// or the loop retries a dead socket forever.
+func TestIngoingLoopExitsWhenRealSocketCloses(t *testing.T) {
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: 0})
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	sock := newUDPTunnelSocket(conn)
+	tunnel := &Tunnel{sock: sock, tun: &fakeTunDevice{batchSize: 1}}
+
+	time.AfterFunc(50*time.Millisecond, func() { _ = sock.Close() })
+	waitForLoopExit(t, tunnel.ingoingLoop)
+}
+
+type eventingWgDevice struct {
+	fakeWgDevice
+	events chan tun.Event
+}
+
+func (d *eventingWgDevice) Events() <-chan tun.Event { return d.events }
+
+// wireguard-go's status goroutines block once the 5-slot channel is full, so
+// more events than that must get through.
+func TestLogTunEventsDrainsUntilDeviceCloses(t *testing.T) {
+	dev := &eventingWgDevice{events: make(chan tun.Event, 5)}
+	go func() {
+		for i := 0; i < 20; i++ {
+			dev.events <- tun.Event(tun.EventUp << (i % 3))
+		}
+		close(dev.events)
+	}()
+
+	waitForLoopExit(t, func() { logTunEvents(dev) })
+
+	if _, open := <-dev.events; open {
+		t.Error("logTunEvents returned before the device closed its event channel")
 	}
 }

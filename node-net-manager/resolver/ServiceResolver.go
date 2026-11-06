@@ -267,6 +267,7 @@ func (r *ServiceResolver) RefreshServiceTable(jobname string) {
 	logger.DebugLogger().Printf("Requested table query refresh for %s", jobname)
 	entryList, err := tableQueryByJobName(jobname, true)
 	if err != nil {
+		logger.ErrorLogger().Printf("Table query refresh for %s failed: %v", jobname, err)
 		return
 	}
 	if err := r.translationTable.ReplaceJobEntries(jobname, entryList); err != nil {
