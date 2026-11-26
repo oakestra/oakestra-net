@@ -1,3 +1,28 @@
+[![Archived](https://img.shields.io/badge/STATUS-ARCHIVED%20%E2%86%92%20moved%20to%20oakestra%2Foakestra-orange?style=for-the-badge)](https://github.com/oakestra/oakestra/pull/648)
+
+> [!WARNING]
+> ## ⚠️ THIS REPOSITORY IS ARCHIVED ⚠️
+>
+> **It is no longer maintained.**
+> Its content has been merged into the main [oakestra/oakestra](https://github.com/oakestra/oakestra) repository with [oakestra/oakestra#648](https://github.com/oakestra/oakestra/pull/648).
+> Please open new issues and pull requests there.
+>
+> The components have been moved as follows:
+>
+> | Here (`oakestra/oakestra-net`) | Now in (`oakestra/oakestra`) |
+> |---|---|
+> | `node-net-manager/` | `net_manager/` |
+> | `root-service-manager/service-manager/` | `root_orchestrator/service-manager/` |
+> | `cluster-service-manager/service-manager/` | `cluster_orchestrator/service-manager/` |
+> | `.github/workflows/node_net_manager_tests.yml` | `.github/workflows/net_manager_tests.yml` |
+> | `.github/workflows/root_tests.yml` | `.github/workflows/root_service_manager_tests.yml` |
+> | `.github/workflows/cluster_tests.yml` | `.github/workflows/cluster_service_manager_tests.yml` |
+> | `.github/workflows/root_service_manager_image.yml` | `.github/workflows/root_service_manager_image.yml` |
+> | `.github/workflows/cluster_service_manager_image.yml` | `.github/workflows/cluster_service_manager_image.yml` |
+> | `.github/workflows/node-net-manager-artifacts.yml` | `.github/workflows/worker_artifacts.yml` (NetManager is now built and released together with the NodeEngine) |
+>
+> The service managers are now built and started together with the root and cluster orchestrators, so the `override-local-service-manager.yml` / `override-custom-service-manager-version.yml` compose overrides are no longer needed.
+
 ![net manager tests](https://github.com/oakestra/oakestra-net/actions/workflows/node_net_manager_tests.yml/badge.svg)
 ![net manager artifacts](https://github.com/oakestra/oakestra-net/actions/workflows/node-net-manager-artifacts.yml/badge.svg)
 ![root artifacts](https://github.com/oakestra/oakestra-net/actions/workflows/root_service_manager_image.yml/badge.svg)
